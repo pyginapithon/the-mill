@@ -305,3 +305,67 @@ def test_trailer_from_a_non_bot_author_keeps_the_name_rule(tmp_path, monkeypatch
     rev = _commit_as(repo, "desk@example.com", _j("fix for ", who, "\n\n", _BOT_TRAILER, "\n"))
     _mod_, fails = _scan_in(monkeypatch, repo)
     assert fails == [f"personal name token in git commit {rev[:12]}"], fails
+
+
+# Commit identities (S-10): authors and committers stay noreply.
+
+_NOREPLY = _j("344578673+desk", "@", "users.noreply.github.com")
+
+
+def _commit_identity(repo: Path, author: str, committer: str, msg: str = "plain change") -> str:
+    (repo / "f.txt").write_text(msg + author, encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    env_args = ("-c", f"user.email={committer}", "-c", "user.name=desk")
+    _git(repo, *env_args, "commit", "-q", "-m", msg, f"--author=desk <{author}>")
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def test_identity_emails_noreply_and_web_flow_pass() -> None:
+    mod = _mod()
+    assert mod.identity_email_ok(_NOREPLY)
+    assert mod.identity_email_ok(_j("49699333+dependabot[bot]", "@", "users.noreply.github.com"))
+    assert mod.identity_email_ok(_j("noreply", "@", "github.com"))
+    for bad in (
+        _j("pyginapithon", "@", "mailhost.example"),
+        _j("desk", "@", "github.com"),
+        _j("desk", "@", "example.com"),
+        "",
+        "no-at-sign",
+    ):
+        assert not mod.identity_email_ok(bad), bad
+
+
+def test_personal_committer_email_fails_by_hash_only(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    personal = _j("desk", "@", "mail-host.co")
+    rev = _commit_identity(repo, _NOREPLY, personal)
+    mod = _mod()
+    monkeypatch.setattr(mod, "mill_root", lambda: repo)
+    fails = mod.scan_git_identities()
+    assert f"committer email is not noreply in git commit {rev[:12]}" in fails, fails
+    assert not any("mail-host" in f for f in fails)
+
+
+def test_personal_author_email_fails(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    rev = _commit_identity(repo, _j("desk", "@", "mail-host.co"), _NOREPLY)
+    mod = _mod()
+    monkeypatch.setattr(mod, "mill_root", lambda: repo)
+    assert f"author email is not noreply in git commit {rev[:12]}" in mod.scan_git_identities()
+
+
+def test_noreply_history_passes(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    _git(repo, "-c", f"user.email={_NOREPLY}", "commit", "-q", "--amend", "--no-edit", "--reset-author")
+    _commit_identity(repo, _NOREPLY, _j("noreply", "@", "github.com"))
+    mod = _mod()
+    monkeypatch.setattr(mod, "mill_root", lambda: repo)
+    assert mod.scan_git_identities() == []
+
+
+def test_project_local_part_needs_a_noreply_domain() -> None:
+    mod = _mod()
+    assert not mod.email_is_placeholder(_j("pyginapithon", "@", "mailhost.co"))
+    assert mod.email_is_placeholder(_j("pyginapithon", "@", "users.noreply.github.com"))
+    assert not mod._email_allowed(_j("pyginapithon", "@", "mailhost.co"))
+    assert mod._email_allowed(_j("pyginapithon", "@", "users.noreply.github.com"))
