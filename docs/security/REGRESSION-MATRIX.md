@@ -17,3 +17,12 @@ what the linked test needs.
 | S-9 | Only a pushed `v*` tag (PyPI, `pypi` environment with a required reviewer) or a manual run (a dry run with no upload) starts `release.yml`, and PyPI is the only upload target. A pull request, a push to `main` or a schedule never publishes, `ci.yml` and `codeql.yml` hold no `id-token: write` and no publish step, and publishing uses OIDC trusted publishing, not a stored token. | `.github/workflows/release.yml`, `ci.yml`, `codeql.yml` | `tests/install/test_github_workflows.py` (release triggers, publish gates, ci and codeql never publish, OIDC only) |
 | S-10 | Every commit's author and committer email is a GitHub noreply address (`users.noreply.github.com`) or GitHub's own web-flow committer; anything else fails `check_pack` on the PR and on main, reported by commit and role, never by address. The project local-part passes the email rules only on a noreply domain, not on a mail host. Accounts that merge keep GitHub email privacy on. | `tools/check_pack.py` (`scan_git_identities`), `docs/dev/CONTRIBUTING-PR.md` step 5 | `tests/install/test_check_pack_identifiers.py` (identity emails, personal author or committer fails by hash only, noreply history passes, project local-part needs a noreply domain) |
 | S-11 | Whole-tree comment and prose hygiene (`tools/precommit_hygiene.py tree`) runs in CI next to `check_pack` (the `ci` `check_pack` job and the `release.yml` `verify` job), so drift that the local hook never sees, such as an ordinary word losing its last lower-case use, fails the PR. | `.github/workflows/ci.yml`, `.github/workflows/release.yml` | `tests/install/test_github_workflows.py` (tree hygiene runs wherever check_pack runs) |
+
+## Function rows
+
+Rows for verb behavior that cold desks and testers depend on. Same shape as
+above; IDs are `F-<slug>`.
+
+| ID  | Behavior guaranteed | Entry path | Regression test(s) |
+|-----|---------------------|-----------|--------------------|
+| F-claim-takeover | `claim` on a card another desk holds exits 1, names the holder and the `unclaim` / `--take-over` ways out, and writes nothing (with `--eta` or `--msg` too). `--take-over` moves the card, appends `took over from <desk>` to its detail and returns `prior_volunteer`. A free card and a desk claiming its own card again work as before. | `_h_claim`, CLI `claim --take-over` | `tests/server/test_claim_takeover_325.py` (all cases) |

@@ -304,6 +304,7 @@ claim project
 claim need
 claim eta
 claim msg
+claim take_over
 claim office
 claim yes
 unclaim (verb)
