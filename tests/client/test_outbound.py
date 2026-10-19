@@ -325,7 +325,7 @@ def test_todo_project_and_doing_guard_243(monkeypatch, tmp_path, cmd, extra, mat
 @pytest.mark.parametrize(
     "cmd,extra,match",
     [
-        ("hold", {"project": "p", "resource": ""}, "resource required"),
+        ("hold", {"project": "p", "resource": "", "doing": "d"}, "--doing needs a resource"),
         ("hold", {"project": "p", "resource": "", "peek": True, "doing": "d"}, "--doing needs a resource"),
         ("hold", {"project": "p", "resource": "r", "doing": "d" * 513}, "--doing must be"),
     ],

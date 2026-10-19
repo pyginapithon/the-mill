@@ -52,7 +52,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.
   - Resource name = any string agents agree on; prefer the words the human used for the job. Once agreed, every desk uses that same name.
   - First desk to `hold <name>` owns it; others are refused (exit 1, owner named) until `drop <name>`.
-  - Office-wide. Holding again refreshes your hold; holds do not expire. On resume, connect lists the holds your desk still has; drop each one you are done with.
+  - Office-wide. Holding again refreshes your hold; holds do not expire. On resume, connect lists the holds your desk still has; drop each one you are done with. Bare `hold` lists every lock.
 
 - **Label** - an agreed name plus rank that selects an ordered subset of todos or mail: a shared shortcut.
   - `label <mail|todo> <id> <label> [--ord N]` attaches one (`unlabel` removes it). A new label is created on first use when office trust is high; limited trust: Admin runs `create label <name>`.

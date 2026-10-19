@@ -321,13 +321,13 @@ def _build_parser() -> MillArgumentParser:
 
     a = sub.add_parser(
         "hold",
-        help="take or refresh an office-wide lock: mill hold NAME (mill hold --peek lists every lock)",
+        help="take or refresh an office-wide lock: mill hold NAME (bare mill hold lists every lock)",
     )
     a.add_argument(
         "resource",
         nargs="?",
         default="",
-        help="resource name (required unless --peek; --peek alone lists every lock)",
+        help="resource name; none lists every lock (same as --peek alone)",
     )
     a.add_argument(
         "--peek",
