@@ -183,8 +183,8 @@ def test_reviewed_commits_are_full_shas_and_ci_clones_full_history() -> None:
     mod = _mod()
     assert mod.NAME_TOKEN_REVIEWED
     assert all(len(s) == 40 and int(s, 16) >= 0 for s in mod.NAME_TOKEN_REVIEWED)
-    ci = (ROOT / ".gitlab-ci.yml").read_text(encoding="utf-8")
-    assert 'GIT_DEPTH: "0"' in ci
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    assert "fetch-depth: 0" in ci.split("\n  check_pack:\n", 1)[1]
 
 
 # Fresh-root clones (S-8): a public import is one root commit with no scrub cut.
@@ -256,3 +256,52 @@ def test_fresh_root_shallow_clone_still_fails_closed(tmp_path, monkeypatch) -> N
 def test_unreadable_shallow_state_counts_as_shallow(tmp_path) -> None:
     mod = _mod()
     assert mod.clone_is_shallow(tmp_path / "not-a-repo")
+
+
+# Dependabot on GitHub (S-8): its generated commits carry a fixed sign-off.
+
+_BOT_AUTHOR = _j("49699333+dependabot[bot]", "@", "users.noreply.github.com")
+_BOT_TRAILER = _j("Signed-off-by: dependabot[bot] <", "support", "@", "github.com", ">")
+
+
+def _commit_as(repo: Path, author: str, msg: str) -> str:
+    (repo / "f.txt").write_text(msg, encoding="utf-8")
+    _git(repo, "add", "f.txt")
+    _git(repo, "-c", "user.name=bot", "-c", f"user.email={author}", "commit", "-q", "-m", msg)
+    return _git(repo, "rev-parse", "HEAD")
+
+
+def _bot_body() -> str:
+    return _j("Bump html-validate\n\nBumps [html-validate] from 1 to 2.\n\n", _BOT_TRAILER, "\n")
+
+
+def test_dependabot_commit_with_its_trailer_passes(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    _commit_as(repo, _BOT_AUTHOR, _bot_body())
+    mod, fails = _scan_in(monkeypatch, repo)
+    assert mod.DEPENDABOT_TRAILER == _BOT_TRAILER
+    assert fails == [], fails
+
+
+def test_bot_address_outside_the_trailer_still_fails(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    addr = _j("support", "@", "github.com")
+    rev = _commit_as(repo, _BOT_AUTHOR, _j(_bot_body(), "\nask ", addr, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert f"email outside placeholder domains in git commit {rev[:12]}" in fails, fails
+
+
+def test_other_github_address_still_fails(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    other = _j("Signed-off-by: someone <", "desk", "@", "github.com", ">")
+    rev = _commit_as(repo, _BOT_AUTHOR, _j("bump a pin\n\n", other, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert f"email outside placeholder domains in git commit {rev[:12]}" in fails, fails
+
+
+def test_trailer_from_a_non_bot_author_keeps_the_name_rule(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    who = _j("W", "ibble")
+    rev = _commit_as(repo, "desk@example.com", _j("fix for ", who, "\n\n", _BOT_TRAILER, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert fails == [f"personal name token in git commit {rev[:12]}"], fails

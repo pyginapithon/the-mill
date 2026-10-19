@@ -141,3 +141,41 @@ def test_name_hit_skips_sentence_start_and_code_spans() -> None:
     assert not ph.name_hit("Keep it. Ordinary words only", vocab={"ordinary"})
     assert not ph.name_hit(f"see `{NAME}` here", vocab=set())
     assert ph.name_hit(f"ask {NAME} first", vocab=set())
+
+
+@pytest.fixture()
+def empty_repo(tmp_path: Path) -> Path:
+    """A repo before its first commit (an orphan or fresh root): no HEAD yet."""
+    if shutil.which("git") is None:
+        pytest.skip("git not on PATH")
+    r = tmp_path / "root"
+    (r / "tools").mkdir(parents=True)
+    for name in ("check_pack.py", "precommit_hygiene.py", "hygiene_words.txt"):
+        shutil.copy(ROOT / "tools" / name, r / "tools" / name)
+    shutil.copytree(ROOT / ".githooks", r / ".githooks")
+    _git(r, "init", "-q")
+    _git(r, "config", "user.email", "desk@users.noreply.gitlab.com")
+    _git(r, "config", "user.name", "desk")
+    _git(r, "config", "core.hooksPath", ".githooks")
+    ph._VOCAB = None
+    return r
+
+
+def test_root_commit_reads_words_from_the_staged_tree(empty_repo: Path) -> None:
+    """With no HEAD, an ordinary word is still known from the staged files."""
+    word = "zeppel" + "inade"
+    (empty_repo / "a.md").write_text(
+        f"the desk keeps a {word} log.\n\nthe desk reads {word.title()} notes.\n",
+        encoding="utf-8",
+    )
+    _git(empty_repo, "add", "a.md")
+    res = _commit(empty_repo, "initial public import")
+    assert res.returncode == 0, res.stderr
+
+
+def test_root_commit_still_fails_on_a_name(empty_repo: Path) -> None:
+    (empty_repo / "a.md").write_text(f"the desk asks {NAME} for notes.\n", encoding="utf-8")
+    _git(empty_repo, "add", "a.md")
+    res = _commit(empty_repo, "initial public import")
+    assert res.returncode != 0
+    assert "a.md:1: personal name token" in res.stderr

@@ -44,6 +44,8 @@ _VOCAB: set[str] | None = None
 def tree_vocab() -> set[str]:
     """Lower-case words used anywhere in the HEAD tree, plus hygiene_words.txt.
 
+    Before the first commit there is no HEAD, so the staged tree is read.
+
     A Title-case comment word that is an ordinary word elsewhere in the repo
     is prose, not a name. A name never appears lower-case, so it still fails.
     """
@@ -52,7 +54,12 @@ def tree_vocab() -> set[str]:
         return _VOCAB
     words: set[str] = set()
     try:
-        raw = _git("grep", "-h", "-o", "-w", "-I", "-E", "[a-z]{3,21}", "HEAD", "--", ".")
+        # A root commit has no HEAD yet: read the staged tree instead.
+        if _has_head():
+            args = ["-E", "[a-z]{3,21}", "HEAD"]
+        else:
+            args = ["--cached", "-E", "[a-z]{3,21}"]
+        raw = _git("grep", "-h", "-o", "-w", "-I", *args, "--", ".")
         words.update(_LOWER_RE.findall(raw.decode("utf-8", "replace")))
     except (OSError, subprocess.CalledProcessError):
         pass
@@ -145,6 +152,15 @@ def scan_text(rel: str, blob: bytes) -> list[str]:
         if name_hit(prose):
             fails.append(f"{rel}:{i}: personal name token in a comment")
     return fails
+
+
+def _has_head() -> bool:
+    """False before the first commit (an orphan or fresh root has no HEAD)."""
+    try:
+        _git("rev-parse", "--verify", "-q", "HEAD")
+    except (OSError, subprocess.CalledProcessError):
+        return False
+    return True
 
 
 def _git(*args: str) -> bytes:

@@ -14,7 +14,7 @@ messages. Login names come from the filesystem (not a word-list); GitLab CI
 skips that net (GITLAB_CI / CI=true). Commit messages at or after the
 history-scrub cut also fail on a Title-cased Latin token that is not on
 the neutral desk-word allow-list (pre-scrub history is not re-scanned).
-CI clones full history (GIT_DEPTH 0, fetch-depth 0). A shallow clone fails
+CI clones full history (actions/checkout fetch-depth 0). A shallow clone fails
 closed. A full clone that never had the cut (a fresh root, such as a public
 import) scans every commit from its root. Commits read by hand and kept are
 listed in NAME_TOKEN_REVIEWED.
@@ -682,6 +682,23 @@ def _name_token_scan_revs(root: Path, cut_present: bool = True) -> frozenset[str
     return frozenset(line.strip() for line in raw.decode().splitlines() if line.strip())
 
 
+# Dependabot's own commits on GitHub. Exact identity only, never all of
+# github.com. The address is assembled so this file passes its own tree scan.
+_BOT_ADDRESS = "support" + "@" + "github.com"
+DEPENDABOT_AUTHOR = "49699333+dependabot[bot]" + "@" + "users.noreply.github.com"
+DEPENDABOT_TRAILER = "Signed-off-by: dependabot[bot] <" + _BOT_ADDRESS + ">"
+
+
+def is_dependabot_commit(author: str, body: str) -> bool:
+    """True for a commit authored by Dependabot that carries its sign-off trailer."""
+    return author.strip() == DEPENDABOT_AUTHOR and DEPENDABOT_TRAILER in body.splitlines()
+
+
+def strip_bot_trailers(body: str) -> str:
+    """Drop the exact Dependabot sign-off line; any other address still counts."""
+    return "\n".join(ln for ln in body.splitlines() if ln.strip() != DEPENDABOT_TRAILER)
+
+
 def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
     """Commit subjects and bodies. The report is the hash, not the message.
 
@@ -689,11 +706,14 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
     Title-case name-token rule runs only for HEAD commits after
     NAME_TOKEN_SCAN_SINCE (--ancestry-path), or for every HEAD commit in a
     full clone that has no cut. A shallow clone without the cut fails closed.
+    The exact Dependabot sign-off trailer is not an email hit, and a commit by
+    the Dependabot identity with that trailer skips the name-token rule (its
+    text is generated, not written by a desk).
     """
     root = mill_root()
     try:
         raw = subprocess.check_output(
-            ["git", "log", "--all", "--format=%H%x1e%B%x1e"],
+            ["git", "log", "--all", "--format=%H%x1f%ae%x1e%B%x1e"],
             cwd=root,
             stderr=subprocess.DEVNULL,
         )
@@ -708,16 +728,18 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
     if not cut_present and clone_is_shallow(root):
         fails.append(
             f"name-token scan cut {NAME_TOKEN_SCAN_SINCE} is not in this clone"
-            " (shallow?); fetch full history (GIT_DEPTH 0)"
+            " (shallow?); fetch full history (fetch-depth 0)"
         )
     parts = raw.decode("utf-8", "replace").split("\x1e")
     index = 0
     while index + 1 < len(parts):
-        rev = parts[index].strip()
+        rev, _, author = parts[index].strip().partition("\x1f")
         body = parts[index + 1]
         index += 2
         if not rev:
             continue
+        bot = is_dependabot_commit(author, body)
+        body = strip_bot_trailers(body)
         if _has_local_home_user(body, pats):
             fails.append(f"local home-user name in git commit {rev[:12]}")
         if text_has_forbidden_address(body):
@@ -726,7 +748,12 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
             fails.append(f"home path with a login name in git commit {rev[:12]}")
         if text_has_personal_email(body):
             fails.append(f"email outside placeholder domains in git commit {rev[:12]}")
-        if rev in name_revs and rev not in NAME_TOKEN_REVIEWED and text_has_personal_name_token(body):
+        if (
+            rev in name_revs
+            and rev not in NAME_TOKEN_REVIEWED
+            and not bot
+            and text_has_personal_name_token(body)
+        ):
             fails.append(f"personal name token in git commit {rev[:12]}")
     return fails
 
