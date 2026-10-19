@@ -52,7 +52,9 @@ BINARY_SUFFIXES = (".exe", ".dll", ".so", ".dylib", ".bin")
 EMAIL_RE = re.compile(
     r"(?<![A-Za-z0-9._%+-])([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})"
 )
+# The project local-part passes only on a noreply domain, never on a mail host.
 ALLOWED_EMAIL_LOCAL = frozenset({"pyginapithon"})
+_NOREPLY_DOMAINS = frozenset({"users.noreply.github.com", "users.noreply.gitlab.com", "noreply.gitlab.com"})
 
 # Windows profile folders that are not a human login. Not a name word-list.
 _SKIP_USER_DIRS = frozenset(
@@ -277,8 +279,6 @@ def text_has_personal_home_path(text: str) -> bool:
 def email_is_placeholder(addr: str) -> bool:
     local, _, domain = addr.rpartition("@")
     domain = domain.casefold().rstrip(".")
-    if local.casefold() in ALLOWED_EMAIL_LOCAL:
-        return True
     # git@host is an SSH remote, not a person.
     if local == "git":
         return True
@@ -450,8 +450,8 @@ def _is_junk_name(path: str) -> str | None:
 
 
 def _email_allowed(addr: str) -> bool:
-    local = addr.split("@", 1)[0].casefold()
-    return local in ALLOWED_EMAIL_LOCAL
+    local, _, domain = addr.rpartition("@")
+    return local.casefold() in ALLOWED_EMAIL_LOCAL and domain.casefold() in _NOREPLY_DOMAINS
 
 
 def _has_home_marker(text: str) -> bool:
@@ -697,6 +697,49 @@ def is_dependabot_commit(author: str, body: str) -> bool:
 def strip_bot_trailers(body: str) -> str:
     """Drop the exact Dependabot sign-off line; any other address still counts."""
     return "\n".join(ln for ln in body.splitlines() if ln.strip() != DEPENDABOT_TRAILER)
+
+
+# GitHub's own committer on web merges and bot commits. Assembled like the
+# Dependabot address so this file passes its own tree scan.
+GITHUB_WEB_FLOW = "noreply" + "@" + "github.com"
+
+
+def identity_email_ok(addr: str) -> bool:
+    """Author and committer emails: a GitHub noreply address or GitHub's own committer."""
+    addr = addr.strip()
+    _, at, domain = addr.rpartition("@")
+    if not at:
+        return False
+    return domain.casefold() == "users.noreply.github.com" or addr.casefold() == GITHUB_WEB_FLOW
+
+
+def scan_git_identities() -> list[str]:
+    """Every commit's author and committer email is noreply (S-10).
+
+    A web merge stamps the merging account's commit email. With email privacy
+    off that is a personal address, so a push to main fails loudly here. The
+    report is the hash and the role, never the address.
+    """
+    root = mill_root()
+    try:
+        raw = subprocess.check_output(
+            ["git", "log", "--all", "--format=%H%x1f%ae%x1f%ce"],
+            cwd=root,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    fails: list[str] = []
+    for line in raw.decode("utf-8", "replace").splitlines():
+        rev, _, rest = line.partition("\x1f")
+        author, _, committer = rest.partition("\x1f")
+        if not rev:
+            continue
+        if not identity_email_ok(author):
+            fails.append(f"author email is not noreply in git commit {rev[:12]}")
+        if not identity_email_ok(committer):
+            fails.append(f"committer email is not noreply in git commit {rev[:12]}")
+    return fails
 
 
 def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
@@ -954,6 +997,7 @@ def main(argv: list[str] | None = None) -> int:
     print("Scanning git tip (tracked files and commit messages)")
     all_fails.extend(f"[git] {f}" for f in scan_git_tracked(home_pats))
     all_fails.extend(f"[git] {f}" for f in scan_git_messages(home_pats))
+    all_fails.extend(f"[git] {f}" for f in scan_git_identities())
 
     for n in all_notes:
         print(n)

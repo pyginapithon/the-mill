@@ -67,6 +67,13 @@ deletion, linear history, and every change lands through a pull request
    merges with squash or rebase (merge commits are off, so history stays
    linear). The head branch is deleted on merge. Do not merge your own PR.
 
+   Merges must keep noreply identities. A web merge (squash or rebase)
+   stamps the merging account's commit email on the result, so every
+   account that merges keeps GitHub email privacy on ("Keep my email
+   addresses private" and "Block command line pushes that expose my
+   email"). `check_pack` fails on main if a personal address lands anyway;
+   fixing that is a history rewrite the human office owner approves.
+
 6. If Builder asks for a rebase:
 
        git fetch origin

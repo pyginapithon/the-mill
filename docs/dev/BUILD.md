@@ -56,7 +56,7 @@ python tools/pack_local.py --install --notify
 - `wall_ui_save/` (local Wall dumps; gitignored, must not ship)
 - surprise binaries under `agent_coord/`
 - home-path prefixes (`C:\Users\`, `C:/Users/`, `/Users/`, `/home/`)
-- emails outside the placeholder domains (`example.com/.org/.net`, `.example`, `.test`, `.invalid`, `.localhost`, GitLab and GitHub noreply); the project local-part `pyginapithon` and `git@` SSH remotes pass
+- emails outside the placeholder domains (`example.com/.org/.net`, `.example`, `.test`, `.invalid`, `.localhost`, GitLab and GitHub noreply); the project local-part `pyginapithon` passes only on a noreply domain, and `git@` SSH remotes pass
 - tokens
 - office dest dumps or Wall diary scrapes
 - a complete IP that is not a documentation address. Documentation ranges are RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) and RFC 3849 (`2001:db8::/32`). Loopback (`127.0.0.0/8`, `::1`) and unspecified (`0.0.0.0`, `::`) may stay. LAN *prefix* `192.168.1.` / `192.168.1.%` / `192.168.1.*` is mill join product and is not a complete host. The same rule covers the wheel, the sdist, git-tracked files (including comments), and git commit messages
@@ -98,6 +98,7 @@ full commit sha (the repo also requires sha pinning), no workflow uses
   `check_pack`, `pytest_no_sql` and `pytest_sql` check out full history
   (`fetch-depth: 0`): they scan commit messages, and a shallow clone fails
   closed (regression row S-8).
+  `check_pack` also fails when any commit's author or committer email is not a GitHub noreply address (`<id>+<login>@users.noreply.github.com`) or GitHub's own web-flow committer; the report names the commit, never the address (regression row S-10).
 - `codeql.yml` runs CodeQL (`analyze (python)`, `analyze (actions)`) on pull
   requests, pushes to `main` and weekly.
 - `release.yml` runs only on a pushed `v*` tag (PyPI) or a manual
