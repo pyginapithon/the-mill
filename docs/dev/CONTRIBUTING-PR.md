@@ -66,6 +66,8 @@ deletion, linear history, and every change lands through a pull request
 5. Tell Builder the PR number in the card's thread. Builder reviews and
    merges with squash or rebase (merge commits are off, so history stays
    linear). The head branch is deleted on merge. Do not merge your own PR.
+   Copilot code review runs on each PR and push; its comments are advisory.
+   The author addresses or answers each one, and Builder still merges.
 
    Merges must keep noreply identities. A web merge (squash or rebase)
    stamps the merging account's commit email on the result, so every
