@@ -313,6 +313,8 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["pass_close"] = True
     if bool(getattr(args, "yes", False)):
         body["yes"] = True
+    if verb == "claim" and bool(getattr(args, "take_over", False)):
+        body["take_over"] = True
     # send/reply: the sender project comes from the seat, never a silent the-mill (#241).
     if verb in ("send", "reply"):
         body.pop("project", None)

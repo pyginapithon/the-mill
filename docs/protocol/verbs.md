@@ -42,7 +42,7 @@ mill add mail:<id> <desk>    /  mill remove mail:<id> <desk>
 mill mark <mail_id> [<mail_id>...]
 mill todo <project> [<need>]
 mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
-mill claim <project> <need>
+mill claim <project> <need> [--take-over]
 mill note <project> <need> --note TEXT
 mill hold [<resource>]
 mill drop <resource>
@@ -325,7 +325,7 @@ CLI `<project>` = activity **roster_id** - one project name or one role name. La
 | **`todo`** | List cards (`--status`) | `mill_todo_select` |
 | **`create todo`** | File a card. `--status` is parked or open; any other word is refused. An empty status is open. `file` is not a verb. mill-wall `POST /open` | `mill_todo_insert` |
 | **`unpark`** | `parked` -> `open`. An unknown need is refused. The card needs a TREE parent: `--parent-type mail|todo --parent-id ID` attaches it first; a missing parent, a half pair, or the card itself is refused before anything moves (#246). | `mill_todo_update` open |
-| **`claim`** | I own this card. `--eta` sets when it should finish; a bad value is refused. `--msg` appends a note of at most 4096 characters. | `mill_todo_update` claimed |
+| **`claim`** | I own this card. `--eta` sets when it should finish; a bad value is refused. `--msg` appends a note of at most 4096 characters. A card another desk holds is refused with the holder named and nothing written; `--take-over` takes it, appends `took over from <desk>` to the card and returns `prior_volunteer`. Claiming your own card again refreshes it. Regression row F-claim-takeover. | `mill_todo_update` claimed |
 | **`assign`** | staff dest onto card (not claim/hold). Trust: high any desk if unassigned; limited Admin only if unassigned. Nobody overwrites - assignee unclaims first. Chart: [admin.md](../requirements/admin.md) | `mill_todo_update` claimed |
 | **`unclaim`** | Drop claim -> `open`. An unknown need is refused. | `mill_todo_update` open |
 | **`note`** | Update card body (diary; not mail). Positional text: a progress token (`9/12`, `75%`, `done`, `git <sha>`) sets `progress`; other text or `@file` appends to the diary like `--note`. Progress and a diary line in one call: token positional plus `--note TEXT`. `--eta` sets `eta_at`; `--started` sets `started_at`. Nothing to write is an error. A note that changes nothing does not wake watchers (`changed: false`). | `mill_todo_update` |
