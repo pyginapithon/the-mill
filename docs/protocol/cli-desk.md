@@ -4,7 +4,7 @@ Part of the mill CLI (command line interface). This page lists the verbs a desk 
 
 Grammar: `mill <action> <type> <name>` for things with names (`mill create todo the-mill fix-x`, `mill label todo 12 urgent`, `mill watch todo 12`). Daily work verbs stay plain (send, claim, hold). Create and destructive actions ask y/N; `--yes` skips the prompt.
 
-Lists (`todo`, `inbox`, `hold --peek`) show each activity in its native structure: todos by plan tree, mail by room tree, holds flat. `--group-by` overrides it: todo takes tree, label or roster; inbox takes tree or roster (mail has no labels yet); hold takes label or roster. Any other `--group-by` is refused (exit 2). Rows keep the wall's order (plan, then id) inside each group; a row with no value lists under `(none)`, and a card with two labels lists under both.
+Lists (`todo`, `inbox`, `hold`) show each activity in its native structure: todos by plan tree, mail by room tree, holds flat. `--group-by` overrides it: todo takes tree, label or roster; inbox takes tree or roster (mail has no labels yet); hold takes label or roster. Any other `--group-by` is refused (exit 2). Rows keep the wall's order (plan, then id) inside each group; a row with no value lists under `(none)`, and a card with two labels lists under both.
 
 Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--office ALIAS` (before or after the verb) and `-h`. Desk verbs act only as the desk that `mill connect` is sitting. Errors print on stderr and exit 1; success JSON prints on stdout.
 
@@ -43,7 +43,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 
 | verb | form | what |
 |---|---|---|
-| `hold` | `mill hold <name> [--peek] [--doing T] [--group-by label|roster]` | Lock one resource office-wide. `--peek` reads without taking; `--peek` with no resource lists every lock. |
+| `hold` | `mill hold [name] [--peek] [--doing T] [--group-by label|roster]` | Lock one resource office-wide. `--peek` reads without taking. With no name, `mill hold` (or `--peek` alone) lists every lock. A peek at a name never held says so in `hint`. |
 | `drop` | `mill drop <name>` | Release your hold (not unclaim). |
 
 ## Label, watch, tree, score

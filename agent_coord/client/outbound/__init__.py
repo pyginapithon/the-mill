@@ -246,9 +246,8 @@ def _guard_args(verb: str, cmd: str, args: Any) -> None:
                 raise CoordError(f"{name}: project required")
             if len(p) > 64:
                 raise CoordError(f"{name}: no such project {p[:64]}")
+    # #326: hold with no resource is the lock list, with or without --peek.
     if verb == "hold" and not str(getattr(args, "resource", "") or "").strip():
-        if not bool(getattr(args, "peek", False)):
-            raise CoordError(f"{name}: resource required (or --peek alone to list every lock)")
         if str(getattr(args, "doing", "") or ""):
             raise CoordError(f"{name}: --doing needs a resource")
     if verb in _DOING_GUARD:
@@ -332,9 +331,11 @@ def body_from_args(args: Any) -> dict[str, Any]:
     if verb in ("hold", "drop"):
         from agent_coord.helpers.bounds import resource_name
 
-        if str(body.get("resource") or "").strip() or verb == "drop" or not getattr(args, "peek", False):
+        if str(body.get("resource") or "").strip() or verb == "drop":
             body["resource"] = resource_name(str(body.get("resource") or ""))
-    if verb == "hold" and bool(getattr(args, "peek", False)):
+        else:
+            body.pop("resource", None)
+    if verb == "hold" and (bool(getattr(args, "peek", False)) or "resource" not in body):
         body["peek"] = True
     detail_file = str(getattr(args, "detail_file", "") or "").strip()
     if detail_file:
