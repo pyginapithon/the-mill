@@ -4,6 +4,7 @@ playwright
 takeaway
 jira
 copilot
+dependabot
 zendesk
 voice
 spell
