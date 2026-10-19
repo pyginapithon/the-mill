@@ -44,7 +44,7 @@ mill todo <project> [<need>]
 mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
 mill claim <project> <need> [--take-over]
 mill note <project> <need> --note TEXT
-mill hold <resource>
+mill hold [<resource>]
 mill drop <resource>
 mill pass <project> <need>
 mill unclaim <project> <need>
@@ -67,8 +67,8 @@ mill label <name> <name> --yes
 - send/reply: body in a UTF-8 file (`--body-file`); one `--to-desk` per desk. `*` is not a desk. A reply with no `--to-desk` goes to the whole room.
 - `<need>`: letters, digits, `.`, `_`, `-`; 64 max. `todo` prints it as `need_id`.
 - `note`: text goes in `--note`; it adds one line to the card detail, the field a peer reads. A card reply leaves out `progress` and `doing` until one is set. Regression row F-note-detail.
-- `<resource>`: one name, locked office-wide (the project is not part of the lock). For a file, use its path from the project root, `/` separators (e.g. `docs/a.md`); `hold` does not create the file. Hold once: holding it again refreshes your hold; it does not stack. A hold does not expire; `drop` it when finished. A refused hold names the owner: wait or mail that desk; do not write without the hold. `mill hold <resource> --peek` shows who holds it and does not take or refresh the lock. `mill hold <project> --peek` with no resource lists every lock held (this replaced the old `status` verb, #254); `--doing` needs a resource. A bare hold still acquires. Regression row F16 (hold-peek-without-acquire).
-- hold and drop refuse an empty or over-length project before the call, and drop refuses an unknown project before it touches a lock. hold with no resource and no `--peek` is refused before the call. hold refuses a `--doing` over 512 chars (#244).
+- `<resource>`: one name, locked office-wide (the project is not part of the lock). For a file, use its path from the project root, `/` separators (e.g. `docs/a.md`); `hold` does not create the file. Hold once: holding it again refreshes your hold; it does not stack. A hold does not expire; `drop` it when finished. A refused hold names the owner: wait or mail that desk; do not write without the hold. `mill hold <resource> --peek` shows who holds it and does not take or refresh the lock; a name never held gets a `hint` (`no hold named X`, and `X is a roster` when it is one) pointing at the list. `mill hold` with no resource, or `mill hold --peek`, lists every lock held (this replaced the old `status` verb, #254); there is no roster argument. `--doing` needs a resource. Regression rows F16 (hold-peek-without-acquire), F-hold-bare-list, F-hold-peek-unknown-hint.
+- hold and drop refuse an empty or over-length project before the call, and drop refuses an unknown project before it touches a lock. hold with no resource lists every lock (#326). hold refuses a `--doing` over 512 chars (#244).
 - The connect sync lists this desk's holds (resource, since) and no other desk's. A dropped hold is absent. Regression row F11 (hold-list-after-resume).
 - A desk's holds, one resource's lock, the held list, the project check before hold/drop/label, and the send offline check each read the rows they answer by index, not the whole hold table, name catalog or seat list; the replies are unchanged. Regression row F23 (direct-lookups).
 - Hints: the desk whose verb changed a card, hold, score or tree node gets no hint for its own change; every other watcher still does. A label change stamps the hint time when the label changed, not the card's last write. Regression row F26 (hint-self-skip).
@@ -335,7 +335,7 @@ CLI `<project>` = activity **roster_id** - one project name or one role name. La
 
 | verb | intent | CALL |
 |---|---|---|
-| **`hold`** | Mutex on a res name. `desk_id` NULL means free. The project is not part of the lock. An unknown, retired, or empty project is refused and nothing is written. Release nulls `desk_id`; the row stays. `--peek` reads through `mill_hold_select` and does not call `mill_hold_upsert`; `hold <project> --peek` with no resource lists every lock held (read only; no locks is an empty list). | `mill_hold_upsert` |
+| **`hold`** | Mutex on a res name. `desk_id` NULL means free. The project is not part of the lock. An unknown, retired, or empty project is refused and nothing is written. Release nulls `desk_id`; the row stays. `--peek` reads through `mill_hold_select` and does not call `mill_hold_upsert`; `hold` with no resource (with or without `--peek`) lists every lock held (read only; no locks is an empty list). | `mill_hold_upsert` |
 | **`drop`** | Release a hold (not unclaim). Reply: `released` true/false; `owner` null once released, `was_owner` is who let go; a drop you do not own has top-level ok false, names the holder in `owner` + `reason`, and the CLI exits 1. HOLD hint only on a real release. `hold` reply carries `held`. | `mill_hold_delete` |
 
 ### tree

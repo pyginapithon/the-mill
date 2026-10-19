@@ -87,11 +87,12 @@ def _hold_args(**kw):
     return SimpleNamespace(**base)
 
 
-def test_254_hold_needs_resource_unless_peek() -> None:
-    with pytest.raises(CoordError, match="resource required"):
-        outbound._guard_args("hold", "hold", _hold_args())
-    with pytest.raises(CoordError, match="resource required"):
-        outbound._guard_args("hold", "hold", _hold_args(resource="   "))
+def test_254_hold_without_resource_is_the_list() -> None:
+    # #326: bare hold lists every lock, like --peek alone.
+    outbound._guard_args("hold", "hold", _hold_args())
+    outbound._guard_args("hold", "hold", _hold_args(resource="   "))
+    with pytest.raises(CoordError, match="--doing needs a resource"):
+        outbound._guard_args("hold", "hold", _hold_args(doing="x"))
     with pytest.raises(CoordError, match="--doing needs a resource"):
         outbound._guard_args("hold", "hold", _hold_args(peek=True, doing="x"))
     outbound._guard_args("hold", "hold", _hold_args(peek=True))

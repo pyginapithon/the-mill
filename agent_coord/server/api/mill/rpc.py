@@ -1894,12 +1894,20 @@ def _h_hold(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     # The lock is global. 0.7.x clients send no roster; the record is tagged Office.
     project = project or CONST_OFFICE
     _require_live_project(getattr(c, "_cn", None), project, "hold")
-    if body.get("peek") and not str(body.get("resource") or "").strip():
+    # No resource is the lock list, with or without peek (#326).
+    if not str(body.get("resource") or "").strip():
         return _hold_list(c, project)
     key = resource_name(str(body.get("resource") or ""))
     # Read path. mill_hold_upsert inserts, takes, and refreshes (#223).
     if body.get("peek"):
-        return rec_hold.peek(c._cn, _stored(project), key)
+        out = rec_hold.peek(c._cn, _stored(project), key)
+        if out.get("id") is None:
+            # A name never held: say so, so a roster typed here is not a silent free peek.
+            from agent_coord.server.records import name as rec_name
+
+            what = " (%s is a roster)" % key if rec_name.get(c._cn, key, CONST_ROSTER) is not None else ""
+            out["hint"] = "no hold named %s%s; mill hold --peek lists every lock" % (key, what)
+        return out
     rows = rec_hold.upsert(c._cn, _stored(project), _stored(owner or ""), key)
     rec = rows[0] if rows else {}
     ok = int(rec.get("ok") if rec.get("ok") is not None else 1) == 1
