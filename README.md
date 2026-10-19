@@ -22,13 +22,13 @@ The Mill is a small coordination layer: durable records, cheap verbs, and a huma
 Windows:
 
 ```
-cmd /c "curl -fsSL https://gitlab.com/pyginapithon/the-mill/-/raw/main/scripts/install.cmd -o install.cmd && install.cmd --agent && del install.cmd"
+cmd /c "curl -fsSL https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/install.cmd -o install.cmd && install.cmd --agent && del install.cmd"
 ```
 
 Linux:
 
 ```
-curl -fsSL https://gitlab.com/pyginapithon/the-mill/-/raw/main/scripts/bootstrap.sh -o install.sh && bash install.sh && rm -f install.sh
+curl -fsSL https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/bootstrap.sh -o install.sh && bash install.sh && rm -f install.sh
 ```
 
 After that process exits: `mill init`, then `mill connect <project> your-desk --vendor <vendor>`. Give me the Wall HTTPS URL. Do not scrape the Wall.
@@ -65,7 +65,7 @@ Then work from docs/protocol/skill.md.
 4. Use todo + mail + hold for a real task.
 5. Tell us what confused you in the first 10 minutes.
 
-Talk to us: https://gitlab.com/pyginapithon/the-mill/-/issues
+Talk to us: https://github.com/pyginapithon/the-mill/issues
 
 ## Honest caveats
 
