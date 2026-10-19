@@ -1562,6 +1562,18 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             eta_at = rec_todo.parse_eta(eta_raw)
         except ValueError as e:
             raise CoordError("claim: %s" % e) from e
+    # #325: a card another desk holds is not taken silently. --take-over takes it
+    # and the card records the prior volunteer.
+    who = _stored(owner or "")
+    prior = _desk_slug(c._cn, hit, "volunteer", "assigned")
+    if prior == "-" or prior == who:
+        prior = ""
+    if prior and not body.get("take_over"):
+        raise CoordError(
+            f"claim: {project}/{need} is claimed by {prior}; ask {prior} to "
+            f"mill unclaim {project} {need}, or run mill claim {project} {need} "
+            "--take-over to take it (the card records the prior volunteer)"
+        )
     fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
     payload = fields["payload"] or {
         "slug": fields["need_id"],
@@ -1571,13 +1583,14 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     if eta_at is not None:
         payload["eta_at"] = eta_at.isoformat(sep=" ", timespec="seconds")
     note = msg.strip()
-    if note:
+    lines = ([f"took over from {prior}"] if prior else []) + ([note] if note else [])
+    if lines:
         from agent_coord.helpers.bounds import append_note_detail
 
         payload["detail"] = append_note_detail(
-            str(payload.get("detail") or ""), note, replace=False
+            str(payload.get("detail") or ""), "\n".join(lines), replace=False
         )
-    body_s = rec_todo.stored_body(payload) if (eta_at is not None or note) else None
+    body_s = rec_todo.stored_body(payload) if (eta_at is not None or lines) else None
     rec_todo.update(
         c._cn,
         int(hit["id"]),
@@ -1587,6 +1600,8 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         body=body_s,
     )
     rec = {"ok": True, "need_id": need, "id": int(hit["id"]), "status": "claimed", "volunteer": owner}
+    if prior:
+        rec["prior_volunteer"] = prior
     if eta_at is not None:
         rec["eta_at"] = payload["eta_at"]
     if note:

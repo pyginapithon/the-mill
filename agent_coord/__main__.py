@@ -953,6 +953,12 @@ def _build_parser() -> MillArgumentParser:
     vo.add_argument("need")
     vo.add_argument("--eta", default="", help="20m / 2h / datetime; a bad value is refused")
     vo.add_argument("--msg", default="", help="note on the card, at most 4096 characters")
+    vo.add_argument(
+        "--take-over",
+        action="store_true",
+        dest="take_over",
+        help="take a card another desk holds; the card records the prior volunteer",
+    )
 
     yd = sub.add_parser(
         "unclaim",
