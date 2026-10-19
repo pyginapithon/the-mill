@@ -52,6 +52,7 @@ jobs:
           test "$(find dist -maxdepth 1 -type f | wc -l)" = 2
       - run: python -m pip install --upgrade pip twine
       - run: python tools/check_pack.py dist
+      - run: python tools/precommit_hygiene.py tree
       - run: python -m twine check --strict dist/*
 
   publish_pypi:
