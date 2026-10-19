@@ -2,7 +2,7 @@
 
 Every third-party action is pinned to a full commit SHA, no workflow uses
 pull_request_target, no job runs on a self-hosted runner, every workflow sets
-top-level permissions, and check_pack clones full history.
+top-level permissions, and every job that scans history clones it in full.
 """
 from __future__ import annotations
 
@@ -53,10 +53,19 @@ def test_top_level_permissions_set() -> None:
         assert re.search(r"^permissions:", text, re.M), p.name
 
 
-def test_check_pack_job_clones_full_history() -> None:
+def _job(text: str, name: str) -> str:
+    body = text.split(f"\n  {name}:\n", 1)[1]
+    nxt = re.search(r"\n  [a-z_]+:\n", body)
+    return body[: nxt.start()] if nxt else body
+
+
+def test_history_jobs_clone_full_history() -> None:
+    """check_pack and both pytest jobs scan commit messages; shallow fails closed."""
     text = (WF / "ci.yml").read_text(encoding="utf-8")
-    job = text.split("\n  check_pack:\n", 1)[1].split("\n  mill_cli_smoke:\n", 1)[0]
-    assert "fetch-depth: 0" in job
+    for name in ("check_pack", "pytest_no_sql", "pytest_sql"):
+        job = _job(text, name)
+        assert job.count("fetch-depth: 0") == job.count("actions/checkout@"), name
+        assert "fetch-depth: 0" in job, name
 
 
 def test_publish_jobs_use_oidc_not_tokens() -> None:
