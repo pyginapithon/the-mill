@@ -1833,6 +1833,9 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         else:
             note_s = (note_s + "\n" + text_s) if note_s else text_s
 
+    supersedes = str(body.get("supersedes") or "").strip()
+    if supersedes and not note_s:
+        raise CoordError("note: --supersedes needs the new text (--note TEXT)")
     eta_raw = str(body.get("eta") or "").strip()
     started = bool(body.get("started"))
     if not (note_s or prog_text or eta_raw or started):
@@ -1840,7 +1843,11 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
             "note: nothing to write (give text such as 9/12 or 75%, @file, --note, --eta, or --started)"
         )
     replace = bool(body.get("replace"))
-    if note_s:
+    if supersedes:
+        payload["detail"] = _supersede_line(
+            c, hit, project, owner, str(payload.get("detail") or ""), supersedes, note_s, replace
+        )
+    elif note_s:
         from agent_coord.helpers.bounds import append_note_detail
 
         payload["detail"] = append_note_detail(
@@ -1876,6 +1883,8 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     }
     if kept.get("progress"):
         rec["progress"] = kept["progress"]
+    if supersedes:
+        rec["superseded"] = supersedes
     for k in ("eta_at", "started_at"):
         if payload.get(k):
             rec[k] = payload[k]
@@ -1883,6 +1892,42 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         # A note that changes nothing does not wake watchers.
         _poke(c, "todo", tid, "note", owner=owner)
     return rec
+
+
+SUPERSEDED = "[superseded] "
+
+
+def _supersede_line(
+    c: Book, hit: dict, project: str, owner: str | None, detail: str, old: str, new: str, replace: bool
+) -> str:
+    """note --supersedes (#333): the matching detail line stays, marked, with the new text under it.
+
+    Append-only: nothing is deleted. Asker or Admin. One exact whole-line match
+    (spaces at the ends ignored); none or several is refused before any write.
+    """
+    from agent_coord.helpers.bounds import NOTE_MAX
+    from agent_coord.server.admin.guard import is_role_admin
+
+    if replace:
+        raise CoordError("note: --supersedes keeps history; not with --replace")
+    who = _stored(owner or "")
+    ask = _desk_slug(c._cn, hit, "asker", "creator")
+    if who != ask and not is_role_admin(c._cn, owner or ""):
+        raise CoordError("note: --supersedes is for the asker (%s) or Admin" % (ask or "unknown"))
+    if old.startswith(SUPERSEDED.strip()):
+        raise CoordError("note: that line is already superseded; quote the line that replaced it")
+    lines = detail.split("\n")
+    hits = [i for i, ln in enumerate(lines) if ln.strip() == old]
+    if not hits:
+        raise CoordError("note: no detail line is exactly %r; copy the whole line from mill todo" % old[:120])
+    if len(hits) > 1:
+        raise CoordError("note: %d detail lines match %r; nothing changed" % (len(hits), old[:120]))
+    i = hits[0]
+    lines[i : i + 1] = [SUPERSEDED + lines[i].strip(), new]
+    joined = "\n".join(lines)
+    if len(joined) > NOTE_MAX:
+        raise CoordError(f"note: detail would be {len(joined)} chars (max {NOTE_MAX}); shorten")
+    return joined
 
 
 def _h_hold(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:

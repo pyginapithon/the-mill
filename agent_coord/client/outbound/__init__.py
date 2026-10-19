@@ -84,6 +84,7 @@ _STR = (
     "type_a",
     "type_b",
     "note",
+    "supersedes",
     "eta",
     "msg",
     "resource",
