@@ -102,7 +102,7 @@ full commit sha (the repo also requires sha pinning), no workflow uses
 - `codeql.yml` runs CodeQL (`analyze (python)`, `analyze (actions)`) on pull
   requests, pushes to `main` and weekly.
 - `release.yml` runs only on a pushed `v*` tag (PyPI) or a manual
-  `workflow_dispatch` from `main` (TestPyPI rehearsal). A push to `main`
+  `workflow_dispatch` (a dry run: build and verify, no upload). A push to `main`
   never starts it.
 
 The `ci` and CodeQL jobs above are the required status checks on `main`.
@@ -121,13 +121,13 @@ and uses PyPI trusted publishing (OIDC). No PyPI token is stored anywhere.
 5. `publish_pypi` runs in the `pypi` environment, which waits for the required reviewer (the human office owner) to approve the deployment and accepts only `v*` tags. It then uploads `dist/` with `pypa/gh-action-pypi-publish` using a short-lived OIDC token.
 6. Hosts then update from PyPI as in step 6 of Release order.
 
-Rehearsal: run `release.yml` by hand (`workflow_dispatch`) on `main`. It builds and verifies the same way, then `publish_testpypi` uploads to TestPyPI in the `testpypi` environment (`main` only). A version already on TestPyPI is skipped, not failed.
+Dry run: run `release.yml` by hand (`workflow_dispatch`). It runs every `ci` job and `verify` the same way and uploads nothing.
 
 Setup, once per project (the human office owner):
 
-- On PyPI, project `the-mill` -> Publishing -> add a trusted publisher (GitHub): owner `pyginapithon`, repository `the-mill`, workflow `release.yml`, environment `pypi`. On TestPyPI the same with environment `testpypi` (a pending publisher if the project does not exist there yet). The workflow file name and the environment names are part of the trust; renaming either breaks publishing.
+- On PyPI, project `the-mill` -> Publishing -> add a trusted publisher (GitHub): owner `pyginapithon`, repository `the-mill`, workflow `release.yml`, environment `pypi`. The workflow file name and the environment name are part of the trust; renaming either breaks publishing.
 - After the first trusted release, revoke any old PyPI API token for the project.
-- GitHub environments `pypi` (required reviewer, deployment tags `v*`) and `testpypi` (branch `main`), and the `main` and `v*` rulesets. These are repo settings, not files.
+- GitHub environment `pypi` (required reviewer, deployment tags `v*`), and the `main` and `v*` rulesets. These are repo settings, not files.
 
 A failed upload leaves PyPI unchanged for that file; fix and rerun the job. PyPI never accepts the same version twice, so a bad release needs a new version and tag.
 

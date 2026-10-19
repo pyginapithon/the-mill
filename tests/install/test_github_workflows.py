@@ -92,8 +92,16 @@ def test_publish_jobs_are_gated_by_environment_and_event() -> None:
     text = _code(WF / "release.yml")
     pypi = _job(text, "publish_pypi")
     assert "name: pypi" in pypi and "startsWith(github.ref, 'refs/tags/v')" in pypi
-    test = _job(text, "publish_testpypi")
-    assert "name: testpypi" in test and "workflow_dispatch" in test
+    assert "testpypi" not in text.casefold() and "test.pypi.org" not in text
+    jobs = set(re.findall(r"^  (\w+):\n    ", text.split("\njobs:\n", 1)[1], re.M))
+    assert jobs == {"ci", "verify", "publish_pypi"}, jobs
+
+
+def test_publish_job_is_oidc_in_pypi_env_with_pinned_action() -> None:
+    pypi = _job(_code(WF / "release.yml"), "publish_pypi")
+    assert "id-token: write" in pypi and "name: pypi" in pypi
+    assert re.search(r"uses: pypa/gh-action-pypi-publish@[0-9a-f]{40}", pypi), pypi
+    assert "password" not in pypi and "secrets." not in pypi and "repository-url" not in pypi
 
 
 def test_ci_and_codeql_never_publish() -> None:
