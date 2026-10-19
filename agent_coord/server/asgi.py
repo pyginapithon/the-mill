@@ -45,6 +45,17 @@ def ws_auth_close(exc: BaseException) -> tuple[int, str]:
     return 1011, ""
 
 
+def _note_connect(c: Any, want: str, desk: str) -> None:
+    """Record the /ws connect (JOIN fanout). Only a connect that sits is recorded (#332)."""
+    from agent_coord.server.records import join as rec_join
+    from agent_coord.server.redact import redact_format
+
+    try:
+        rec_join.note_connect(c._cn, want)
+    except Exception as e:
+        _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
+
+
 def latency_snapshot() -> dict[str, float | int]:
     """Cheap mill-wall timing for unit/benchmark. Not a Wall API."""
     xs = sorted(_samples)
@@ -318,7 +329,7 @@ def make_asgi_app(
     from starlette.requests import Request
     from starlette.responses import Response
 
-    from .push import HUB
+    from .push import HUB, WS_IN_USE
 
     Handler = make_handler(roots or parse_roots(), api_only=api_only)
 
@@ -462,6 +473,8 @@ def make_asgi_app(
         from agent_coord.server.redact import redact_format
 
         desk = str(websocket.path_params.get("desk") or "")
+        # mill connect -r: do not take a seat another live socket holds (#332).
+        refuse = str(websocket.query_params.get("refuse") or "") == "1"
         try:
             await websocket.accept()
         except Exception as e:
@@ -488,10 +501,8 @@ def make_asgi_app(
             with Book() as c:
                 if rec_join.token_matches(c._cn, want, digest):
                     ok = True
-                    try:
-                        rec_join.note_connect(c._cn, want)
-                    except Exception as e:
-                        _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
+                    if not refuse:
+                        _note_connect(c, want, desk)
             if not ok:
                 _log.warning("ws auth bad token desk=%s", desk)
                 try:
@@ -510,10 +521,27 @@ def make_asgi_app(
             except Exception:
                 pass
             return
+        held = None
         try:
-            await HUB.add(desk, websocket)
+            held = await HUB.add(desk, websocket, refuse=refuse)
         except Exception as e:
             _log.warning("%s", redact_format("ws add fail desk=%s err=%s", desk, e))
+        if held:
+            since = f" since {held['since']}" if held.get("since") else ""
+            try:
+                await websocket.close(code=WS_IN_USE, reason=f"seat in use: {held['desk']}{since}"[:120])
+            except Exception:
+                pass
+            return
+        if refuse:
+            try:
+                from agent_coord.helpers.ident import desk_name
+                from agent_coord.server.book import Book
+
+                with Book() as c:
+                    _note_connect(c, desk_name(desk), desk)
+            except Exception as e:
+                _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
         try:
             from agent_coord.helpers.ident import desk_name
             from agent_coord.server.book import Book
