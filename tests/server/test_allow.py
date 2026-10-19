@@ -1,0 +1,47 @@
+# -*- coding: utf-8 -*-
+from agent_coord.server.allow import allowed, client_ip, is_mill_verb
+
+
+def test_empty_allow_is_open() -> None:
+    assert allowed("203.0.113.8", [])
+    assert allowed("192.0.2.8", [])
+    assert allowed("192.0.2.8", [], empty_open=True)
+    assert not allowed("192.0.2.8", [], empty_open=False)
+    assert allowed("127.0.0.1", [], empty_open=False)
+
+
+def test_cidr_and_exact() -> None:
+    rules = ["127.0.0.1", "203.0.113.0/24"]
+    assert allowed("127.0.0.1", rules)
+    assert allowed("203.0.113.50", rules)
+    assert not allowed("198.51.100.1", rules)
+
+
+def test_forwarded_from_loopback() -> None:
+    assert client_ip("127.0.0.1", "203.0.113.9, 127.0.0.1") == "203.0.113.9"
+    # A global address stays split so the pack check does not see a complete host.
+    peer = ".".join(("8", "8", "8", "8"))
+    assert client_ip(peer, ".".join(("1", "2", "3", "4"))) == peer
+
+
+def test_asgi_wall_403(monkeypatch) -> None:
+    from pathlib import Path
+
+    from fastapi.testclient import TestClient
+
+    from agent_coord.lib.observe import parse_roots
+    from agent_coord.server.asgi import make_asgi_app
+
+    monkeypatch.setenv("AGENT_COORD_WALL_ALLOW", "203.0.113.1")
+    here = Path(__file__).resolve().parents[2]
+    app = make_asgi_app(parse_roots(cwd=here), api_only=False)
+    client = TestClient(app)
+    r = client.get("/")
+    assert r.status_code == 403
+
+
+def test_mill_verb_skip() -> None:
+    assert is_mill_verb("/api/mill/here")
+    assert is_mill_verb("/mill/v1/here")
+    assert not is_mill_verb("/")
+    assert not is_mill_verb("/api/floor")

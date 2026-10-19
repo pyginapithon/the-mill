@@ -1,0 +1,54 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+.pytest_cache/
+.pytest-tmp/
+.pytest-tmp-*/
+.pytest-basetemp/
+pack-deps.txt
+*.prev
+*.tmp.*
+tmp/
+.coverage
+.env
+.env.*
+*.pem
+*.pyc
+*.bak
+uv.lock
+.grok/
+.agents/
+
+LOCAL-NOTES.md
+
+# Local scratch / e2e leftovers
+# Temporary. Remove this line after the build.
+_scan_tests.py
+agent_coord/web/wall_ui_save/
+tmp-route-e2e/
+.mill-evidence-scratch/
+
+# Local product-thinking drafts (review before commit)
+docs/UNDERSTANDING-DIARY.md
+docs/USE-CASES.md
+docs/bots/
+
+# Cold-run batch artifacts (local / not product)
+docs/skills/COLD-RUN-*.json
+
+docs/skills/COLD-RUN-RESULTS.md
+
+# Local runtime logs
+logs/
+
+# Wall validator modules. package.json and the configs stay in the repo.
+tools/wall-validators/node_modules/
+
+# Revisit later. Not this pass.
+# Mail list reader treats mail.roster_id and activity.roster_id as fallbacks. They are different jobs: sender tag vs the project the event is counted under.
+# human_desk has no committed writer. The live seat is join.token_hash.
+# Door code still deletes and updates agent_human, agent_human_device, and agent_human_collect. Those tables are not in tables.sql. The errors are swallowed.
+.mill/

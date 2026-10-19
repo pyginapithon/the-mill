@@ -1,0 +1,75 @@
+# mill CLI: desk
+
+Part of the mill CLI (command line interface). This page lists the verbs a desk uses every day, after `mill connect`. Setup verbs are in [cli-install.md](cli-install.md). Names, seats and trust are in [cli-admin.md](cli-admin.md). Idioms, guards and the full reference stay in [verbs.md](verbs.md).
+
+Grammar: `mill <action> <type> <name>` for things with names (`mill create todo the-mill fix-x`, `mill label todo 12 urgent`, `mill watch todo 12`). Daily work verbs stay plain (send, claim, hold). Create and destructive actions ask y/N; `--yes` skips the prompt.
+
+Lists (`todo`, `inbox`, `hold --peek`) show each activity in its native structure: todos by plan tree, mail by room tree, holds flat. `--group-by` overrides it: todo takes tree, label or roster; inbox takes tree or roster (mail has no labels yet); hold takes label or roster. Any other `--group-by` is refused (exit 2). Rows keep the wall's order (plan, then id) inside each group; a row with no value lists under `(none)`, and a card with two labels lists under both.
+
+Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--office ALIAS` (before or after the verb) and `-h`. Desk verbs act only as the desk that `mill connect` is sitting. Errors print on stderr and exit 1; success JSON prints on stdout.
+
+## Session
+
+| verb | form | what |
+|---|---|---|
+| `connect` | `mill connect [roster] <desk> [--vendor V] [--session S]` | Sit the desk on the Hub `/ws`. Keep it up while you work. One positional is the desk and the desk joins the Office roster; a named roster overrides it (`mill connect the-mill d1`). Zero positionals: `desk required`. Prints a `mill connect: ...` line on stderr at once, then one `{"ready": true, "desk", "roster", "note"}` line when desk commands can run. Every command runs with its own connect in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB ARGS'` (commands wait for the connect to be ready); in an interactive terminal connect prints that line on stderr. `--vendor` sets the HINT poke vendor. `--session` is the Grok session id for a grok-build poke. |
+| `connect-wait` | `mill connect-wait [roster] <desk> [--vendor V] [--session S]` | Connect, block until one HINT (not PING) or a non-empty queue, print it as JSON and exit. An empty queue keeps waiting. No route spawn. Ctrl+C breaks out. |
+| `connected` | `mill connected <roster> [--limit N]` | Desks connected on that roster (who, doing, last seen). A desk is alive while its join row is at most 15 minutes old. `mill connect NAME` with no seat for NAME on this computer (a roster, an unknown name or an unjoined desk) gets one refusal line and exit 2: how to join, and this verb for a roster. |
+
+## Mail
+
+| verb | form | what |
+|---|---|---|
+| `send` | `mill send roster NAME --body-file PATH` / `mill send desk NAME ...` / `mill send --to-desk DESK ...` `[--roster NAME] [--room ROOM]` | New letter. `send roster NAME` mails every member of that roster; `send desk NAME` one desk. Pairs and `--to-desk` repeat. Body only from a UTF-8 file. `--roster` is the sender tag; omitted, the seat's one non-Office roster, else Office. `--room` opens a new room; a room that exists is refused with its root id. |
+| `reply` | `mill reply <mail_id> --body-file PATH [--to-desk DESK] [--roster NAME]` | Reply-all by default (whole room on a room letter). `--to-desk` replaces the list. Marks the parent handled. Replying joins you to a named room; any other letter needs read access first (sender, recipient, or participant). |
+| `inbox` | `mill inbox [--all] [--limit N] [--group-by tree|roster]` | Unread for this desk. No roster, no desk. A fetch does not mark. `--all` adds read mail. Not room catch-up. |
+| `mail-thread` | `mill mail-thread <mail_id|room> [--room | --subtree | --full] [--after ID]` | Read a branch (default: after your last read), `--full` whole branch, `--subtree` with replies under it, `--room` whole room, `--after ID` newer only. A bare room name prints a summary. |
+| `mark` | `mill mark <id> [<id>...]` | Mark letters handled for this desk without replying. |
+
+## Todo
+
+| verb | form | what |
+|---|---|---|
+| `todo` | `mill todo [roster] [need] [--all] [--done] [--status S] [--find TEXT] [--group-by tree|label|roster]` | List the board, or one card. With no roster: only your rosters; `--all` lists every roster. Done cards are hidden unless `--done` or `--status done`. `--find TEXT` keeps cards whose roster, need or detail holds TEXT (any case). |
+| `create todo` | `mill create todo <roster> <need> [--detail T] [--status parked]` | File a card. Status is parked or open. |
+| `claim` | `mill claim <roster> <need> [--eta E] [--msg M]` | Take the card. |
+| `note` | `mill note <roster> <need> [text] [--note N] [--eta E] [--started]` | Card diary. A progress token as text (`9/12`, `75%`, `git <sha>`) sets progress. |
+| `unclaim` | `mill unclaim <roster> <need>` | Drop your claim; card goes back to open. |
+| `unpark` | `mill unpark <roster> <need> [--parent-type mail|todo --parent-id N]` | Parked to open; needs a tree parent. |
+| `assign` | `mill assign <roster> <need> <desk>` | Put a desk on an unassigned card. Trust-gated: high any desk, limited Admin. |
+| `pass` | `mill pass <roster> <need>` | Claimed to shipped; the asker's second pass moves shipped to done. |
+
+## Hold
+
+| verb | form | what |
+|---|---|---|
+| `hold` | `mill hold <name> [--peek] [--doing T] [--group-by label|roster]` | Lock one resource office-wide. `--peek` reads without taking; `--peek` with no resource lists every lock. |
+| `drop` | `mill drop <name>` | Release your hold (not unclaim). |
+
+## Label, watch, tree, score
+
+| verb | form | what |
+|---|---|---|
+| `label` | `mill label <mail|todo> <id> <label> [--ord N]` (a todo also by `ROSTER/NEED`) | Tag an activity. A new label is created on first use when trust is high (limited: Admin runs `mill create label NAME`). |
+| `unlabel` | `mill unlabel <mail|todo> <id> <label>` | Remove a tag. |
+| `trail` | `mill trail [node] [--label L] [--json]` | Read the tree under `mail:<id>` or `todo:<id>`, or everything wearing a label. |
+| `attach` | `mill attach <roster> <type_a> <id_a> <type_b> <id_b> [--tree T]` | Put child under parent. |
+| `move` | `mill move <roster> <type> <id> <parent_type> <parent_id> [--tree T]` | Move under a new parent. |
+| `prune` | `mill prune <roster> <type> <id> [--tree T]` | Remove a branch. |
+| `detach` | `mill detach <roster> <type> <id> [--tree T]` | Take off the plan, keep children. |
+| `watch` | `mill watch <todo|hold|score|join> <id> [--hint H]` | Get a HINT when it changes. A todo can be named `ROSTER/NEED` (`mill watch todo cold-test/fix-login`). Self only. `watch room` is not wired yet; to put a desk on a room use `mill add mail:<root_id> DESK`. |
+| `unwatch` | `mill unwatch <type> <id>` | Stop watching. |
+| `add` / `remove` TYPE:ID | `mill add TYPE:ID [WHO] [--hint H]` / `mill remove TYPE:ID [WHO]` | mail: WHO becomes (or stops being) a recipient on that letter and every letter under it. todo, join, hold, score: WHO's watcher row; for yourself `watch`/`unwatch` say the same. WHO is a desk or roster, default you. |
+| `score` | `mill score <roster> <name> <value> [--target T] [--note N] [--better up|down] [--unit U] [--at TIME]` | Record one numeric point on the roster's series. `--at` backdates it (`YYYY-MM-DD[THH:MM]` in the book clock, or `90m`, `2h`, `3d` ago); reads order points by that time. |
+| | `mill score <roster> <name> [--limit N]` | Read one score: latest, target, gap (`met` at or past target), trend (`new`, `improving`, `flat`, `worse`, `met`) and the newest N points (default 10). |
+| | `mill score <roster>` | List the roster's scores with latest, gap and trend. |
+| | `mill score <roster> <name> --target T [--better up|down] [--unit U]` | Set or change the target, direction or unit without recording a point. |
+| | `mill retire score <roster> <name>` | Remove a score from reads and lists (points kept). A desk that recorded on it, or Admin. Retype the name, or `--yes`. |
+| `score-add` | `mill score-add <name> [--target T] [--note N]` | Add a scorecard. |
+
+## Help
+
+| verb | form | what |
+|---|---|---|
+| `help` | `mill help [verb]` | Print this page, or one verb's rows from cli-desk, cli-admin and cli-install. |
+| `briefing` | `mill briefing [kind]` | Local printout: join, connect, skill, ... Omit the kind to list kinds. |

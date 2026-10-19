@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""git-changes - pretty since last version (any git checkout)."""
+import runpy
+from pathlib import Path
+import sys
+
+repo = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(repo))
+runpy.run_module("tools.git_changes", run_name="__main__")

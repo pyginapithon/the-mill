@@ -1,0 +1,107 @@
+-- MILL_NAME_GET: SELECT only (reads must not mint).
+-- MILL_NAME_PUT: INSERT on first use (intentional create paths only).
+-- MILL_NAME calls MILL_NAME_PUT. Reads use MILL_NAME_GET. Creates use MILL_NAME_PUT.
+-- A name is (type, bare string). id is the primary key. idx_type is UNIQUE (type, name).
+-- Deleted names stay unique; retired names SIGNAL on get and put.
+
+DROP FUNCTION IF EXISTS MILL_NAME;
+DROP FUNCTION IF EXISTS MILL_NAME_GET;
+DROP FUNCTION IF EXISTS MILL_NAME_PUT;
+DROP FUNCTION IF EXISTS MILL_NEXT_ID;
+DROP FUNCTION IF EXISTS MILL_SLUG;
+DROP FUNCTION IF EXISTS MILL_DESLUG;
+DROP FUNCTION IF EXISTS MILL_KIND;
+DROP FUNCTION IF EXISTS MILL_NAME_TYPE;
+DROP FUNCTION IF EXISTS MILL_NAME_BARE;
+DROP FUNCTION IF EXISTS MILL_NAME_KEY;
+DROP FUNCTION IF EXISTS NAME_TYPE;
+DROP FUNCTION IF EXISTS NAME_BARE;
+DROP FUNCTION IF EXISTS PROJECT_KEY;
+DROP FUNCTION IF EXISTS DESK_KEY;
+DROP FUNCTION IF EXISTS ROLE_KEY;
+DROP FUNCTION IF EXISTS LABEL_KEY;
+DROP FUNCTION IF EXISTS RES_KEY;
+DROP FUNCTION IF EXISTS TREE_KEY;
+
+DELIMITER //
+
+CREATE FUNCTION MILL_NAME_GET(p_type VARCHAR(16), p_name VARCHAR(64)) RETURNS BIGINT UNSIGNED
+  NOT DETERMINISTIC
+  READS SQL DATA
+BEGIN
+  DECLARE v_id BIGINT UNSIGNED;
+  DECLARE v_del DATETIME(6);
+  IF p_type IS NULL OR p_type NOT IN ('desk','roster','label','tree','res') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name type is desk, roster, label, tree, or res';
+  END IF;
+  IF p_name IS NULL OR TRIM(p_name) = '' THEN
+    RETURN NULL;
+  END IF;
+  SELECT id, deleted INTO v_id, v_del
+    FROM name
+   WHERE type = p_type AND name = TRIM(p_name)
+   LIMIT 1;
+  IF v_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+  IF v_del IS NOT NULL THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'name retired: mill reclaim NAME NAME --yes (mill host only)';
+  END IF;
+  RETURN v_id;
+END //
+
+CREATE FUNCTION MILL_NAME_PUT(p_type VARCHAR(16), p_name VARCHAR(64)) RETURNS BIGINT UNSIGNED
+  NOT DETERMINISTIC
+  MODIFIES SQL DATA
+BEGIN
+  DECLARE v_id BIGINT UNSIGNED;
+  DECLARE v_del DATETIME(6);
+  DECLARE v_dup INT DEFAULT 0;
+  DECLARE CONTINUE HANDLER FOR 1062 SET v_dup = 1;
+  IF p_type IS NULL OR p_type NOT IN ('desk','roster','label','tree','res') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name type is desk, roster, label, tree, or res';
+  END IF;
+  IF p_name IS NULL OR TRIM(p_name) = '' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name is empty';
+  END IF;
+  SELECT id, deleted INTO v_id, v_del
+    FROM name
+   WHERE type = p_type AND name = TRIM(p_name)
+   LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    IF v_del IS NOT NULL THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'name retired: mill reclaim NAME NAME --yes (mill host only)';
+    END IF;
+    RETURN v_id;
+  END IF;
+  INSERT INTO name (type, name) VALUES (p_type, TRIM(p_name));
+  IF v_dup = 1 THEN
+    SELECT id, deleted INTO v_id, v_del
+      FROM name
+     WHERE type = p_type AND name = TRIM(p_name)
+     LIMIT 1;
+    IF v_id IS NULL THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'name insert lost a race';
+    END IF;
+    IF v_del IS NOT NULL THEN
+      SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'name retired: mill reclaim NAME NAME --yes (mill host only)';
+    END IF;
+    RETURN v_id;
+  END IF;
+  SET v_id = LAST_INSERT_ID();
+  RETURN v_id;
+END //
+
+-- Same as MILL_NAME_PUT.
+CREATE FUNCTION MILL_NAME(p_type VARCHAR(16), p_name VARCHAR(64)) RETURNS BIGINT UNSIGNED
+  NOT DETERMINISTIC
+  MODIFIES SQL DATA
+BEGIN
+  RETURN MILL_NAME_PUT(p_type, p_name);
+END //
+
+DELIMITER ;

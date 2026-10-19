@@ -1,0 +1,192 @@
+# Port of .gitlab-ci.yml (build + check stages). GitLab stays primary until the
+# cutover; both CIs run in parallel until then. Keep the two in step.
+# Rules: every action is pinned to a full commit SHA, no pull_request_target,
+# no self-hosted runners (fork PRs on a public repo would run code on them).
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  # release.yml calls this file so a tag is gated by the same jobs.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Literal prefix: when called from release.yml, github.workflow is the caller.
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build_pack:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          # No cache on tag runs: a release must not restore a cache written by a branch.
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') && 'pip' || '' }}
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install --upgrade pip build
+      - run: python -m build
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  check_pack:
+    needs: build_pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: the commit-message scans start at a cut older than any
+          # shallow depth, and check_pack fails closed on a shallow clone.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') && 'pip' || '' }}
+          cache-dependency-path: pyproject.toml
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - run: python -m pip install --upgrade pip pip-audit
+      - run: python tools/check_pack.py dist
+      - run: python tools/write_pack_deps.py
+      - run: pip-audit -r pack-deps.txt
+
+  mill_cli_smoke:
+    needs: build_pack
+    # Pinned image, not ubuntu-latest: 24.04 ships OpenSSL 3.0, the case the
+    # C-driver restart fix exists for.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') && 'pip' || '' }}
+          cache-dependency-path: pyproject.toml
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install dist/the_mill-*.tar.gz
+      - run: python tools/mill_cli_smoke.py
+      # F34: the built env must run the book on the connector's C extension.
+      - run: test "$(uname -m)" = "x86_64"
+      - run: python -m agent_coord.server.records.driver --require-c
+      - run: python tools/check_skill_copy.py --installed
+
+  pytest_no_sql:
+    needs: build_pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      # Node 24.21.0 is the desk runtime. html-validate needs ^22.22 or >=24.8.
+      NODE_VERSION: v24.21.0
+      NODE_SHA256: fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') && 'pip' || '' }}
+          cache-dependency-path: pyproject.toml
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - name: Install Node (official tarball, sha256 checked)
+        run: |
+          set -eu
+          test "$(uname -m)" = "x86_64"
+          tarball="$RUNNER_TEMP/node.tar.xz"
+          curl -fsSL --retry 5 --retry-all-errors -o "$tarball" \
+            "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz"
+          echo "${NODE_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/node"
+          tar -xJf "$tarball" -C "$RUNNER_TEMP/node" --strip-components=1
+          echo "$RUNNER_TEMP/node/bin" >> "$GITHUB_PATH"
+      - run: test "$(node -v)" = "$NODE_VERSION"
+      - run: npm ci --prefix tools/wall-validators
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install dist/the_mill-*.tar.gz "pytest>=8" "httpx>=0.27"
+      - run: python -m pytest tests -m "not sql"
+
+  pytest_sql:
+    needs: build_pack
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      # One throwaway MySQL per job. The job runs on the VM, so the service is
+      # reached on 127.0.0.1 through the mapped port, not by a service alias.
+      # The password is a CI-only value for this disposable container.
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_ROOT_HOST: "%"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      AGENT_COORD_HOST: 127.0.0.1
+      AGENT_COORD_USER: root
+      AGENT_COORD_PASSWORD: root
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: ${{ !startsWith(github.ref, 'refs/tags/') && 'pip' || '' }}
+          cache-dependency-path: pyproject.toml
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist/
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install dist/the_mill-*.tar.gz "pytest>=8" "httpx>=0.27"
+      - name: Wait for MySQL
+        shell: python
+        run: |
+          import sys, time, mysql.connector
+          last = None
+          for _ in range(30):
+              try:
+                  mysql.connector.connect(host="127.0.0.1", user="root", password="root", connection_timeout=5).close()
+                  sys.exit(0)
+              except Exception as e:
+                  last = e
+                  time.sleep(2)
+          sys.exit("mysql not ready: %s" % last)
+      - run: python -m pytest tests -m sql

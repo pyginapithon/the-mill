@@ -1,0 +1,10 @@
+#!/bin/sh
+# Hygiene on the commit message. Setup: git config core.hooksPath .githooks
+root=$(git rev-parse --show-toplevel) || exit 1
+for py in python3 python py; do
+  if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys; sys.exit(sys.version_info < (3, 8))" >/dev/null 2>&1; then
+    exec "$py" "$root/tools/precommit_hygiene.py" msg "$1"
+  fi
+done
+echo "commit-msg: no python found (tried python3, python, py)" >&2
+exit 1

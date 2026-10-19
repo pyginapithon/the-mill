@@ -1,0 +1,326 @@
+"""30-day push drop writes one expired line per desk and does not age that line out.
+
+F17: the drop is mill_push_expire (wall start, then twice a day), not every take.
+"""
+from __future__ import annotations
+
+import json
+import os
+
+import pytest
+
+pytestmark = pytest.mark.sql
+
+from agent_coord.install import migrate
+from agent_coord.server.records import apply, connect
+from agent_coord.server.records import push as rec_push
+from agent_coord.server.records.db import conn_kwargs as _conn_kwargs
+from tests.server.records.conftest import seed_names
+from tests.sql_isolate import throwaway_db
+
+TEST_DB = throwaway_db("mill_push_expired_test")
+
+
+def _cn():
+    import mysql.connector
+
+    kw = _conn_kwargs()
+    kw.pop("database", None)
+    kw["autocommit"] = True
+    admin = mysql.connector.connect(**kw)
+    cur = admin.cursor()
+    cur.execute(
+        f"CREATE DATABASE IF NOT EXISTS `{TEST_DB}` "
+        "DEFAULT CHARACTER SET utf8mb4 DEFAULT COLLATE utf8mb4_0900_ai_ci"
+    )
+    cur.close()
+    admin.close()
+    os.environ["AGENT_COORD_DATABASE"] = TEST_DB
+    cn = connect(TEST_DB)
+    apply(cn, wipe=True)
+    return cn
+
+
+@pytest.fixture(scope="module")
+def cn():
+    try:
+        c = _cn()
+    except Exception as e:
+        pytest.skip(f"mysql mill records: {e}")
+    yield c
+    c.close()
+
+
+def _desk(cn, name: str) -> int:
+    return seed_names(cn, (name, "desk"))[0]
+
+
+def _push(cn, desk_id: int, kind: str, outcome: str, days_ago: int, payload: dict) -> int:
+    cur = cn.cursor()
+    try:
+        cur.execute(
+            "INSERT INTO push_queue (desk_id, kind, payload, outcome, created) "
+            f"VALUES (%s, %s, %s, %s, DATE_SUB(NOW(6), INTERVAL {int(days_ago)} DAY))",
+            (desk_id, kind, json.dumps(payload), outcome),
+        )
+        cn.commit()
+        return int(cur.lastrowid)
+    finally:
+        cur.close()
+
+
+def _rows(cn, desk_id: int) -> list[dict]:
+    cur = cn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            "SELECT id, kind, payload, outcome, created FROM push_queue "
+            "WHERE desk_id = %s ORDER BY id",
+            (desk_id,),
+        )
+        out = []
+        for row in cur.fetchall():
+            payload = row["payload"]
+            if isinstance(payload, str):
+                payload = json.loads(payload)
+            row["payload"] = payload
+            out.append(row)
+        return out
+    finally:
+        cur.close()
+
+
+def _counts(item: dict) -> dict:
+    return {k: int(item[k]) for k in ("hint", "mail", "receipt", "missed", "error")}
+
+
+def _blob(item: dict) -> str:
+    return json.dumps(item, default=str)
+
+
+def test_fresh_rows_have_no_expired_line(cn) -> None:
+    desk = _desk(cn, "push-expire-fresh")
+    _push(cn, desk, "mail", "missed", 1, {"id": 1, "body": "still-here"})
+    items = rec_push.take(cn, "push-expire-fresh")
+    assert [item["kind"] for item in items] == ["mail"]
+    assert items[0]["body"] == "still-here"
+    assert _rows(cn, desk) == []
+
+
+def test_other_desk_sync_writes_one_line_and_take_returns_it(cn) -> None:
+    away = _desk(cn, "push-expire-away")
+    other = _desk(cn, "push-expire-other")
+    _push(cn, away, "hint", "missed", 40, {"type": "todo", "id": 9, "body": "old-hint"})
+    _push(cn, away, "mail", "error", 35, {"id": 8, "body": "old-mail"})
+    _push(cn, away, "receipt", "sent", 31, {"id": 8, "body": "old-receipt"})
+    _push(cn, other, "hint", "sent", 1, {"type": "todo", "id": 3, "hint": "TODO"})
+    rec_push.expire(cn)
+    other_items = rec_push.take(cn, "push-expire-other")
+    assert [item["kind"] for item in other_items] == ["hint"]
+    queued = _rows(cn, away)
+    assert [row["kind"] for row in queued] == ["expired"]
+    payload = queued[0]["payload"]
+    assert set(payload) == {
+        "window_start",
+        "window_end",
+        "hint",
+        "mail",
+        "receipt",
+        "missed",
+        "error",
+    }
+    assert payload["window_start"] <= payload["window_end"]
+    assert [int(payload[k]) for k in ("hint", "mail", "receipt", "missed", "error")] == [
+        1,
+        1,
+        1,
+        1,
+        1,
+    ]
+    assert "old-hint" not in json.dumps(payload)
+    items = rec_push.take(cn, "push-expire-away")
+    assert len(items) == 1
+    assert items[0]["kind"] == "expired"
+    assert items[0]["outcome"] == "missed"
+    assert _counts(items[0]) == {
+        "hint": 1,
+        "mail": 1,
+        "receipt": 1,
+        "missed": 1,
+        "error": 1,
+    }
+    assert "body" not in items[0]
+    assert rec_push.take(cn, "push-expire-away") == []
+
+
+def test_later_window_updates_the_same_line(cn) -> None:
+    away = _desk(cn, "push-expire-later")
+    other = _desk(cn, "push-expire-later-other")
+    _push(cn, away, "hint", "missed", 40, {"body": "first"})
+    rec_push.expire(cn)
+    first = _rows(cn, away)
+    assert len(first) == 1
+    line_id = int(first[0]["id"])
+    created = str(first[0]["created"])
+    _push(cn, away, "mail", "missed", 40, {"body": "second"})
+    _push(cn, other, "hint", "sent", 1, {"hint": "TODO"})
+    rec_push.expire(cn)
+    again = _rows(cn, away)
+    assert [int(row["id"]) for row in again] == [line_id]
+    assert int(again[0]["payload"]["hint"]) == 1
+    assert int(again[0]["payload"]["mail"]) == 1
+    assert int(again[0]["payload"]["missed"]) == 2
+    assert str(again[0]["created"]) >= created
+    items = rec_push.take(cn, "push-expire-later")
+    assert [item["kind"] for item in items] == ["expired"]
+    assert _counts(items[0])["mail"] == 1
+    assert "second" not in _blob(items[0])
+
+
+def test_fresh_row_comes_out_before_the_expired_line(cn) -> None:
+    desk = _desk(cn, "push-expire-order")
+    _push(cn, desk, "hint", "missed", 40, {"body": "gone"})
+    _push(cn, desk, "mail", "sent", 1, {"id": 4, "body": "kept"})
+    rec_push.expire(cn)
+    items = rec_push.take(cn, "push-expire-order")
+    assert [item["kind"] for item in items] == ["mail", "expired"]
+    assert items[0]["body"] == "kept"
+    assert "gone" not in _blob(items[1])
+    assert _counts(items[1])["hint"] == 1
+
+
+def test_expired_line_does_not_age_out(cn) -> None:
+    away = _desk(cn, "push-expire-stay")
+    _push(cn, away, "hint", "error", 40, {"body": "drop-me"})
+    rec_push.expire(cn)
+    cur = cn.cursor()
+    try:
+        cur.execute(
+            "UPDATE push_queue SET created = DATE_SUB(NOW(6), INTERVAL 40 DAY) "
+            "WHERE desk_id = %s AND kind = 'expired'",
+            (away,),
+        )
+        cn.commit()
+    finally:
+        cur.close()
+    _desk(cn, "push-expire-stay-other")
+    _push(cn, _desk(cn, "push-expire-stay-other"), "mail", "sent", 40, {"body": "other-old"})
+    rec_push.expire(cn)
+    still = _rows(cn, away)
+    assert [row["kind"] for row in still] == ["expired"]
+    items = rec_push.take(cn, "push-expire-stay")
+    assert [item["kind"] for item in items] == ["expired"]
+    assert _counts(items[0])["error"] == 1
+
+
+def test_put_rejects_expired_kind(cn) -> None:
+    _desk(cn, "push-expire-put")
+    with pytest.raises(Exception, match="push: kind"):
+        rec_push.put(cn, "push-expire-put", "expired", {"hint": 1}, "missed")
+
+
+def test_ensure_widens_kind_and_refreshes_take(cn) -> None:
+    cur = cn.cursor()
+    try:
+        cur.execute("DELETE FROM push_queue")
+        cn.commit()
+        cur.execute(
+            "ALTER TABLE push_queue MODIFY kind "
+            "ENUM('hint','mail','receipt') NOT NULL"
+        )
+        cn.commit()
+    finally:
+        cur.close()
+    out = migrate.ensure(cn)
+    assert "push_queue.kind.expired" in out["applied"]
+    assert "sp_push" in out["applied"]
+    cur = cn.cursor()
+    try:
+        cur.execute(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'push_queue' "
+            "AND COLUMN_NAME = 'kind'"
+        )
+        kind = cur.fetchone()[0]
+    finally:
+        cur.close()
+    assert "expired" in str(kind)
+    desk = _desk(cn, "push-expire-ensure")
+    _push(cn, desk, "mail", "missed", 40, {"body": "via-ensure"})
+    rec_push.expire(cn)
+    items = rec_push.take(cn, "push-expire-ensure")
+    assert [item["kind"] for item in items] == ["expired"]
+    assert "via-ensure" not in _blob(items[0])
+
+
+def _clear(cn) -> None:
+    cur = cn.cursor()
+    try:
+        cur.execute("DELETE FROM push_queue")
+        cn.commit()
+    finally:
+        cur.close()
+
+
+def test_take_does_not_sweep_other_desks(cn) -> None:
+    """F17: a take reads only this desk. Another desk's old rows wait for the sweep."""
+    _clear(cn)
+    away = _desk(cn, "push-f17-away")
+    me = _desk(cn, "push-f17-me")
+    _push(cn, away, "mail", "missed", 40, {"body": "away-old"})
+    _push(cn, me, "hint", "sent", 1, {"hint": "TODO"})
+    assert [i["kind"] for i in rec_push.take(cn, "push-f17-me")] == ["hint"]
+    left = _rows(cn, away)
+    assert [r["kind"] for r in left] == ["mail"]
+    assert left[0]["payload"]["body"] == "away-old"
+
+
+def test_take_never_hands_out_an_old_row_before_the_sweep(cn) -> None:
+    """F17: a row past 30 days is not returned, even when the sweep has not run yet."""
+    _clear(cn)
+    desk = _desk(cn, "push-f17-old")
+    _push(cn, desk, "mail", "missed", 40, {"body": "too-old"})
+    fresh = _push(cn, desk, "mail", "sent", 1, {"id": 5, "body": "fresh"})
+    items = rec_push.take(cn, "push-f17-old")
+    assert [i["body"] for i in items] == ["fresh"]
+    assert "too-old" not in _blob(items)
+    left = _rows(cn, desk)
+    assert [r["kind"] for r in left] == ["mail"]
+    assert int(left[0]["id"]) != fresh
+    out = rec_push.expire(cn)
+    assert out["deleted"] == 1
+    items = rec_push.take(cn, "push-f17-old")
+    assert [i["kind"] for i in items] == ["expired"]
+    assert _counts(items[0])["mail"] == 1
+    assert _rows(cn, desk) == []
+
+
+def test_expire_counts_and_second_pass_is_a_no_op(cn) -> None:
+    """F17: the sweep reports what it dropped; running it again changes nothing."""
+    _clear(cn)
+    a = _desk(cn, "push-f17-a")
+    b = _desk(cn, "push-f17-b")
+    _push(cn, a, "hint", "missed", 31, {"body": "a1"})
+    _push(cn, a, "mail", "error", 45, {"body": "a2"})
+    _push(cn, b, "receipt", "sent", 60, {"body": "b1"})
+    _push(cn, b, "mail", "sent", 2, {"body": "b-fresh"})
+    first = rec_push.expire(cn)
+    assert first["deleted"] == 3
+    assert first["cut"]
+    snap = [(r["id"], r["kind"], json.dumps(r["payload"], sort_keys=True)) for d in (a, b) for r in _rows(cn, d)]
+    assert sorted(k for _i, k, _p in snap) == ["expired", "expired", "mail"]
+    second = rec_push.expire(cn)
+    assert second["deleted"] == 0
+    again = [(r["id"], r["kind"], json.dumps(r["payload"], sort_keys=True)) for d in (a, b) for r in _rows(cn, d)]
+    assert again == snap
+
+
+def test_expire_on_a_fresh_queue_writes_no_line(cn) -> None:
+    _clear(cn)
+    desk = _desk(cn, "push-f17-fresh")
+    _push(cn, desk, "mail", "sent", 29, {"body": "inside-window"})
+    assert rec_push.expire(cn)["deleted"] == 0
+    assert [r["kind"] for r in _rows(cn, desk)] == ["mail"]
+
+
+def test_take_for_an_unknown_desk_is_empty(cn) -> None:
+    assert rec_push.take(cn, "push-f17-nobody") == []

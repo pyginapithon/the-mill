@@ -1,0 +1,3 @@
+prune agent_coord/web/wall_ui_save
+global-exclude *.pyc
+global-exclude __pycache__

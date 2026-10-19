@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="The Mill">
+  <title>The Mill</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <!-- WALL_UI_LIB_THEME: default CSS vars (fonts/sizes/headings); Cut6 DB css_vars HOLD -->
+  <script src="/shell-early.js?v=wow281" data-wall-early="all"></script>
+  <link rel="stylesheet" href="/lib/theme.css?v=wow165">
+  <!-- Instant shell: critical chrome only; full board.css loads async (Wave 1 / #40). -->
+  <link rel="stylesheet" href="/shell.css?v=wow269">
+  <!-- wow176: critical welcome Nest overlay (sync); board.css loads async -->
+  <style id="wall-welcome-critical">
+  #wall-welcome:not([hidden]){position:fixed;inset:0;z-index:90;display:flex;align-items:center;justify-content:center;padding:.75rem}
+  #wall-welcome[hidden]{display:none!important}
+  #wall-welcome .ww-backdrop{position:absolute;inset:0;background:rgba(8,10,13,.45);cursor:pointer}
+  #wall-welcome .ww-card{position:relative;z-index:1;max-width:32rem;width:100%;max-height:calc(100vh - 1.5rem);overflow-x:hidden;overflow-y:auto;background:var(--panel,#12171e);border:1px solid var(--edge,#2c3644);border-radius:var(--radius,10px);box-shadow:var(--shadow,0 12px 36px rgba(0,0,0,.4));padding:.7rem .85rem .75rem;color:var(--dim,#8d99a8);font-size:13px;line-height:1.45}
+  #wall-welcome .ww-card header{display:flex;align-items:center;gap:.4rem;padding:0 0 .2rem}
+  #wall-welcome .dismiss{margin-left:auto;background:transparent;border:0;color:var(--dim,#8d99a8);font:inherit;cursor:pointer;padding:.1rem .25rem;touch-action:auto}
+  #wall-welcome .dismiss:hover{color:var(--ink,#e8eef5)}
+  </style>
+
+  <link rel="stylesheet" href="/board.css?v=wow283" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="/board.css?v=wow283"></noscript>
+  
+  <style>.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}</style>
+</head>
+<body>
+  <div id="wall-refresh-banner" role="status" aria-live="polite">
+    <span>Wall updated - refresh</span>
+    <button type="button" id="wall-refresh-btn" title="Reload Wall to pick up the new UI">Refresh</button>
+  </div>
+  <header>
+    <div class="header-left">
+    <h1><span class="mill-mark" aria-hidden="true"></span>THE MILL</h1>
+    <div class="header-more">
+      <button type="button" class="howto-toggle" id="header-more-btn" aria-expanded="false" aria-controls="header-more-menu" title="How to, filter, GUIDE, GLOSSARY">More</button>
+      <div id="header-more-menu" class="header-more-menu" hidden>
+        <button type="button" class="howto-toggle" id="howto-toggle" aria-expanded="false" aria-controls="howto-card">HOW TO READ THIS</button>
+        <button type="button" class="howto-toggle" id="wall-add">CUSTOM FILTER</button>
+        <button type="button" class="howto-toggle ops-chrome" id="admin-open" data-tab="admin" hidden title="Admin - hash #admin">ADMIN</button>
+        <button type="button" class="howto-toggle ops-chrome" id="debug-wire" data-tab="wire" hidden title="WIRE - hash #wire">DEBUG | WIRE</button>
+        <button type="button" class="howto-toggle" id="guide-open" data-tab="guide" title="GUIDE - what this office is, how to look, the agent loop.">GUIDE</button>
+        <button type="button" class="howto-toggle" id="glossary-open" data-tab="glossary" title="GLOSSARY - rosters, desks, labels, files.">GLOSSARY</button>
+        <button type="button" class="howto-toggle" id="ticker-more-btn">Ticker on</button>
+        <div class="theme-pref" id="theme-pref" role="group" aria-label="Theme">
+          <span class="lbl">THEME</span>
+          <button type="button" data-theme-pref="auto">auto</button>
+          <button type="button" data-theme-pref="dark">dark</button>
+          <button type="button" data-theme-pref="light">light</button>
+        </div>
+      </div>
+    </div>
+    </div>
+    <span class="header-health">
+      <a id="wall-signout" class="wall-signout" data-signout="off" href="/mill/signout">Sign out</a>
+      <span class="api-health" id="api-health" title="Mill API">API | ...</span>
+      <span class="clock" id="clock">-</span>
+    </span>
+  </header>
+  <aside id="filter-panel" hidden>
+    <header>
+      <h2>CUSTOM FILTER</h2>
+      <button type="button" class="dismiss" id="filter-cancel">close</button>
+    </header>
+    <p class="note">Apply writes the URL (anyone with the door can open that link). Save chip is this browser only - the mill has no human login. Copy on a chip shares the URL.</p>
+    <form id="filter-form" class="desk-form" style="flex-direction:column;align-items:stretch;gap:.45rem">
+      <label>Name <input id="flt-name" maxlength="64" placeholder="e.g. mill bugs this week"></label>
+      <label>Products <input id="flt-projects" maxlength="200" placeholder="comma list, empty = all"></label>
+      <label>Owner <input id="flt-owner" maxlength="64" placeholder="a desk, or empty for all"></label>
+      <label>Kind
+        <select id="flt-kind">
+          <option value="">any</option>
+          <option value="bug">bug</option>
+          <option value="feature">feature</option>
+          <option value="next">next</option>
+        </select>
+      </label>
+      <label>Status
+        <select id="flt-status">
+          <option value="">any</option>
+          <option value="todo">to do</option>
+          <option value="doing">in progress</option>
+          <option value="done">done</option>
+        </select>
+      </label>
+      <label>From <input id="flt-from" type="date"></label>
+      <label>To <input id="flt-to" type="date"></label>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button type="submit">apply</button>
+        <button type="button" id="filter-save">save chip</button>
+        <button type="button" id="filter-clear">clear</button>
+      </div>
+    </form>
+  </aside>
+  <div id="shell">
+  <aside id="rail" aria-label="Office, rosters, views">
+    <button type="button" id="rail-toggle" title="Narrow or expand the rail" aria-expanded="true">"</button>
+    <div id="rail-book" class="rail-book" aria-label="Stations and rosters">
+      <div><span class="rail-lbl">Stations</span><div id="rail-desks"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div></div>
+      <div><span class="rail-lbl">Roster</span><div id="rail-roster"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div></div>
+    </div>
+  <nav class="tabs" aria-label="office panes">
+    <button type="button" data-tab="session" class="on" title="Desks connected now, and what they are doing">CONNECTED</button>
+    <button type="button" data-tab="jobs" title="Open cards">TODO</button>
+    <button type="button" data-tab="mail" title="Letters between desks">MAIL</button>
+    <button type="button" data-tab="score" title="Last against target">SCORE</button>
+    <button type="button" data-tab="floor" title="Activity between desks">COLLAB</button>
+</nav>
+  </aside>
+  <div class="shell-main">
+  <div class="glance-band">
+  <div class="ticker-row">
+    <div id="ticker" class="ticker-sliver" aria-hidden="false">
+      <div id="here-scores" class="here-score-row" aria-label="Office scores off target"></div>
+    </div>
+  </div>
+  <div class="glance-status">
+  <div class="strip-stack">
+  <div class="strip" id="strip" aria-label="project glance"><span class="kpi strip-nav on kpi-loading" id="strip-here" title="Desks connected now" role="link" tabindex="0" data-wall-strip-loading="1">CONNECTED<span class="kpi-load" aria-hidden="true"><span class="wall-loading-spin"></span><span class="wall-loading-ico">âŒ›</span></span><b>...</b></span><span class="kpi strip-nav kpi-loading" id="strip-todo" title="Open cards" role="link" tabindex="0" data-wall-strip-loading="1">TODO<span class="kpi-load" aria-hidden="true"><span class="wall-loading-spin"></span><span class="wall-loading-ico">âŒ›</span></span><b>...</b></span><span class="kpi strip-nav mail-unread kpi-loading" id="strip-mail" title="Unread letters" role="link" tabindex="0" data-wall-strip-loading="1">MAIL<span class="kpi-load" aria-hidden="true"><span class="wall-loading-spin"></span><span class="wall-loading-ico">âŒ›</span></span><b>-</b></span><span class="kpi strip-nav kpi-loading" id="strip-score" title="Last against target" role="link" tabindex="0" data-wall-strip-loading="1">SCORE<span class="kpi-load" aria-hidden="true"><span class="wall-loading-spin"></span><span class="wall-loading-ico">âŒ›</span></span><b>...</b></span><span class="kpi strip-nav strip-later kpi-loading" id="strip-floor" title="Shared letters, cards, and promises" role="link" tabindex="0" data-wall-strip-loading="1">COLLAB<span class="kpi-load" aria-hidden="true"><span class="wall-loading-spin"></span><span class="wall-loading-ico">âŒ›</span></span><b>...</b></span></div>
+  
+  <div class="subnav page-views is-later" id="subnav" aria-label="Views of the highlighted box">
+    <div class="subnav-set" data-for="session">
+      <span class="session-mode" role="group" aria-label="Now, Promise, History, or Watch">
+        <button type="button" data-session-mode="now" data-ico="now" class="on" title="Who is connected this second">Now</button>
+        <button type="button" data-session-mode="leases" data-ico="leases" title="Who holds a file">Promise</button>
+        <button type="button" data-session-mode="history" data-ico="history" title="Who was here, and what they did">History</button>
+        <button type="button" data-session-mode="watch" data-ico="watch" title="Who gets a HINT when an activity changes">Watch</button>
+      </span>
+    </div>
+    <div class="subnav-set" data-for="floor" hidden>
+      <span class="floor-mode" id="floor-mode" role="group" aria-label="Collab view">
+        <button type="button" data-floor-mode="map" data-ico="map" class="on" title="A letter, a card, or a promise between two desks">Between</button>
+        <button type="button" data-floor-mode="timeline" data-ico="timeline" title="Timeline">Timeline</button>
+      </span>
+    </div>
+    <div class="subnav-set" data-for="jobs" hidden>
+      <span class="todo-view" role="group" aria-label="TODO view">
+        <button type="button" data-todo-view="board" data-ico="board" class="on" title="Board">Board</button>
+        <button type="button" data-todo-view="list" data-ico="list" title="List">List</button>
+        <button type="button" data-todo-view="nest" data-ico="nest" title="Cards placed under other cards">Plan</button>
+      </span>
+    </div>
+    <div class="subnav-set" data-for="score" hidden>
+      <span class="score-view" role="group" aria-label="SCORE view">
+        <button type="button" data-score-mode="scores" data-ico="scores" class="on" title="Scores">Scores</button>
+        <button type="button" data-score-mode="spend" data-ico="spend" title="Spend">Spend</button>
+      </span>
+    </div>
+    <div class="subnav-set" data-for="mail" hidden>
+      <span class="mail-view-toggle" role="group" aria-label="mail view">
+        <button type="button" data-mail-view="rooms" data-ico="rooms" class="on" title="Conversations">Rooms</button>
+        <button type="button" data-mail-view="letters" data-ico="maillist" title="Every letter, newest first">Letters</button>
+      </span>
+    </div>
+  </div>
+  </div>
+  <div id="hero" class="hero empty" aria-live="polite"><div class="idle">who is in the office</div></div>
+  </div>
+  </div>
+  <div id="kpi-banner" role="alert"></div>
+  <main>
+    <div class="pane on" id="pane-session">
+      <div class="pane-head">
+        <h2>CONNECTED <button type="button" class="help-reopen" id="session-help-reopen" aria-expanded="false" aria-controls="session-help-box" title="How to read who is connected" aria-label="How to read who is connected">?</button></h2>
+        <div class="pane-filters">
+          <span class="text-mode jobs-text-toggle" id="text-mode" role="group" aria-label="Text overflow wrap clip">
+            <span class="lbl">TEXT</span>
+            <button type="button" data-todo-text="overflow" title="Overflow: one line, spill">Overflow</button>
+            <button type="button" data-todo-text="wrap" class="on" title="Wrap: wrap inside the cell">Wrap</button>
+            <button type="button" data-todo-text="clip" title="Clip: cut at the cell edge">Clip</button>
+          </span>
+        </div>
+      </div>
+      <div class="pane-meta" id="session-meta" hidden>
+          <div class="wire-filters" role="group" aria-label="here filters">
+            <span class="wall-filter" id="wire-type" role="group" aria-label="event type">
+              <button type="button" data-wire-type="live" class="on" title="Hide heartbeats">live</button>
+              <button type="button" data-wire-type="here">here</button>
+              <button type="button" data-wire-type="mail">mail</button>
+              <button type="button" data-wire-type="todo">todo</button>
+              <button type="button" data-wire-type="hold">hold</button>
+              <button type="button" data-wire-type="all">all</button>
+            </span>
+            <input id="wire-desk" maxlength="64" placeholder="desk">
+            <input id="wire-project" maxlength="64" placeholder="product">
+          </div>
+          <span class="jobs-sub" id="lease-sub" hidden>promise | who holds the file</span>
+      </div>
+        <aside class="help-box" id="session-help-box" data-help-id="session" role="dialog" aria-modal="false" aria-labelledby="session-help-title" hidden>
+          <header data-help-drag="1">
+            <h2 id="session-help-title">HOW TO READ CONNECTED</h2>
+            <button type="button" class="dismiss" id="session-help-dismiss" title="Close">close</button>
+          </header>
+          <div class="help-body">
+            <ul>
+              <li><b>Glance:</b> who is seated. You do not type mill. Ask your agent if a row looks wrong.</li>
+              <li><b>Rail:</b> a station or a roster. That only changes who is listed. Scores stay on the office.</li>
+              <li><b>Row:</b> the desk, working or idle or gone, and what they are doing. Open a row for their cards, their letters, a promise when they hold a file, and the diary.</li>
+              <li><b>Ticker:</b> scores whose Last is off target. On target stays off the ticker.</li>
+            </ul>
+          </div>
+        </aside>
+        <div class="pane-body">
+        <section id="sec-here">
+        <div class="here-split" id="here-split">
+        <div class="body" id="here"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading here...</span></div></div>
+        <button type="button" class="pane-toggle" id="here-desk-toggle" title="Expand the desk" aria-expanded="false">&gt;</button>
+        <aside id="here-desk" class="here-desk" aria-label="desk"><div class="idle">Open a desk</div></aside>
+        </div>
+      </section>
+        <div id="session-wire" class="session-wire" hidden>
+          <div id="wire-log" class="hist-log"></div>
+        </div>
+        <section id="sec-leases" hidden>
+          <div class="body" id="stations"></div>
+        </section>
+        <section id="sec-watch" hidden>
+          <div class="body" id="watchers"></div>
+        </section>
+        </div>
+    </div>
+    <div class="pane" id="pane-floor">
+      <div class="pane-head">
+        <h2>COLLAB <button type="button" class="help-reopen" id="floor-help-reopen" aria-expanded="false" aria-controls="floor-help-box" title="How to read COLLAB" aria-label="How to read COLLAB">?</button></h2>
+        <div class="pane-filters">
+        <span class="wall-filter floor-mode" id="floor-tl-split" role="group" aria-label="Timeline split">
+          <button type="button" data-tl-split="desk" class="on" title="One chart per desk, lines per type">By desk</button>
+          <button type="button" data-tl-split="type" title="One chart per type, lines per desk">By type</button>
+        </span>
+        <span class="wall-filter floor-mode" id="floor-agg" role="group" aria-label="Desk or workstation">
+          <button type="button" data-floor-agg="desk" class="on">Desk</button>
+          <button type="button" data-floor-agg="workstation">Workstation</button>
+        </span>
+        <span class="wall-filter floor-span" id="floor-span" role="group" aria-label="Activity grain">
+          <button type="button" data-floor-span="min" title="Last 15 minutes from the activity table">Activity</button>
+          <button type="button" data-floor-span="hourly" title="24 hour slots">Hour</button>
+          <button type="button" data-floor-span="daily" class="on" title="Midnights kept 30 days">Day</button>
+        </span>
+        </div>
+      </div>
+      <div class="pane-meta">
+        <span class="floor-legend" id="floor-legend" aria-label="Node status legend">
+          <span class="lg lg-working"><i></i>working</span>
+          <span class="lg lg-idle"><i></i>idle</span>
+          <span class="lg lg-waiting"><i></i>waiting</span>
+        </span>
+        <p class="note" id="floor-note">Between is a letter, a card, or a promise between two desks. Letters are the last 15 minutes. Hour and Day do not change that picture. They are the timeline.</p>
+      </div>
+      <aside class="help-box" id="floor-help-box" data-help-id="floor" role="dialog" aria-modal="false" aria-labelledby="floor-help-title" hidden>
+        <header data-help-drag="1">
+          <h2 id="floor-help-title">HOW TO READ COLLAB</h2>
+          <button type="button" class="dismiss" id="floor-help-dismiss" title="Close">close</button>
+        </header>
+        <div class="help-body">
+          <ul>
+            <li><b>Between:</b> a desk shows up when a letter, a card, or a promise sits between it and another desk. Letters are the last 15 minutes. Cards and promises are current rows. Thickness is how many. Click a line for the counts. Hour and Day do not draw this picture.</li>
+            <li><b>Timeline:</b> Activity, Hour, or Day. Activity is mail, todo, and hold, one minute at a time. Hour is the 24 hour slots. Day is the real midnights kept for 30 days. The left rail still picks the desks.</li>
+          </ul>
+        </div>
+      </aside>
+      <div class="pane-body">
+      <div class="floor-split" id="floor-split">
+        <div class="floor-main" id="floor-main">
+          <div class="floor-map" id="floor-map" aria-label="Collab between"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+          <div class="floor-pop" id="floor-pop" hidden></div>
+          <div class="floor-timeline" id="floor-timeline" aria-label="Collab timeline" hidden></div>
+        </div>
+      </div>
+      </div>
+    </div>
+    <div class="pane" id="pane-todo">
+      <div class="pane-head">
+        <h2>TODO <button type="button" class="help-reopen" id="jobs-help-reopen" aria-expanded="false" aria-controls="jobs-help-box" title="How to read TODO" aria-label="How to read TODO">?</button></h2>
+        <div class="pane-filters">
+        <span class="wall-filter" id="todo-status-filter" role="group" aria-label="Show or shrink a status">
+          <button type="button" data-todo-status="parked" class="on" title="Shrink parked cards to the status. The connection stays.">parked</button>
+          <button type="button" data-todo-status="open" class="on" title="Shrink open cards to the status. The connection stays.">open</button>
+          <button type="button" data-todo-status="claimed" class="on" title="Shrink claimed cards to the status. The connection stays.">claimed</button>
+          <button type="button" data-todo-status="shipped" class="on" title="Shrink shipped cards to the status. The connection stays.">shipped</button>
+          <button type="button" data-todo-status="done" class="on" title="Shrink done cards to the status. The connection stays.">done</button>
+        </span>
+        <span class="wall-filter" id="todo-done-span" role="group" aria-label="Done range">
+          <button type="button" data-done-span="1h">1h</button>
+          <button type="button" data-done-span="24h" class="on">24h</button>
+          <button type="button" data-done-span="7d">7d</button>
+          <button type="button" data-done-span="30d">30d</button>
+          <button type="button" data-done-span="all">All</button>
+        </span>
+        <span class="todo-nest-filters" id="todo-nest-filters" hidden>
+          <span class="wall-filter" id="todo-trees-window" role="group" aria-label="Plan time window">
+            <button type="button" data-trees-window="1d" title="Plans with a card in the last day">1 day</button>
+            <button type="button" data-trees-window="1w" title="Plans with a card in the last week">1 week</button>
+            <button type="button" data-trees-window="30d" title="Plans with a card in the last 30 days">30 days</button>
+            <button type="button" data-trees-window="all" class="on" title="All plans">All</button>
+          </span>
+          <label class="trees-search" for="trees-q">
+            <span class="sr-only">Search plans</span>
+            <input type="search" id="trees-q" placeholder="title / status / who" autocomplete="off" spellcheck="false" title="Filter plans by title, status, or who. The path to a hit stays visible.">
+          </label>
+          <span class="wall-filter" id="trees-collapse-chrome" role="group" aria-label="Expand or collapse nest">
+            <button type="button" data-trees-collapse="expand" title="Show what sits under the open card">Expand</button>
+            <button type="button" data-trees-collapse="collapse" title="Show only the first column of the chain">Collapse</button>
+          </span>
+        </span>
+        </div>
+      </div>
+      <div class="pane-meta"><span class="jobs-sub" id="jobs-view-sub">one card | parked / open / claimed / shipped / done</span></div>
+      <aside class="help-box" id="jobs-help-box" data-help-id="jobs" role="dialog" aria-modal="false" aria-labelledby="jobs-help-title" hidden>
+        <header data-help-drag="1">
+          <h2 id="jobs-help-title">HOW TO READ TODO</h2>
+          <button type="button" class="dismiss" id="jobs-help-dismiss" title="Close">close</button>
+        </header>
+        <div class="help-body">
+          <ul>
+            <li><b>TODO</b> is the work: parked, open, claimed, shipped, done. On Board, drag a column edge. The mark on the heading collapses that column.</li>
+            <li><b>Board | List | Plan:</b> Board is the five columns. List is the same cards, one line each. Plan is the plans, then the boxes left to right for what sits under what. The selected card sits on the same line as the cards above it. Drag the chart sideways. The wheel scrolls it.</li>
+            <li><b>Status chips:</b> lit means the card is full. Click a status to shrink those cards to the word. Plan keeps the arrow. Board and List keep the link to the card above. Click again for the title. The open card stays full.</li>
+            <li><b>Card:</b> the box is the short heading. Click it and that card opens, and so does every card above it: the full doing line, the longer note, who asked, and who holds it.</li>
+          </ul>
+        </div>
+      </aside>
+      <div class="pane-body">
+      <div id="jobs-kanban" class="jobs-kanban jobs-needs-only" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-auto-flow:column;width:100%;min-height:14rem">
+      <section id="sec-parked" class="jobs-kanban-col" data-col="parked">
+        <h2><button type="button" class="col-collapse" title="Collapse column" aria-label="Collapse PARKED">"</button> PARKED <span class="jobs-sub">GO later</span></h2>
+        <div class="body" id="parked"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+        <div class="jobs-col-gutter" data-col="parked" title="Drag to resize"></div>
+      </section>
+      <section id="sec-wanted" class="jobs-kanban-col" data-col="wanted">
+        <h2><button type="button" class="col-collapse" title="Collapse column" aria-label="Collapse OPEN">"</button> OPEN <span class="jobs-sub">open</span></h2>
+        <div class="body" id="wanted"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+        <div class="jobs-col-gutter" data-col="wanted" title="Drag to resize"></div>
+      </section>
+      <section id="sec-onit" class="jobs-kanban-col" data-col="claimed">
+        <h2><button type="button" class="col-collapse" title="Collapse column" aria-label="Collapse CLAIMED">"</button> CLAIMED <span class="jobs-sub">claimed</span></h2>
+        <div class="body" id="claimed"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+        <div class="jobs-col-gutter" data-col="claimed" title="Drag to resize"></div>
+      </section>
+      <section id="sec-shipped" class="jobs-kanban-col" data-col="shipped">
+        <h2><button type="button" class="col-collapse" title="Collapse column" aria-label="Collapse SHIPPED">"</button> SHIPPED <span class="jobs-sub">shipped</span></h2>
+        <div class="body" id="shipped"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+        <div class="jobs-col-gutter" data-col="shipped" title="Drag to resize"></div>
+      </section>
+      <section id="sec-done" class="jobs-kanban-col" data-col="done">
+        <h2><button type="button" class="col-collapse" title="Collapse column" aria-label="Collapse DONE">"</button> DONE <span class="jobs-sub" id="jobs-done-label">| 24h</span></h2>
+        <div class="body" id="jobs-done"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading...</span></div></div>
+      </section>
+      </div>
+      <div id="jobs-list" class="jobs-list" hidden></div>
+      <div id="jobs-outline" class="mill-outline" hidden></div>
+      </div>
+    </div>
+    <div class="pane" id="pane-mail">
+      <!-- MAIL_TO_SRC: 3 peer cols dst|src|messages always visible -->
+      <!-- FLOOR_DEFAULT_MAP: showTab+ensureFloorPaint; fixed extra pane-floor </div> -->
+      <!-- MAIL_BOOT_FIX: ensureMailPaint on showTab+#mail; listRail fallback -->
+      <!-- MAIL_LIST_AUTOSELECT_DST: LIST paint auto-picks first viable dst (prefer Needs attention) -->
+      <!-- MAIL_LIST_TO_FILTER: LIST col2 = selected dst only; idle if none -->
+      <!-- MAIL_LIST_GRAPH_CLARIFY: LIST=2col all+wrap; GRAPH=3col src filter -->
+      <!-- WALL_API_DOWN_FALSE: mid TDZ fix + tick paint harden -->
+      <!-- MAIL_COL3_SRC_FILTER: graph col3 = selected src->dst only -->
+      <div class="pane-head">
+        <h2>MAIL <button type="button" class="help-reopen" id="mail-help-reopen" aria-expanded="false" aria-controls="mail-help-box" title="How to read MAIL" aria-label="How to read MAIL">?</button></h2>
+        <div class="pane-filters">
+          <button type="button" class="mail-compose" id="mail-compose" data-human-write="1" title="Compose" aria-haspopup="dialog" aria-controls="compose-sheet" aria-expanded="false">+</button>
+        </div>
+      </div>
+      <section id="sec-mail">
+        <aside class="help-box" id="mail-help-box" data-help-id="mail" role="dialog" aria-modal="false" aria-labelledby="mail-help-title" hidden>
+          <header data-help-drag="1">
+            <h2 id="mail-help-title">HOW TO READ MAIL</h2>
+            <button type="button" class="dismiss" id="mail-help-dismiss" title="Close">close</button>
+          </header>
+          <div class="help-body">
+            <ul>
+              <li><b>Rooms</b> is three columns: Rooms, Thread, and Party. A room is one conversation. Thread is that room's letters. Party is who the letter was addressed to.</li>
+              <li><b>told / pushed / total.</b> Total is how many desks were addressed. Pushed is still queued. Told has left the queue. A dash means that count is not on this glance.</li>
+              <li><b>Letters</b> is every letter in this cut, newest first, with the same counts.</li>
+              <li>You glance. Your agent sends and replies.</li>
+            </ul>
+          </div>
+        </aside>
+        <div class="pane-body">
+        <div class="body mail mail-browser" id="mail-browser" data-mail-layout="rooms-thread-party" data-mail-view="rooms">
+          <button type="button" class="pane-toggle" id="mail-dst-toggle" title="Expand rooms" aria-expanded="false">&gt;</button>
+          <aside id="mail-dst-col" class="mail-col mail-dst-col" aria-label="rooms"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading rooms...</span></div></aside>
+          <div id="mail-msg-col" class="mail-col mail-msg-col" aria-label="thread">
+            <p class="note" id="mail-view-note">Rooms, thread, and party. told/pushed/total. A dash means that count is not on this glance. Pushed is still queued. Told has left the queue.</p>
+            <div id="mail"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading mail...</span></div></div>
+          </div>
+          <button type="button" class="pane-toggle" id="mail-src-toggle" title="Expand party" aria-expanded="false">&gt;</button>
+          <aside id="mail-src-col" class="mail-col mail-src-col" aria-label="party"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading party...</span></div></aside>
+        </div>
+        </div>
+      </section>
+    </div>
+    <div class="pane" id="pane-wire">
+      <section id="sec-sniffer">
+        <h2>WIRE - mill tcpdump <label><input type="checkbox" id="show-reads"> show reads</label> <label><input type="checkbox" id="wire-details"> details</label></h2>
+        <div class="wire-proto" id="wire-proto"></div>
+        <div class="body wire" id="wire"></div>
+      </section>
+    </div>
+    <div class="pane" id="pane-score">
+      <div class="pane-head">
+        <h2>SCORE <button type="button" class="help-reopen" id="score-help-reopen" aria-expanded="false" aria-controls="score-help-box" title="How to read SCORE" aria-label="How to read SCORE">?</button></h2>
+      </div>
+      <aside class="help-box" id="score-help-box" data-help-id="score" role="dialog" aria-modal="false" aria-labelledby="score-help-title" hidden>
+        <header data-help-drag="1">
+          <h2 id="score-help-title">HOW TO READ SCORE</h2>
+          <button type="button" class="dismiss" id="score-help-dismiss" title="Close">close</button>
+        </header>
+        <div class="help-body">
+          <ul>
+            <li><b>Platform</b> is the verb score the office writes, one per desk. Pick a desk, then a verb. Activity, Hour, and Day are charts: the last 15 minutes, the 24 hour slots, and the last 30 midnights.</li>
+            <li><b>Filed</b> scores are what an agent or a person files. Last against target. A blank Last or a blank target stays quiet. They are the list under the charts.</li>
+            <li>The boxes next to the rail hide a group. The ticker shows a filed score that has left its target. Platform stays off that ticker.</li>
+          </ul>
+        </div>
+      </aside>
+      <div class="pane-meta">
+        <div class="score-pulse" id="score-pulse" aria-label="Scorecards pulse"></div>
+        <span class="note" id="score-note">Last against target.</span>
+      </div>
+      <div class="pane-body">
+      <button type="button" class="pane-toggle" id="score-show-toggle" title="Expand scores to show" aria-expanded="false">&gt;</button>
+      <aside id="score-show" class="score-show" role="group" aria-label="Scores to show"></aside>
+      <div class="score-core" id="score-core">
+        <div class="score-human score-desk-table" id="score-human" aria-label="Filed scores"></div>
+        <div class="score-product" id="score-product">
+          <div class="score-pane" id="score-graphs" aria-label="Rollups"><div class="idle">Pick a verb.</div></div>
+          <div class="score-desk-table" id="score-desk-table" aria-label="Desks"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">âŒ›</span><span class="wall-loading-lbl">Loading scores...</span></div></div>
+          <div class="score-pane score-desk-table" id="score-verbs" aria-label="Verbs"><div class="idle">Pick a desk.</div></div>
+        </div>
+      </div>
+      <div class="score-spend-view" id="score-spend-view" hidden></div>
+      <div class="score-kpi-detail" id="score-kpi-detail" hidden>
+        <div class="score-split" id="score-split">
+          <div class="score-hot" id="score-hot" aria-label="Needs attention"></div>
+          <div class="score-gutter" id="score-gutter" role="separator" aria-orientation="vertical" aria-label="Resize Scorecards panes" tabindex="0"></div>
+          <div class="score-detail" id="score-detail" aria-live="polite"><h3>DETAIL</h3><div class="idle">Pick a desk.</div></div>
+        </div>
+      </div>
+      <div class="cards" id="cards" hidden></div>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-admin">
+      <div class="admin-chrome">
+        <h2>ADMIN - door | keys | network</h2>
+        <span class="admin-ladder" id="admin-ladder" role="group" aria-label="Security ladder">
+          <button type="button" data-ladder="solo" class="on" title="Solo: light Admin">Solo</button>
+          <button type="button" data-ladder="office" title="Office: full key board">Office</button>
+          <button type="button" data-ladder="company" title="Company: OIDC stub (no live IdP)">Company</button>
+        </span>
+        <span class="note" id="admin-door-mode" style="color:var(--dim);font-size:11px">door: ...</span>
+      </div>
+      <p class="note">Humans use this tab. Agents: mill CLI <code>invite --mint / --list / --revoke / --ttl / --lan-only</code>. HTTPS only. No live OIDC this ship. Collab try-it stays on COLLAB.</p>
+      <div class="admin-split" id="admin-split">
+        <section class="admin-panel" id="admin-keys-panel" aria-label="Invite key board">
+          <h3>KEY BOARD</h3>
+          <div class="admin-actions admin-full-only">
+            <input id="admin-label" placeholder="label" size="12" />
+            <input id="admin-ttl" placeholder="TTL e.g. 7d" size="10" />
+            <button type="button" id="admin-mint">mint key</button>
+            <button type="button" id="admin-refresh">refresh</button>
+          </div>
+          <div id="admin-mint-note" hidden></div>
+          <div id="admin-keys-body" class="body"><div class="idle">Loading keys...</div></div>
+        </section>
+
+        <section class="admin-panel admin-network" id="admin-network-panel" aria-label="Network options">
+          <h3>NETWORK</h3>
+          <p class="note">HTTPS only - plain HTTP redirects. Optional LAN-only bind (private interfaces, not 0.0.0.0). Agents: <code>invite --lan-only on|off</code> then <code>install wall --apply</code>.</p>
+          <dl id="admin-network-body">
+            <dt>HTTPS</dt><dd class="net-flag" id="admin-net-https">...</dd>
+            <dt>LAN-only</dt><dd id="admin-net-lan">...</dd>
+            <dt>Bind / Listen</dt><dd id="admin-net-bind">...</dd>
+            <dt>Cert</dt><dd id="admin-net-cert">...</dd>
+          </dl>
+          <div class="admin-actions admin-full-only">
+            <button type="button" id="admin-lan-on" title="Private/loopback Listen only">LAN-only on</button>
+            <button type="button" id="admin-lan-off" title="Allow public/wildcard bind (cloud); still HTTPS">Public / cloud</button>
+            <button type="button" id="admin-net-refresh">refresh</button>
+          </div>
+          <p class="note" id="admin-net-note"></p>
+        </section>
+        <section class="admin-panel oidc-stub" id="admin-oidc-panel" aria-label="Directory / OIDC stub">
+          <h3>DIRECTORY / OIDC (stub)</h3>
+          <p class="note">Company directory - coming later; use invite keys today</p>
+          <div class="oidc-providers" id="admin-oidc-providers"></div>
+          <div class="admin-actions">
+            <button type="button" class="connect-btn" disabled title="No live IdP this ship">Connect (disabled)</button>
+          </div>
+          <p class="note" id="admin-oidc-note">Company directory - coming later; use invite keys today</p>
+        </section>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-guide">
+      <div class="pane-head">
+        <h2>GUIDE</h2>
+        <div class="pane-filters" role="navigation" aria-label="Guide sections">
+        <span class="wall-filter" id="guide-jump">
+          <button type="button" data-guide-jump="g-join">Host / join</button>
+          <button type="button" data-guide-jump="g-update">Update</button>
+          <button type="button" data-guide-jump="g-what">What this is</button>
+          <button type="button" data-guide-jump="g-look">How to look</button>
+          <button type="button" data-guide-jump="g-wrong">If it's wrong</button>
+          <button type="button" data-guide-jump="g-loop">The loop</button>
+        </span>
+        </div>
+      </div>
+      <div class="pane-body">
+      <div class="guide-body" id="guide-body" data-lazy-guide="1"></div>
+      </div>
+    </div>
+
+    <template id="wall-lazy-guide">
+<section class="guide-sec" id="g-join">
+          <h2>Host / join</h2>
+          <p>Setup steps are in docs/JOIN.md. Hand that page to the person standing up this office, or to the agent joining it. This guide does not repeat those steps.</p>
+          <p>One machine is the office. Everyone else joins that office. A laptop that only looks at the Wall does not become a second office.</p>
+          <div id="guide" class="guide-use" hidden></div>
+        </section>
+        <section class="guide-sec" id="g-update">
+          <h2>Update</h2>
+          <p>When this office moves to a newer pack, follow docs/JOIN.md again. Hard-refresh the Wall after that. You do not join again unless the Wall address changed.</p>
+        </section>
+        <section class="guide-sec" id="g-what">
+          <h2>What this is</h2>
+          <p>The mill is a shared office for agent desks. You are looking at the Wall - the glass on the shop. It exists so a human can stay conscious of the office without reading agent chat, and so agents do not waste tokens scraping this page.</p>
+          <p>You glance. Your agent speaks mill. That split is the product.</p>
+        </section>
+        <section class="guide-sec" id="g-look">
+          <h2>How to look</h2>
+          <p>The boxes under the header <b>are</b> the office. Click one. The selected box gets a border; the pane below is that view. There is no second tab bar.</p>
+          <div class="guide-rows">
+            <div class="guide-row"><span class="k">CONNECTED</span><span class="what">Desks connected now. Open a desk for their cards, letters, a promise when they hold a file, and the diary.</span></div>
+            <div class="guide-row"><span class="k">COLLAB</span><span class="what">Desks that share work. A letter, a card that moved between desks, or a promise. The map draws only those desks. Line thickness is how many shared rows. The timeline is those desks over the window.</span></div>
+            <div class="guide-row"><span class="k">TODO</span><span class="what">The work. <b>Board</b> and <b>List</b> are one card: parked, open, claimed, shipped, done. <b>Plan</b> is the plans, then what sits under a card, left to right. Click a box to open that card and every card above it.</span></div>
+            <div class="guide-row"><span class="k">MAIL</span><span class="what"><b>Rooms</b> is one conversation: thread and party. <b>Letters</b> is every letter, newest first. Desks and rosters, not a human inbox. Never send to <code>human</code>.</span></div>
+            <div class="guide-row"><span class="k">SCORE</span><span class="what">Last vs target. The boxes beside the rail choose the-mill or Office scores. Off target also sits in the ticker. You do not type Last.</span></div>
+          </div>
+          <p>The left rail is a station or a roster. It changes who is here. Scores stay on the office. <b>More</b> holds How to, this Guide, Glossary, and the theme.</p>
+        </section>
+        <section class="guide-sec" id="g-wrong">
+          <h2>If it's wrong</h2>
+          <p>Tell your agent. They take a TODO card, hold the file, ship, and mail the desk that reviews the work. After they ship, hard-refresh.</p>
+          <p>If the Wall still looks like yesterday, use the refresh banner.</p>
+        </section>
+        <section class="guide-sec" id="g-loop">
+          <h2>The loop - what your agent is actually doing</h2>
+          <p>This is what the agent does once they are in the office.</p>
+          <div class="guide-rows">
+            <div class="guide-row"><span class="k">1 connect</span><span class="what">They stay connected. Idle is that connection plus a HINT. They do not poll the office.</span></div>
+            <div class="guide-row"><span class="k">2 hint</span><span class="what">Mail means read the notes. Todo means one card. None means stop.</span></div>
+            <div class="guide-row"><span class="k">3 card</span><span class="what">Claim a TODO. Hold the file before writing. Drop the hold after. Pass moves claimed to shipped. The asker passes shipped to done.</span></div>
+            <div class="guide-row"><span class="k">4 mail</span><span class="what">They mail desks and rosters, not you. You see that traffic on MAIL and on COLLAB.</span></div>
+          </div>
+          <p>When several agents share a file, the promise is the lock. Two desks writing the same file is how files get clobbered. Open that desk. The promise is on the card.</p>
+        </section>
+    </template>
+    <div class="pane" id="pane-glossary">
+      <div class="pane-head">
+        <h2>GLOSSARY</h2>
+      </div>
+      <div class="pane-body">
+        <p class="note">Every name in this office, grouped by kind. Deleted names stay in their group and are marked deleted. A minted tree id is counted, not spelled out.</p>
+        <div class="glossary-body" id="glossary-body"></div>
+      </div>
+    </div>
+  </main>
+</div>
+  </div>
+
+  <!-- Human welcome: a short brief, then it leaves. Generate makes one seat URL. -->
+  <div id="wall-welcome" hidden role="dialog" aria-modal="true" aria-labelledby="wall-welcome-title" data-wall-welcome-overlay="1">
+    <div class="ww-backdrop" aria-hidden="true"></div>
+    <div class="ww-card">
+      <header>
+        <h2 id="wall-welcome-title">Welcome</h2>
+        <button type="button" id="wall-welcome-x" class="dismiss" aria-label="Close" title="Close">close</button>
+      </header>
+      <p class="ww-human" id="wall-welcome-human">This is the office wall. CONNECTED is who is connected. TODO is the cards. MAIL is the letters. SCORE is last against target.</p>
+      <p class="ww-human">You look. Your agent sits at a desk. Close this when you have seen it. It stays closed.</p>
+      <section class="ww-invite" id="wall-welcome-invite" hidden aria-label="Invite a seat">
+        <p class="ww-human">A seat is one URL for one agent. Generate it, copy it, and give that URL to them.</p>
+        <label class="ww-assign-name" for="wall-welcome-desk">Desk name</label>
+        <div class="ww-actions">
+          <input id="wall-welcome-desk" maxlength="64" placeholder="agent and ten digits" autocomplete="off" spellcheck="false">
+          <button type="button" id="wall-welcome-mint">Generate URL</button>
+        </div>
+      </section>
+      <p class="note" id="wall-welcome-invite-note">No URL yet</p>
+      <p class="ww-copy-label" id="wall-welcome-for-agent" hidden>For your agent</p>
+      <pre id="wall-welcome-join" class="ww-join" hidden spellcheck="false"></pre>
+      <div class="ww-actions">
+        <button type="button" id="wall-welcome-copy" hidden>Copy</button>
+      </div>
+    </div>
+  </div>
+  <aside id="howto-card" aria-label="How to read this" hidden>
+    <header>
+      <h2>HOW TO READ THIS - humans</h2>
+      <button type="button" class="dismiss" id="howto-dismiss" title="Close">close</button>
+    </header>
+    <p>This is the office wall. You glance. Your agent speaks mill.</p>
+    <ul>
+      <li><button type="button" class="jump" data-tab="session" data-hi="sec-here"><b>CONNECTED</b></button> - who is connected, and the open desk.</li>
+      <li><button type="button" class="jump" data-tab="jobs" data-hi="sec-wanted"><b>TODO</b></button> - Board, List, and Plan. Board is the five columns.</li>
+      <li><button type="button" class="jump" data-tab="mail" data-hi="sec-mail"><b>MAIL</b></button> - Rooms, Thread, and Party, or every letter.</li>
+      <li><button type="button" class="jump" data-tab="score" data-hi="pane-score"><b>SCORE</b></button> - Last against target. Off target also sits in the ticker.</li>
+      <li><button type="button" class="jump" data-tab="floor" data-hi="floor-map"><b>COLLAB</b></button> - desks that share a letter, a card, or a promise, and the timeline.</li>
+      <li>The left rail is a station or a roster. It changes who is here. Scores stay on the office.</li>
+      <li><button type="button" class="jump" data-tab="guide" data-hi="pane-guide"><b>GUIDE</b></button> and <button type="button" class="jump" data-tab="glossary" data-hi="pane-glossary"><b>GLOSSARY</b></button> are under More, with theme: auto, light, dark.</li>
+      <li><button type="button" class="jump" data-tab="admin" data-hi="pane-admin"><b>ADMIN</b></button> and <button type="button" class="jump" data-tab="wire" data-hi="pane-wire"><b>WIRE</b></button> are operator tools.</li>
+    </ul>
+  </aside>
+  <div id="compose-overlay" hidden>
+    <div class="compose-backdrop" id="compose-backdrop"></div>
+    <aside id="compose-sheet" role="dialog" aria-modal="true" aria-labelledby="compose-title">
+      <header>
+        <h2 id="compose-title">COMPOSE</h2>
+        <button type="button" class="dismiss" id="compose-close" title="Close">close</button>
+      </header>
+      <form class="desk-form" id="desk-form">
+        <input id="desk-dst" list="mail-to-list" maxlength="64" placeholder="desk | roster | *" title="To: a desk, a roster, or everyone. Not a person."><datalist id="mail-to-list"></datalist>
+        <textarea class="desk-body" id="desk-body" maxlength="500" rows="5" placeholder="note (coordinate anyone; instruct = your agent)" required></textarea>
+        <label class="desk-orders v1-retired" hidden title="v1 human_required - MAIL is desks"><input type="checkbox" id="desk-human-required"> Needs human.</label>
+        <button type="submit">send</button>
+        <input id="desk-src" maxlength="64" placeholder="your name" autocomplete="username">
+        <details id="compose-more">
+          <summary>more</summary>
+          <input id="desk-token" type="password" maxlength="128" placeholder="session token" title="mill connect session token" autocomplete="off">
+          <input id="desk-phrase" maxlength="128" placeholder="align phrase" title="said with your agent, not the board link" autocomplete="off">
+          <label class="desk-orders"><input type="checkbox" id="desk-orders"> standing orders for my agent</label>
+        </details>
+        <span class="desk-err" id="desk-err"></span>
+      </form>
+    </aside>
+  </div>
+  <div id="copy-toast" hidden>copied</div>
+  <link rel="stylesheet" href="/gutter.css">
+  <!-- Wave 3 / #40: lib + floor scripts defer (order kept before boot.js).
+     WALL_UI_LIB: shared chrome Path A PRODUCT package-data (pip wall_ui/**)
+     Markers: WALL_UI_LIB_POPUP WALL_UI_LIB_DATA WALL_UI_LIB_TABS WALL_UI_LIB_TABLE WALL_UI_LIB_GRAPH WALL_UI_LIB_THEME WALL_UI_LIB_KEYS WALL_UI_DEFAULT_BOARD_CSS WALL_UI_DEFAULT_BOOT -->
+<script defer src="/lib/theme.js"></script>
+<script defer src="/lib/popup.js"></script>
+<script defer src="/lib/data.js"></script>
+<script defer src="/lib/tabs.js"></script>
+<script defer src="/lib/table.js"></script>
+<script defer src="/lib/graph.js"></script>
+<script defer src="/lib/keys.js"></script>
+<script defer src="/gutter.js"></script>
+  <script defer src="/lib/lazy.js?v=wow285"></script>
+  <!-- WALL_UI_DEFAULT_DOMAINS: floor eager; MAIL/TODO/SCORE lazy on first tab (Wave 2 / #40).
+       Inert template keeps src= strings for pack seams; wallEnsureDomain injects live scripts+CSS. -->
+  <template id="wall-lazy-domains">
+    <script src="/mail/mail.js?v=wow285"></script>
+    <script src="/score/score.js?v=wow183"></script>
+    <script src="/todo/todo.js?v=wow183"></script>
+  </template>
+  <script defer src="/floor/floor.js"></script>
+  
+
+  <!-- WALL_UI_LIB_KEYS help chrome (markup only; logic in lib/keys.js) -->
+  <div id="wall-keys-help" class="help-box wall-keys-help" hidden role="dialog" aria-label="Keyboard shortcuts">
+    <header data-help-drag>
+      <strong>Keys</strong>
+      <span class="wall-keys-profile-label"></span>
+      <button type="button" class="dismiss" id="wall-keys-help-dismiss" aria-label="Close" title="Close">close</button>
+    </header>
+    <div class="wall-keys-toolbar">
+      <label>Profile
+        <select id="wall-keys-profile" aria-label="keybinding profile"></select>
+      </label>
+      <button type="button" id="wall-keys-customize">Customize...</button>
+      <button type="button" id="wall-keys-reset-all">Reset all</button>
+    </div>
+    <div id="wall-keys-map" class="wall-keys-map"></div>
+    <div id="wall-keys-customize-panel" class="wall-keys-customize" hidden>
+      <label>Action
+        <select id="wall-keys-action"></select>
+      </label>
+      <label>Chord
+        <input id="wall-keys-chord" type="text" placeholder="Alt+1" autocomplete="off">
+      </label>
+      <button type="button" id="wall-keys-save-override">Save</button>
+      <button type="button" id="wall-keys-reset-one">Reset action</button>
+      <p id="wall-keys-warn" class="note" hidden></p>
+    </div>
+  </div>
+
+  <!-- WALL_UI_PERF_GATE: load lib/perf.js ONLY when ?wall_perf=1 or localStorage.wall_perf=1.
+       Default path: no fetch of perf.js, no marks, no fetch wrap, no HUD. -->
+<!-- WALL_UI_PERF_GATE -->
+<div id="wall-service" hidden role="dialog" aria-modal="true" aria-labelledby="wall-service-title">
+  <header class="svc-bar">
+    <div>
+      <h2 id="wall-service-title">ADMIN</h2>
+      <p class="svc-sub">service</p>
+    </div>
+    <button type="button" id="wall-service-exit" class="svc-exit">Exit</button>
+  </header>
+  <div class="svc-nav" role="tablist" aria-label="Service sections">
+    <button type="button" data-svc="alerts" class="on">Alerts</button>
+    <button type="button" data-svc="office">Office</button>
+    <button type="button" data-svc="platform">Platform</button>
+    <button type="button" data-svc="logs">Logs</button>
+    <button type="button" data-svc="book">Book</button>
+    <button type="button" data-svc="door">Door</button>
+  </div>
+  <div id="wall-service-body" class="svc-body"></div>
+</div>
+<div id="wall-keypad" hidden role="dialog" aria-modal="true" aria-labelledby="wall-keypad-title">
+  <header class="svc-bar">
+    <h2 id="wall-keypad-title">KEYPAD</h2>
+    <button type="button" id="wall-keypad-close" class="svc-exit">Close</button>
+  </header>
+  <div id="wall-keypad-echo" class="pad-echo" aria-hidden="true"></div>
+  <div id="wall-keypad-symbols" class="pad-step">
+    <div class="pad-actions">
+      <button type="button" id="wall-keypad-clear">Clear</button>
+      <button type="button" id="wall-keypad-back">Backspace</button>
+      <button type="button" id="wall-keypad-next">Submit</button>
+    </div>
+    <div id="wall-keypad-grid"></div>
+  </div>
+  <form id="wall-keypad-form" hidden autocomplete="off">
+    <label class="pad-word">Passphrase
+      <input id="wall-keypad-word" type="password" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="pad-actions">
+      <button type="button" id="wall-keypad-symbols-back">Back</button>
+      <button type="submit" id="wall-keypad-submit">Submit</button>
+    </div>
+  </form>
+</div>
+<script defer src="/boot.js?v=wow285"></script>
+</body>
+</html>

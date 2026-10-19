@@ -1,0 +1,30 @@
+/* WALL_UI_COMPONENTS_GUTTER - shared gutter chrome (Floor/Score keep class aliases). */
+.wall-gutter {
+  flex: 0 0 6px;
+  align-self: stretch;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  border-radius: 2px;
+  touch-action: none;
+}
+.wall-gutter::before {
+  content: "";
+  position: absolute;
+  top: 10%;
+  bottom: 10%;
+  left: 2px;
+  width: 2px;
+  background: var(--edge, var(--line));
+  border-radius: 1px;
+}
+.wall-gutter:hover::before,
+.wall-split.resizing .wall-gutter::before {
+  background: var(--amber);
+}
+.wall-split.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+/* Aliases: existing Floor/Score markup keeps .floor-gutter / .score-gutter */
+.floor-gutter, .score-gutter { /* see board.html; shared behavior via gutter.js */ }

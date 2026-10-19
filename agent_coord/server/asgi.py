@@ -1,0 +1,751 @@
+# -*- coding: utf-8 -*-
+"""FastAPI/uvicorn mill-wall. Same Handler as middleware.
+
+Wall /api and mill-verb HTTP contracts stay. Request log (status + duration_ms)
+plus nginx combined access/error logs at the TLS edge.
+"""
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sys
+import time
+from http.client import HTTPMessage
+from io import BytesIO
+from pathlib import Path
+from typing import Any
+
+from agent_coord.server.redact import err_text
+
+from agent_coord.server.middleware import make_handler
+from agent_coord.lib.observe import parse_roots
+
+_log = logging.getLogger("mill.wall")
+_server: Any = None
+_samples: list[float] = []
+_SAMPLE_CAP = 200
+_n = 0
+_ms_max = 0.0
+
+
+def hold_envelope_ok(verb: str, result: Any) -> bool:
+    """Top-level ok matches a refused hold or a refused drop (#207, #227)."""
+    if verb in ("hold", "drop") and isinstance(result, dict) and result.get("ok") is False:
+        return False
+    return True
+
+
+def ws_auth_close(exc: BaseException) -> tuple[int, str]:
+    """A down book during /ws auth is try-again. Other failures stay 1011 (#144)."""
+    from agent_coord.server.records.db import book_down
+
+    if book_down(exc):
+        return 1013, "book unavailable"
+    return 1011, ""
+
+
+def latency_snapshot() -> dict[str, float | int]:
+    """Cheap mill-wall timing for unit/benchmark. Not a Wall API."""
+    xs = sorted(_samples)
+    n = len(xs)
+    if not n:
+        return {"n": _n, "p50_ms": 0.0, "p95_ms": 0.0, "max_ms": _ms_max}
+    p50 = xs[n // 2]
+    p95 = xs[min(n - 1, int(n * 0.95))]
+    return {"n": _n, "p50_ms": p50, "p95_ms": p95, "max_ms": _ms_max}
+
+
+def _note_ms(ms: float) -> None:
+    global _n, _ms_max
+    _n += 1
+    _ms_max = max(_ms_max, ms)
+    _samples.append(ms)
+    if len(_samples) > _SAMPLE_CAP:
+        del _samples[0 : len(_samples) - _SAMPLE_CAP]
+    if _n % 50 == 0:
+        snap = latency_snapshot()
+        _log.info(
+            "mill-wall latency n=%s p50=%.1fms p95=%.1fms max=%.1fms",
+            snap["n"],
+            snap["p50_ms"],
+            snap["p95_ms"],
+            snap["max_ms"],
+        )
+
+
+class _FakeServer:
+    def __init__(self, host: str, port: int) -> None:
+        self.server_address = (host, port)
+
+
+def _access_log_path() -> Path:
+    home = Path(os.environ.get("AGENT_COORD_MILL_HOME") or "").expanduser()
+    if not str(home):
+        home = Path.home() / ".mill"
+    logs = home / "logs"
+    logs.mkdir(parents=True, exist_ok=True)
+    return logs / "mill-wall-access.log"
+
+
+def _line(method: str, path: str, status: int, ms: float, nbytes: int, req_b: int = 0) -> str:
+    return f"{method} {path} {status} req_b={req_b} resp_b={nbytes} {ms:.1f}ms"
+
+
+def record_access(
+    log_path: Path,
+    method: str,
+    path: str,
+    status: int,
+    ms: float,
+    nbytes: int,
+    req_b: int = 0,
+) -> str:
+    """Redact door secrets, then store one mill-wall access line."""
+    from agent_coord.server.redact import redact_secrets
+
+    line = redact_secrets(_line(method, path, status, ms, nbytes, req_b=req_b))
+    _log.info(line)
+    try:
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except OSError:
+        pass
+    return line
+
+
+
+async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[str, Any] | None:
+    """Parse client text. Valid RPC -> reply dict. Non-RPC -> None (ignore). Bad RPC shape -> error reply."""
+    import asyncio
+
+    from agent_coord.helpers.errors import CoordError
+    from agent_coord.helpers.ident import desk_name
+    from agent_coord.server.api.mill.rpc import dispatch_ws
+    from agent_coord.server.book import Book
+    from agent_coord.server.mill_json import stamp_mill
+    from agent_coord.server.push import socket_seated
+    from agent_coord.client.session_errors import SESSION_WS_REQUIRED
+
+    text = raw if isinstance(raw, str) else str(raw or "")
+
+    def _sync_now(who: str) -> list:
+        from agent_coord.server.push import take_sync
+
+        try:
+            with Book() as c:
+                return take_sync(c._cn, who)
+        except Exception:
+            return []
+
+    async def _fail(fail_id: Any, error: str) -> dict[str, Any]:
+        sync = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: _sync_now(desk_name(desk))
+        )
+        return stamp_mill({"id": fail_id, "ok": False, "error": error, "sync": sync})
+
+    try:
+        msg = json.loads(text) if text else None
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(msg, dict):
+        return None
+    if (
+        msg.get("drop") == 1
+        and isinstance(msg.get("frame"), dict)
+        and not (msg.get("verb") or msg.get("cmd"))
+    ):
+        frame = dict(msg["frame"])
+
+        def _note() -> None:
+            from agent_coord.server.book import Book
+            from agent_coord.server.records.push import note_drop
+
+            with Book() as c:
+                note_drop(c._cn, desk_name(desk), frame)
+
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, _note)
+        except Exception:
+            pass
+        return None
+    if (
+        msg.get("exit") == 1
+        and isinstance(msg.get("frame"), dict)
+        and not (msg.get("verb") or msg.get("cmd"))
+    ):
+        frame = dict(msg["frame"])
+
+        def _exit_line() -> None:
+            from agent_coord.server.book import Book
+            from agent_coord.server.records.push import note_route_exit
+
+            with Book() as c:
+                note_route_exit(c._cn, desk_name(desk), frame)
+
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, _exit_line)
+        except Exception:
+            pass
+        return None
+
+    has_id = "id" in msg
+    has_verb = "verb" in msg or "cmd" in msg
+    # Existing server pushes use type/hint; never treat as client RPC.
+    if str(msg.get("hint") or "") and not has_verb:
+        return None
+    if str(msg.get("type") or "") in ("heartbeat", "session") and not has_verb:
+        return None
+    # Non-RPC client text: ignore.
+    if not has_id and not has_verb:
+        return None
+    # Looks like RPC but bad shape.
+    req_id = msg.get("id")
+    verb = str(msg.get("verb") or msg.get("cmd") or "").strip()
+    args = msg.get("args", {})
+    if not has_id or req_id is None or req_id == "":
+        return await _fail(req_id if has_id else None, "ws rpc: id required")
+    if not verb:
+        return await _fail(req_id, "ws rpc: verb required")
+    if args is None:
+        args = {}
+    if not isinstance(args, dict):
+        return await _fail(req_id, "ws rpc: args must be an object")
+
+    who = desk_name(desk)
+    if not socket_seated(who, websocket) and not socket_seated(desk, websocket):
+        return await _fail(req_id, SESSION_WS_REQUIRED)
+
+    t0 = time.perf_counter()
+
+    # The transport peer decides the office-host (loopback) Admin marker, never
+    # the client args. A forwarded request (reverse proxy) is not treated as
+    # loopback so a proxy hop cannot masquerade as the office host.
+    ws_peer = ""
+    ws_forwarded = False
+    try:
+        client = getattr(websocket, "client", None)
+        ws_peer = str(getattr(client, "host", "") or "")
+        hdrs = getattr(websocket, "headers", None)
+        if hdrs is not None:
+            ws_forwarded = bool((hdrs.get("x-forwarded-for") or "").strip())
+    except Exception:
+        ws_peer = ""
+        ws_forwarded = False
+
+    def _run() -> Any:
+        with Book() as c:
+            return dispatch_ws(
+                c, who, verb, args, req_id=str(req_id), peer=ws_peer, forwarded=ws_forwarded
+            )
+
+    def _sync() -> list:
+        from agent_coord.server.push import take_sync
+
+        with Book() as c:
+            return take_sync(c._cn, who)
+
+    try:
+        result = await asyncio.get_running_loop().run_in_executor(None, _run)
+    except CoordError as e:
+        ms = (time.perf_counter() - t0) * 1000.0
+        err = " ".join(str(e).split())[:160]
+
+        def _verb_err() -> None:
+            from agent_coord.server.push import perf_log
+
+            perf_log("verb", ms, desk=who or desk, verb=verb, ok=0, err=err)
+
+        try:
+            await asyncio.get_running_loop().run_in_executor(None, _verb_err)
+        except Exception:
+            pass
+        sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
+        return stamp_mill({"id": req_id, "ok": False, "error": str(e), "sync": sync})
+    except Exception as e:
+        sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
+        return stamp_mill({"id": req_id, "ok": False, "error": err_text(e), "sync": sync})
+
+    # Kick/supersede during handler: do not complete RPC on a dead seat.
+    if not socket_seated(who, websocket) and not socket_seated(desk, websocket):
+        sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
+        return stamp_mill({"id": req_id, "ok": False, "error": SESSION_WS_REQUIRED, "sync": sync})
+    sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
+    # A refused hold or drop keeps result.ok false. The envelope ok must match (#207, #227).
+    env_ok = hold_envelope_ok(verb, result)
+    reply = stamp_mill({"id": req_id, "ok": env_ok, "result": result, "sync": sync})
+    ms = (time.perf_counter() - t0) * 1000.0
+    resp_b = 0
+    try:
+        from agent_coord.server.mill_json import with_bytes
+
+        reply, resp_b = with_bytes(reply)
+    except Exception:
+        pass
+    try:
+        req_b = len(text.encode("utf-8"))
+
+        def _note() -> None:
+            try:
+                from agent_coord.server.push import perf_log
+
+                perf_log("verb", ms, desk=who or desk, verb=verb, ok=1 if env_ok else 0)
+            except Exception:
+                pass
+
+        # The score write goes to the flusher and the log line to a worker; the
+        # reply does not wait for either (F24). It used to await mill_score_event.
+        from agent_coord.server.score_system import enqueue_verb
+
+        enqueue_verb(who or desk, verb, req_b=req_b, resp_b=resp_b, ms=ms)
+        asyncio.get_running_loop().run_in_executor(None, _note)
+    except Exception:
+        pass
+    return reply
+
+
+
+def make_asgi_app(
+    roots: dict[str, Path] | None = None,
+    *,
+    api_only: bool = False,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+):
+    """ASGI app: FastAPI catch-all that drives middleware.make_handler."""
+    import asyncio
+
+    from starlette.requests import Request
+    from starlette.responses import Response
+
+    from .push import HUB
+
+    Handler = make_handler(roots or parse_roots(), api_only=api_only)
+
+    log_path = _access_log_path()
+
+    async def _dispatch(request: Request) -> Response:
+        t0 = time.perf_counter()
+        path = request.url.path
+        try:
+            return await _dispatch_inner(request, t0)
+        except Exception as e:
+            try:
+                from agent_coord.server.push import api_log, mill_admin_alert
+                from agent_coord.server.middleware import _office
+
+                api_log(f"{request.method} {path} 500 dispatch err={e}")
+                with _office() as c:
+                    mill_admin_alert(c._cn, f"asgi {request.method} {path}: {e}", verb="asgi")
+            except Exception:
+                pass
+            from agent_coord.server.mill_json import dumps_mill_bytes
+
+            return Response(
+                content=dumps_mill_bytes({"error": err_text(e)}),
+                status_code=500,
+                media_type="application/json; charset=utf-8",
+            )
+
+    async def _dispatch_inner(request: Request, t0: float) -> Response:
+        path = request.url.path
+        from .allow import allowed, client_ip, is_mill_verb
+
+        peer = request.client.host if request.client else "127.0.0.1"
+        ip = client_ip(peer, request.headers.get("x-forwarded-for") or "")
+        from agent_coord.server.admin.door import mode as door_mode
+
+        if door_mode() == "ip":
+            if not allowed(ip, empty_open=False):
+                return Response(
+                    content=b"mill-wall: door=ip; add this address to wall-allow.txt\n",
+                    status_code=403,
+                    media_type="text/plain; charset=utf-8",
+                )
+        elif not is_mill_verb(path):
+            if not allowed(ip):
+                return Response(
+                    content=b"mill-wall: IP not on wall-allow (human Wall ACL)\n",
+                    status_code=403,
+                    media_type="text/plain; charset=utf-8",
+                )
+        body = await request.body()
+        if request.url.query:
+            path = path + "?" + request.url.query
+        handler = Handler.__new__(Handler)
+        handler.command = request.method
+        handler.path = path
+        handler.request_version = "HTTP/1.1"
+        handler.requestline = f"{request.method} {path} HTTP/1.1"
+        handler.close_connection = True
+        handler.rfile = BytesIO(body)
+        handler.wfile = BytesIO()
+        msg = HTTPMessage()
+        for key, val in request.headers.items():
+            msg[key] = val
+        if "Content-Length" not in msg:
+            msg["Content-Length"] = str(len(body))
+        handler.headers = msg
+        client = request.client
+        handler.client_address = (
+            client.host if client else "127.0.0.1",
+            client.port if client else 0,
+        )
+        handler.server = _FakeServer(host, port)
+        handler.request = None
+        handler.connection = None
+        handler.raw_requestline = handler.requestline.encode("latin-1", "replace")
+        status = [200]
+        resp_headers: list[tuple[str, str]] = []
+
+        def send_response(code: int, message: str | None = None) -> None:
+            status[0] = int(code)
+
+        def send_header(key: str, val: str) -> None:
+            resp_headers.append((str(key), str(val)))
+
+        def end_headers() -> None:
+            return None
+
+        handler.send_response = send_response  # type: ignore[method-assign]
+        handler.send_header = send_header  # type: ignore[method-assign]
+        handler.end_headers = end_headers  # type: ignore[method-assign]
+        handler.log_request = lambda *a, **k: None  # type: ignore[method-assign]
+        method = (request.method or "GET").upper()
+
+        def _run_handler() -> None:
+            if method == "POST":
+                handler.do_POST()
+            else:
+                handler.do_GET()
+
+        await asyncio.get_running_loop().run_in_executor(None, _run_handler)
+        raw = handler.wfile.getvalue()
+        cookies: list[tuple[str, str]] = []
+        hdrs: dict[str, str] = {}
+        for key, val in resp_headers:
+            if key.lower() == "content-length":
+                continue
+            if key.lower() == "set-cookie":
+                cookies.append((key, val))
+                continue
+            hdrs[key] = val
+        media = hdrs.pop("Content-Type", None) or hdrs.pop("content-type", None)
+        ms = (time.perf_counter() - t0) * 1000.0
+        _note_ms(ms)
+        record_access(
+            log_path,
+            request.method,
+            path,
+            status[0],
+            ms,
+            len(raw),
+            req_b=len(body),
+        )
+        hdrs["X-Mill-Duration-Ms"] = f"{ms:.1f}"
+        response = Response(
+            content=raw,
+            status_code=status[0],
+            media_type=media,
+            headers=hdrs,
+        )
+        for key, val in cookies:
+            response.headers.append(key, val)
+        return response
+
+    from starlette.applications import Starlette
+    from starlette.routing import Route, WebSocketRoute
+    from starlette.websockets import WebSocket as StarWS
+
+
+    async def ws_endpoint(websocket: StarWS) -> None:
+        from agent_coord.server.redact import redact_format
+
+        desk = str(websocket.path_params.get("desk") or "")
+        try:
+            await websocket.accept()
+        except Exception as e:
+            _log.warning("%s", redact_format("ws accept fail desk=%s err=%s", desk, e))
+            return
+        auth = (websocket.headers.get("authorization") or "").strip()
+        token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+        if not token:
+            _log.warning("ws auth missing desk=%s", desk)
+            try:
+                await websocket.close(code=4401)
+            except Exception:
+                pass
+            return
+        try:
+            from agent_coord.client.tokens import token_hash
+            from agent_coord.helpers.ident import desk_name
+            from agent_coord.server.book import Book
+            from agent_coord.server.records import join as rec_join
+
+            digest = token_hash(token)
+            want = desk_name(desk)
+            ok = False
+            with Book() as c:
+                if rec_join.token_matches(c._cn, want, digest):
+                    ok = True
+                    try:
+                        rec_join.note_connect(c._cn, want)
+                    except Exception as e:
+                        _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
+            if not ok:
+                _log.warning("ws auth bad token desk=%s", desk)
+                try:
+                    await websocket.close(code=4401)
+                except Exception:
+                    pass
+                return
+        except Exception as e:
+            _log.warning("%s", redact_format("ws auth fail desk=%s err=%s", desk, e))
+            code, reason = ws_auth_close(e)
+            try:
+                if reason:
+                    await websocket.close(code=code, reason=reason)
+                else:
+                    await websocket.close(code=code)
+            except Exception:
+                pass
+            return
+        try:
+            await HUB.add(desk, websocket)
+        except Exception as e:
+            _log.warning("%s", redact_format("ws add fail desk=%s err=%s", desk, e))
+        try:
+            from agent_coord.helpers.ident import desk_name
+            from agent_coord.server.book import Book
+            from agent_coord.server.mill_json import stamp_mill
+            from agent_coord.server.push import connect_sync_frame
+
+            def _connect_sync() -> dict:
+                with Book() as c:
+                    return connect_sync_frame(c._cn, desk_name(desk))
+
+            frame = await asyncio.get_running_loop().run_in_executor(None, _connect_sync)
+            await websocket.send_text(json.dumps(stamp_mill(frame), default=str))
+        except Exception as e:
+            _log.warning("%s", redact_format("ws sync fail desk=%s err=%s", desk, e))
+        try:
+            while True:
+                try:
+                    raw = await websocket.receive_text()
+                except Exception:
+                    break
+                try:
+                    reply = await _ws_handle_client_text(desk, websocket, raw)
+                except Exception as e:
+                    _log.warning("%s", redact_format("ws rpc fail desk=%s err=%s", desk, e))
+                    reply = None
+                if reply is None:
+                    continue
+                try:
+                    await websocket.send_text(json.dumps(reply, default=str))
+                except Exception:
+                    break
+        finally:
+            try:
+                HUB.discard(desk, websocket)
+            except Exception:
+                pass
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def lifespan(_app):
+        HUB.bind_loop(asyncio.get_running_loop())
+        try:
+            from agent_coord.server.records.db import warm_pool
+
+            await asyncio.get_running_loop().run_in_executor(None, warm_pool)
+        except Exception:
+            pass
+
+        async def _warm_paths() -> None:
+            # After listen: open read paths (rooms + lean mailbox) so first Wall paint is warm.
+            try:
+                await asyncio.sleep(0)
+                from agent_coord.server.records.db import warm_read_paths
+
+                await asyncio.get_running_loop().run_in_executor(None, warm_read_paths)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                pass
+
+        async def _ping() -> None:
+            while True:
+                try:
+                    await asyncio.sleep(20)
+                    for desk in list(HUB.rooms):
+                        try:
+                            HUB.notify(desk, {"type": "heartbeat", "id": 0, "hint": "PING"})
+                        except Exception:
+                            pass
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    await asyncio.sleep(20)
+
+        async def _score() -> None:
+            from agent_coord.server.score_tick import tick
+
+            loop = asyncio.get_running_loop()
+            try:
+                await loop.run_in_executor(None, tick)
+            except Exception:
+                pass
+            while True:
+                try:
+                    await asyncio.sleep(900)
+                    await loop.run_in_executor(None, tick)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    await asyncio.sleep(900)
+
+        async def _push_expire() -> None:
+            # 30-day queue sweep: once at start, then every PUSH_EXPIRE_EVERY_S.
+            from agent_coord.server.push import PUSH_EXPIRE_EVERY_S, expire_sweep
+
+            loop = asyncio.get_running_loop()
+            while True:
+                try:
+                    await loop.run_in_executor(None, expire_sweep)
+                    await asyncio.sleep(PUSH_EXPIRE_EVERY_S)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    await asyncio.sleep(PUSH_EXPIRE_EVERY_S)
+
+        ping_task = asyncio.create_task(_ping())
+        score_task = asyncio.create_task(_score())
+        expire_task = asyncio.create_task(_push_expire())
+        warm_task = asyncio.create_task(_warm_paths())
+        yield
+        warm_task.cancel()
+        ping_task.cancel()
+        score_task.cancel()
+        expire_task.cancel()
+
+    _http = ["GET", "POST", "HEAD", "PUT", "PATCH", "DELETE", "OPTIONS"]
+
+    async def http_endpoint(request: Request) -> Response:
+        return await _dispatch(request)
+
+    app = Starlette(
+        routes=[
+            WebSocketRoute("/ws/{desk}", ws_endpoint),
+            Route("/", http_endpoint, methods=_http),
+            Route("/{path:path}", http_endpoint, methods=_http),
+        ],
+        lifespan=lifespan,
+    )
+    from starlette.middleware.gzip import GZipMiddleware
+
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    return app
+
+
+def log_startup() -> None:
+    """One mill-perf line when the wall process comes up (#220), with the driver (F34)."""
+    try:
+        from agent_coord.install.packver import package_version
+        from agent_coord.server.push import perf_log
+        from agent_coord.server.records.driver import cached, warn_once
+
+        info = warn_once(cached())
+        perf_log(
+            "startup",
+            0.0,
+            version=package_version(),
+            db_driver=info.get("path"),
+            connector=info.get("version") or None,
+        )
+    except Exception:
+        pass
+
+
+def run_uvicorn(
+    host: str,
+    port: int,
+    roots: dict[str, Path] | None = None,
+    *,
+    api_only: bool = False,
+    dogfood: bool = False,
+) -> None:
+    """Block as mill-wall (replaces ThreadingHTTPServer.serve_forever)."""
+    global _server
+    import uvicorn
+
+    from agent_coord.helpers.ident import this_host
+    from .netbind import assert_mill_api_bind
+
+    roots = roots or parse_roots()
+    from .netbind import cert_paths
+
+    certs = cert_paths()
+    tls = bool(certs.get("cert_exists"))
+    assert_mill_api_bind(host, api_only=api_only)
+    if not api_only and not tls:
+        h = (host or "").strip()
+        if h in ("0.0.0.0", "::", "*") or (
+            h and h not in ("127.0.0.1", "localhost", "::1") and not h.startswith("127.")
+        ):
+            raise SystemExit(
+                "HTTPS-only: refusing cleartext wall on non-loopback. "
+                "Need ~/.mill/ssl/wall.crt + wall.key (mill --http service) or nginx TLS."
+            )
+    if dogfood:
+        print(
+            "dogfood foreground wall - office wall is `mill install wall --apply`. "
+            "This process is not a mill session.",
+            flush=True,
+        )
+    scheme = "https" if tls else "http"
+    print(
+        f"factory board on {scheme}://{host}:{port}/  node={this_host()}  roots={list(roots)}  asgi=uvicorn",
+        flush=True,
+    )
+    print(f"mill-wall access log {_access_log_path()}", flush=True)
+    from agent_coord.server.win_wall_svc import _no_console_stdio
+
+    _no_console_stdio()
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    app = make_asgi_app(roots, api_only=api_only, host=host, port=port)
+    kw = dict(
+        app=app,
+        host=host,
+        port=port,
+        log_level="info",
+        access_log=False,
+        use_colors=False,
+        log_config=None,
+    )
+    if tls:
+        kw["ssl_certfile"] = certs["cert"]
+        kw["ssl_keyfile"] = certs["key"]
+    if sys.platform == "win32":
+        import asyncio
+
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    config = uvicorn.Config(**kw)
+    server = uvicorn.Server(config)
+    # Windows SERVICE: signals only work on the process main thread
+    # https://github.com/encode/uvicorn/issues/526
+    server.install_signal_handlers = lambda: None
+    _server = server
+    log_startup()
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        print("\nboard stopped")
+    finally:
+        _server = None
+
+
+def shutdown_uvicorn() -> None:
+    if _server is not None:
+        _server.should_exit = True

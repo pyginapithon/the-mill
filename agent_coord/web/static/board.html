@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Factory wall">
+  <title>The Mill - the board</title>
+  <!-- WALL_UI_LIB_THEME: default CSS vars (fonts/sizes/headings); Cut6 DB css_vars HOLD -->
+  <link rel="stylesheet" href="lib/theme.css">
+  <link rel="stylesheet" href="board.css">
+  
+</head>
+<body>
+  <div id="wall-refresh-banner" role="status" aria-live="polite">
+    <span>Wall updated - refresh</span>
+    <button type="button" id="wall-refresh-btn" title="Reload Wall to pick up the new UI">Refresh</button>
+  </div>
+  <header>
+    <h1>THE MILL</h1>
+    <span class="sub" id="wall-label">office floor</span>
+    <button type="button" class="howto-toggle" id="howto-toggle" aria-expanded="false" aria-controls="howto-card">HOW TO READ THIS</button>
+    <button type="button" class="howto-toggle" id="wall-add">CUSTOM FILTER</button>
+    <button type="button" class="howto-toggle" id="admin-open" data-tab="admin" title="Admin - invite keys, security ladder, OIDC stub. Operator chrome.">ADMIN</button>
+    <button type="button" class="howto-toggle" id="debug-wire" data-tab="wire" title="WIRE - mill tcpdump. Also hash #wire.">DEBUG | WIRE</button>
+    <button type="button" class="howto-toggle" id="guide-open" data-tab="guide" title="GUIDE - TERMS and INSTRUCTIONS. Always on the wall.">GUIDE</button>
+    <span class="clock" id="clock">-</span>
+  </header>
+  <nav class="walls" id="walls-nav" aria-label="filters"></nav>
+  <aside id="filter-panel" hidden>
+    <header>
+      <h2>CUSTOM FILTER</h2>
+      <button type="button" class="dismiss" id="filter-cancel">close</button>
+    </header>
+    <p class="note">Apply writes the URL (anyone with the door can open that link). Save chip is this browser only - the mill has no human login. Copy on a chip shares the URL.</p>
+    <form id="filter-form" class="desk-form" style="flex-direction:column;align-items:stretch;gap:.45rem">
+      <label>Name <input id="flt-name" maxlength="64" placeholder="e.g. mill bugs this week"></label>
+      <label>Products <input id="flt-projects" maxlength="200" placeholder="comma list, empty = all"></label>
+      <label>Owner <input id="flt-owner" maxlength="64" placeholder="coord, setter-upper, empty = all"></label>
+      <label>PLAN label
+        <select id="flt-kind">
+          <option value="">any</option>
+          <option value="bug">bug</option>
+          <option value="feature">feature</option>
+          <option value="next">next</option>
+        </select>
+      </label>
+      <label>PLAN cut
+        <select id="flt-status">
+          <option value="">any</option>
+          <option value="todo">to do</option>
+          <option value="doing">in progress</option>
+          <option value="done">done</option>
+        </select>
+      </label>
+      <label>From <input id="flt-from" type="date"></label>
+      <label>To <input id="flt-to" type="date"></label>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        <button type="submit">apply</button>
+        <button type="button" id="filter-save">save chip</button>
+        <button type="button" id="filter-clear">clear</button>
+      </div>
+    </form>
+  </aside>
+  <div class="strip" id="strip" aria-label="project glance"><span class="kpi">API<b>...</b></span><span class="kpi">HERE<b>...</b></span><span class="kpi">JOBS<b>...</b></span><span class="kpi">MAIL<b>-</b></span><span class="kpi">Waiting<b>...</b></span></div>
+  <div id="hero" class="hero empty" aria-live="polite"><div class="idle">no leftover | no judged KPIs</div></div>
+  <nav class="tabs" aria-label="office panes">
+    <button type="button" data-tab="session" class="on" title="Who is clocked in - idle / working / waiting / blocked">SESSION</button>
+    <button type="button" data-tab="floor" title="Floor map glance - desks, mail traffic, tokens, throughput">FLOOR</button>
+    <button type="button" data-tab="jobs" title="What is being worked on, and what still needs doing">JOBS</button>
+    <button type="button" data-tab="score" title="If these go the wrong way, stop and debug">SCORECARDS</button>
+    <button type="button" data-tab="mail" title="Talk to agents and coworkers. Email, not chat.">MAIL</button>
+    <button type="button" data-tab="plan" title="PLAN: organize what & when (label / cut). Humans on Wall; planning agents via API/CLI. Execution is JOBS.">PLAN</button>
+</nav>
+  <div id="kpi-banner" role="alert"></div>
+  <div id="leftover-banner" role="status"></div>
+  <main>
+    <div class="pane on" id="pane-session">
+            <section id="sec-here">
+        <div class="session-chrome">
+          <h2>SESSION - who is here</h2>
+          <button type="button" class="help-reopen" id="session-help-reopen" aria-expanded="false" aria-controls="session-help-box" title="How to read Session">How to read | ?</button>
+        </div>
+        <aside class="help-box" id="session-help-box" data-help-id="session" role="dialog" aria-modal="false" aria-labelledby="session-help-title" hidden>
+          <header data-help-drag="1">
+            <h2 id="session-help-title">HOW TO READ SESSION</h2>
+            <button type="button" class="dismiss" id="session-help-dismiss" title="Close">close</button>
+          </header>
+          <div class="help-body">
+            <ul>
+              <li><b>Column order (left->right):</b> <b>desk</b> | <b>status</b> | <b>waiting on</b> | <b>what / job</b>. No separate line / project / node:pid / session_root columns.</li>
+              <li><b>Desk (stacked):</b> line 1 = <b>owner</b> bold + <b>mail icon</b>; show | role only when role is set and != owner; line 2 muted = <code>node:pid</code> under the name. Do <b>not</b> put project id under desk.</li>
+              <li><b>Mail icon</b> = message this desk (opens mail popup; To = that owner; src = your human badge). <b>Unread badge</b> = that desk <b>agent-unread</b> (mill party=agent); hidden when zero. Human open is optional.</li>
+              <li><b>Status chip:</b> working | idle | waiting | blocked (+ <b>stale</b> if heartbeat / lease dead).</li>
+              <li><b>Waiting on:</b> desk ids / <code>lease:resource</code> / <code>JOB:id</code> - empty shows -. Lease blocks use <b>desk</b> or <code>lease:resource</code> (not role). Roles in waiting_on are for mail/coord waits, not file locks. Column hides when no desk waits. Never vague "waiting" with no target.</li>
+              <li><b>What / job:</b> short <code>doing</code>; JOB+ETA+progress when claimed (<b>no claimed JOB -> chip idle</b> even if doing set). Muted <b>project id</b> under what (e.g. mill) - not the disk path (<code>session_root</code> tooltip on desk OK only).</li>
+              <li><b>Honesty:</b> agents clear <code>waiting_on</code> when unblocked / JOB done (CLI <code>waiting-on --waiting-on ""</code>). Pulse <b>Waiting</b> = desks with non-empty <code>waiting_on</code>. Wire OFF by default.</li>
+            </ul>
+          </div>
+        </aside>
+        <div class="body" id="here"></div>
+      </section>
+    </div>
+    <div class="pane" id="pane-floor">
+      <div class="floor-chrome">
+        <h2>FLOOR - office glance</h2>
+        <span class="floor-legend" id="floor-legend" aria-label="Node status legend">
+          <span class="lg lg-working"><i></i>working</span>
+          <span class="lg lg-idle"><i></i>idle</span>
+          <span class="lg lg-waiting"><i></i>waiting</span>
+        </span>
+        <span class="floor-mode" id="floor-mode" role="group" aria-label="Floor view mode">
+          <button type="button" data-floor-mode="map" class="on">Map</button>
+          <button type="button" data-floor-mode="timeline">Timeline</button>
+        </span>
+        <span class="floor-mode" id="floor-agg" role="group" aria-label="Floor node aggregation">
+          <button type="button" data-floor-agg="desk" class="on">Desk</button>
+          <button type="button" data-floor-agg="workstation">Workstation</button>
+        </span>
+        <span class="floor-span" id="floor-span" role="group" aria-label="Floor time window">
+          <button type="button" data-floor-span="1h">1h</button>
+          <button type="button" data-floor-span="24h" class="on">24h</button>
+          <button type="button" data-floor-span="7d">7d</button>
+        </span>
+      </div>
+            <p class="note" id="floor-note">Map: <b>Desk</b> nodes (default) or <b>Workstation</b> host rollup; edges = mail traffic; unread/tokens/done chips. Timeline: one lane per desk - working/waiting/idle + token spark + jobs-done. Shared time chips. Detail opens <b>beside</b> (peer panes; drag the split; no below-fold). Mail tab = work pile; Scorecards = deep KPI.</p>
+      <div class="floor-split" id="floor-split">
+        <div class="floor-main" id="floor-main">
+          <div class="floor-map" id="floor-map" aria-label="Floor map"></div>
+          <div class="floor-timeline" id="floor-timeline" aria-label="Floor timeline" hidden></div>
+        </div>
+        <div class="floor-gutter" id="floor-gutter" role="separator" aria-orientation="vertical" aria-label="Resize Floor panes" tabindex="0"></div>
+        <div class="floor-detail" id="floor-detail" aria-live="polite"><h3>DETAIL</h3><div class="idle">Click a desk or mail edge.</div></div>
+      </div>
+    </div>
+    <div class="pane" id="pane-jobs">
+      <div class="jobs-chrome">
+        <h2>JOBS - mill needs <span class="jobs-sub">not human PLAN</span></h2>
+        <div class="jobs-view-toggle" role="tablist" aria-label="Jobs views">
+          <button type="button" data-jobs-view="needs" class="on" role="tab" aria-selected="true">Needs</button>
+          <button type="button" data-jobs-view="stations" role="tab" aria-selected="false">Stations</button>
+        </div>
+        <button type="button" class="help-reopen" id="jobs-help-reopen" aria-expanded="false" aria-controls="jobs-help-box" title="How to read Jobs">How to read | ?</button>
+      </div>
+      <aside class="help-box" id="jobs-help-box" data-help-id="jobs" role="dialog" aria-modal="false" aria-labelledby="jobs-help-title" hidden>
+        <header data-help-drag="1">
+          <h2 id="jobs-help-title">HOW TO READ JOBS</h2>
+          <button type="button" class="dismiss" id="jobs-help-dismiss" title="Close">close</button>
+        </header>
+        <div class="help-body">
+          <ul>
+            <li><b>Needs</b> = mill <code>needs</code> kanban: <b>Open</b> (HELP WANTED) | <b>In progress</b> (ON IT / claimed) | <b>Done</b> (time window: 1h/24h/7d/30d/all). Not the human PLAN tab.</li>
+            <li><b>Card:</b> need_id | doing | asker | volunteer | progress/ETA | stale cue if holder dead.</li>
+            <li><b>Stations</b> = peer sub-tab (same pane; swaps with Needs). Who may write a scarce file (leases). Holder = <b>desk id</b> (session), not role. Roles are mail-only. Blocked desks show on <b>Session</b> via status + <code>waiting_on</code>.</li>
+          </ul>
+        </div>
+      </aside>
+      <section id="sec-wanted" class="jobs-kanban-col jobs-needs-only">
+        <h2>OPEN <span class="jobs-sub">HELP WANTED</span></h2>
+        <div class="body" id="wanted"></div>
+      </section>
+      <section id="sec-onit" class="jobs-kanban-col jobs-needs-only">
+        <h2>IN PROGRESS <span class="jobs-sub">ON IT</span></h2>
+        <div class="body" id="claimed"></div>
+      </section>
+      <section id="sec-done" class="jobs-kanban-col jobs-needs-only">
+        <h2>DONE <span class="jobs-sub" id="jobs-done-label">| 24h</span>
+          <select id="jobs-done-span" aria-label="Done time span" title="Done time span">
+            <option value="1h">1h</option>
+            <option value="24h" selected>24h</option>
+            <option value="7d">7d</option>
+            <option value="30d">30d</option>
+            <option value="all">All</option>
+          </select>
+        </h2>
+        <div class="body" id="jobs-done"></div>
+      </section>
+      <section id="sec-leases" class="jobs-stations-only">
+        <h2>STATIONS <span class="jobs-sub">who may write this resource | desk holder</span></h2>
+        <div class="body" id="stations"></div>
+      </section>
+    </div>
+    <div class="pane" id="pane-backlog">
+      <div class="plan-chrome" id="plan-chrome" role="toolbar" aria-label="Plan filters">
+        <label class="sr-only" for="plan-cut">cut</label>
+        <select id="plan-cut" title="Cut / when (user-named). Help examples: a season or version name." aria-label="cut">
+          <option value="">this cut</option>
+        </select>
+        <input id="plan-label" maxlength="64" placeholder="label" aria-label="label" title="Free label">
+        <input id="board-search" maxlength="80" placeholder="search" aria-label="search Plan">
+        <span class="plan-hist" id="plan-hist" role="group" aria-label="history">
+          <button type="button" data-plan-hist="this" class="on" title="This cut: parked + upcoming">This cut</button>
+          <button type="button" data-plan-hist="prior" title="Prior cuts / finished">Prior</button>
+          <button type="button" data-plan-hist="all" title="All Plan items">All</button>
+        </span>
+        <span class="plan-view-toggle" id="plan-view-toggle" role="group" aria-label="Plan view">
+          <button type="button" data-plan-view="tiles" class="on" title="Tiles (default)">Tiles</button>
+          <button type="button" data-plan-view="list" title="List">List</button>
+        </span>
+        <button type="button" class="plan-park" id="plan-park" title="Park an item" aria-haspopup="dialog" aria-controls="park-sheet" aria-expanded="false">+</button>
+      </div>
+      <section class="plan-body" id="sec-plan-list">
+        <h2>PLAN <span class="jobs-sub" id="plan-sub">what &amp; when - execution is JOBS</span></h2>
+        <p class="note" id="plan-note">Organize what &amp; when (label / cut) - Wall for humans; mill API/CLI for planning agents; same records. Default = this cut (parked + upcoming). Pull to floor opens a JOB. No todo/doing/done columns here.</p>
+        <div class="body" id="issue-list"></div>
+        <div id="issue-todo" hidden></div>
+        <div id="issue-doing" hidden></div>
+        <div id="issue-done" hidden></div>
+        <form id="issue-form" hidden></form>
+        <span class="desk-err" id="issue-err" hidden></span>
+      </section>
+    </div>
+    <div id="park-overlay" hidden>
+      <div class="park-backdrop" id="park-backdrop"></div>
+      <aside id="park-sheet" role="dialog" aria-modal="true" aria-labelledby="park-title">
+        <header>
+          <h2 id="park-title">PARK</h2>
+          <button type="button" class="dismiss" id="park-close" title="Close">close</button>
+        </header>
+        <p class="park-hint">Plan what &amp; when. Cut and label are names you choose (help examples: a season, a version). Filing lands parked - not a JOB.</p>
+        <form class="desk-form" id="park-form">
+          <input id="park-title-input" maxlength="200" placeholder="title" required>
+          <input id="park-cut" maxlength="64" placeholder="cut / when (optional)" title="User-named when. Help examples: spring, v0.3">
+          <input id="park-label" maxlength="64" placeholder="label (optional)">
+          <textarea class="desk-body" id="park-detail" maxlength="500" rows="4" placeholder="detail (optional)"></textarea>
+          <input id="park-who" maxlength="64" placeholder="for (optional)">
+          <input id="park-src" maxlength="64" placeholder="your name">
+          <details id="park-more">
+            <summary>more</summary>
+            <input id="park-token" type="password" maxlength="128" placeholder="badge" autocomplete="off">
+            <input id="park-phrase" maxlength="128" placeholder="align phrase">
+          </details>
+          <button type="submit">park</button>
+          <span class="desk-err" id="park-err"></span>
+        </form>
+      </aside>
+    </div>
+    <div id="edit-overlay" hidden>
+      <div class="park-backdrop" id="edit-backdrop"></div>
+      <aside id="edit-sheet" role="dialog" aria-modal="true" aria-labelledby="edit-title">
+        <header>
+          <h2 id="edit-title">EDIT</h2>
+          <button type="button" class="dismiss" id="edit-close" title="Close">close</button>
+        </header>
+        <p class="park-hint">Update title, detail, cut (when), and label. Same fields agents set via issue-set.</p>
+        <form class="desk-form" id="edit-form">
+          <input type="hidden" id="edit-id" value="">
+          <input id="edit-title-input" maxlength="200" placeholder="title" required>
+          <input id="edit-cut" maxlength="64" placeholder="cut / when" title="User-named when">
+          <input id="edit-label" maxlength="64" placeholder="label">
+          <textarea class="desk-body" id="edit-detail" maxlength="500" rows="4" placeholder="detail"></textarea>
+          <input id="edit-src" maxlength="64" placeholder="your name">
+          <details id="edit-more">
+            <summary>more</summary>
+            <input id="edit-token" type="password" maxlength="128" placeholder="badge" autocomplete="off">
+            <input id="edit-phrase" maxlength="128" placeholder="align phrase">
+          </details>
+          <button type="submit">save</button>
+          <span class="desk-err" id="edit-err"></span>
+        </form>
+      </aside>
+    </div>
+    <div class="pane" id="pane-mail">
+      <!-- MAIL_TO_SRC: 3 peer cols dst|src|messages always visible -->
+      <!-- FLOOR_DEFAULT_MAP: showTab+ensureFloorPaint; fixed extra pane-floor </div> -->
+      <!-- MAIL_BOOT_FIX: ensureMailPaint on showTab+#mail; listRail fallback -->
+      <!-- MAIL_LIST_AUTOSELECT_DST: LIST paint auto-picks first viable dst (prefer Needs attention) -->
+      <!-- MAIL_LIST_TO_FILTER: LIST col2 = selected dst only; idle if none -->
+      <!-- MAIL_LIST_GRAPH_CLARIFY: LIST=2col all+wrap; GRAPH=3col src filter -->
+      <!-- WALL_API_DOWN_FALSE: mid TDZ fix + tick paint harden -->
+      <!-- MAIL_COL3_SRC_FILTER: graph col3 = selected src->dst only -->
+      <section id="sec-mail">
+        <h2><span>MAIL</span>
+          <span class="mail-mode-toggle" role="group" aria-label="mail mode">
+            <button type="button" data-mail-mode="attention" class="on" title="Dst with agent-unread or open human_required">Needs attention</button>
+            <button type="button" data-mail-mode="all" title="All destinations">All</button>
+            <button type="button" data-mail-mode="recent" title="Recent mail">Recent</button>
+          </span>
+          <span class="mail-view-toggle" role="group" aria-label="mail view">
+            <button type="button" data-mail-view="list" class="on" title="2-col: messages for selected dst; wrap toggle">LIST</button>
+            <button type="button" data-mail-view="graph" title="3-col: dst then src then messages">GRAPH</button>
+          </span>
+          <button type="button" class="mail-compose" id="mail-compose" title="Compose" aria-haspopup="dialog" aria-controls="compose-sheet" aria-expanded="false">+</button>
+        </h2>
+        <div class="body mail mail-browser" data-mail-layout="dst-src-msg" data-mail-view="list">
+          <aside id="mail-dst-col" class="mail-col mail-dst-col" aria-label="destinations"></aside>
+          <aside id="mail-src-col" class="mail-col mail-src-col" aria-label="senders"></aside>
+          <div id="mail-msg-col" class="mail-col mail-msg-col" aria-label="messages">
+            <p class="note" id="mail-view-note">LIST: 2-col selected-dst messages (wrap<->nowrap). GRAPH: dst -> src -> messages (col3 = selected src->dst). No bare human setter-upper as dst.</p>
+            <div id="mail"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="pane" id="pane-wire">
+      <section id="sec-sniffer">
+        <h2>WIRE - mill tcpdump <label><input type="checkbox" id="show-reads"> show reads</label> <label><input type="checkbox" id="wire-details"> details</label></h2>
+        <div class="wire-proto" id="wire-proto"></div>
+        <div class="body wire" id="wire"></div>
+      </section>
+    </div>
+    <div class="pane" id="pane-score">
+      <div class="pane-toolbar">SCORECARDS - bottlenecks | progress | LLM vs mill-bytes <span id="score-spend" class="kpi">MILL SPEND</span> <span class="layout-toggle" data-layout-id="score"></span></div>
+      <div class="score-pulse" id="score-pulse" aria-label="Scorecards pulse"></div>
+      <div class="score-chrome" id="score-chrome">
+        <span class="score-span" id="score-span" role="group" aria-label="Scorecards window">
+          <button type="button" data-score-span="24h" class="on">24h</button>
+          <button type="button" data-score-span="7d">7d</button>
+        </span>
+        <span class="score-mode" id="score-mode" role="group" aria-label="Scorecards mode">
+          <button type="button" data-score-mode="core" class="on">Core</button>
+          <button type="button" data-score-mode="kpi">KPI detail</button>
+        </span>
+        <span class="score-filter" id="score-filter" role="group" aria-label="KPI detail filter" hidden>
+          <button type="button" data-score-filter="needs" class="on">Needs attention</button>
+          <button type="button" data-score-filter="all">All desks</button>
+        </span>
+        <span class="note" id="score-note">floor waiting_on + needs | LLM exact / dim LLM est / mill bytes | agent_kpi secondary</span>
+      </div>
+      <div class="score-core" id="score-core">
+        <div class="score-block" id="score-bottlenecks" aria-label="Bottlenecks"></div>
+        <div class="score-block" id="score-desk-progress" aria-label="Progress and tokens by desk"></div>
+      </div>
+      <div class="score-kpi-detail" id="score-kpi-detail" hidden>
+        <div class="score-split" id="score-split">
+          <div class="score-hot" id="score-hot" aria-label="Needs attention"></div>
+          <div class="score-gutter" id="score-gutter" role="separator" aria-orientation="vertical" aria-label="Resize Scorecards panes" tabindex="0"></div>
+          <div class="score-detail" id="score-detail" aria-live="polite"><h3>DETAIL</h3><div class="idle">Pick a desk.</div></div>
+        </div>
+        <div class="score-desk-table" id="score-desk-table" aria-label="Desk KPI table"></div>
+      </div>
+      <div class="cards" id="cards" hidden></div>
+    </div>
+
+    <div class="pane" id="pane-admin">
+      <div class="admin-chrome">
+        <h2>ADMIN - door | keys | network</h2>
+        <span class="admin-ladder" id="admin-ladder" role="group" aria-label="Security ladder">
+          <button type="button" data-ladder="solo" class="on" title="Solo: light Admin">Solo</button>
+          <button type="button" data-ladder="office" title="Office: full key board">Office</button>
+          <button type="button" data-ladder="company" title="Company: OIDC stub (no live IdP)">Company</button>
+        </span>
+        <span class="note" id="admin-door-mode" style="color:var(--dim);font-size:11px">door: ...</span>
+      </div>
+      <p class="note">Humans use this tab. Agents: mill CLI <code>invite --mint / --list / --revoke / --ttl / --lan-only</code>. HTTPS only. No live OIDC this ship. Floor try-it stays on FLOOR.</p>
+      <div class="admin-split" id="admin-split">
+        <section class="admin-panel" id="admin-keys-panel" aria-label="Invite key board">
+          <h3>KEY BOARD</h3>
+          <div class="admin-actions admin-full-only">
+            <input id="admin-label" placeholder="label" size="12" />
+            <input id="admin-ttl" placeholder="TTL e.g. 7d" size="10" />
+            <button type="button" id="admin-mint">mint key</button>
+            <button type="button" id="admin-refresh">refresh</button>
+          </div>
+          <div id="admin-mint-note" hidden></div>
+          <div id="admin-keys-body" class="body"><div class="idle">Loading keys...</div></div>
+        </section>
+
+        <section class="admin-panel admin-network" id="admin-network-panel" aria-label="Network options">
+          <h3>NETWORK</h3>
+          <p class="note">HTTPS only - plain HTTP redirects. Optional LAN-only bind (private interfaces, not 0.0.0.0). Agents: <code>invite --lan-only on|off</code> then <code>install wall --apply</code>.</p>
+          <dl id="admin-network-body">
+            <dt>HTTPS</dt><dd class="net-flag" id="admin-net-https">...</dd>
+            <dt>LAN-only</dt><dd id="admin-net-lan">...</dd>
+            <dt>Bind / Listen</dt><dd id="admin-net-bind">...</dd>
+            <dt>Cert</dt><dd id="admin-net-cert">...</dd>
+          </dl>
+          <div class="admin-actions admin-full-only">
+            <button type="button" id="admin-lan-on" title="Private/loopback Listen only">LAN-only on</button>
+            <button type="button" id="admin-lan-off" title="Allow public/wildcard bind (cloud); still HTTPS">Public / cloud</button>
+            <button type="button" id="admin-net-refresh">refresh</button>
+          </div>
+          <p class="note" id="admin-net-note"></p>
+        </section>
+        <section class="admin-panel oidc-stub" id="admin-oidc-panel" aria-label="Directory / OIDC stub">
+          <h3>DIRECTORY / OIDC (stub)</h3>
+          <p class="note">Company directory - coming later; use invite keys today</p>
+          <div class="oidc-providers" id="admin-oidc-providers"></div>
+          <div class="admin-actions">
+            <button type="button" class="connect-btn" disabled title="No live IdP this ship">Connect (disabled)</button>
+          </div>
+          <p class="note" id="admin-oidc-note">Company directory - coming later; use invite keys today</p>
+        </section>
+      </div>
+    </div>
+
+    <div class="pane" id="pane-guide">
+      <section>
+        <h2>TUTORIAL - first motions</h2>
+          <p class="note">Mill prefs (Cut 6): change office/desk knobs then refresh - font/land-tab/keys without git.</p>
+
+        <div class="body" id="guide-tutorial">loading...</div>
+      </section>
+      <section>
+        <h2>TERMS</h2>
+        <div class="body" id="guide-terms">loading...</div>
+      </section>
+      <section>
+        <h2>INSTRUCTIONS</h2>
+        <div class="body" id="guide-instructions">
+          <h3>Humans</h3>
+          <div id="guide-human">loading...</div>
+          <h3>Agents</h3>
+          <div id="guide-agent">loading...</div>
+          <h3>Features</h3>
+          <div id="guide-features">loading...</div>
+          <h3>Use cases</h3>
+          <div id="guide">loading...</div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <aside id="howto-card" aria-label="How to read this">
+    <header>
+      <h2>HOW TO READ THIS - humans</h2>
+      <button type="button" class="dismiss" id="howto-dismiss" title="Dismiss">dismiss</button>
+    </header>
+    <p>Quiet mill standup for <b>mill</b>. Land on <b>SESSION</b> - who is here. Leftover mill work is <b>JOBS</b>.</p>
+    <ul>
+      <li><button type="button" class="jump" data-tab="session" data-hi="sec-here"><b>SESSION</b></button> - glance: desk | status | waiting on | what/job. Mail icon = message this desk (popup; unread badge when inbox has mail). Floating How to read | ?.</li>
+      <li><button type="button" class="jump" data-tab="floor" data-hi="floor-map"><b>FLOOR</b></button> - map glance: desks, mail edges, tokens + throughput chips (1h/24h/7d). Not Wire.</li>
+      <li><button type="button" class="jump" data-tab="jobs" data-hi="sec-wanted"><b>JOBS</b></button> - mill needs kanban Open / In progress / Done. Peer sub-tabs Needs | Stations (desk holder). not BACKLOG.</li>
+      <li><button type="button" class="jump" data-tab="score" data-hi="pane-score"><b>SCORECARDS</b></button> - live agent_kpi Last vs Target. Mill spend on that view.</li>
+      <li><button type="button" class="jump" data-tab="mail" data-hi="sec-mail"><b>MAIL</b></button> - desk rail; default Needs attention (agent-unread / human_required). All / Recent toggles.</li>
+      <li><button type="button" class="jump" data-tab="stations" data-hi="sec-leases"><b>STATIONS</b></button> - who may write this live file (Jobs -> Stations sub-tab; desk holder).</li>
+      <li><button type="button" class="jump" data-tab="plan" data-hi="sec-plan-list"><b>PLAN</b></button> - humans organize what &amp; when (label / cut). Execution is JOBS. (was BACKLOG)</li>
+          <li><button type="button" class="jump" data-tab="admin" data-hi="pane-admin"><b>ADMIN</b></button> - operator chrome (with Debug/Guide): invite keys, security ladder, OIDC stub.</li>
+      <li><button type="button" class="jump" data-tab="guide" data-hi="pane-guide"><b>GUIDE</b></button> - TERMS, INSTRUCTIONS, how-to. Also one click from chrome.</li>
+      <li><button type="button" class="jump" data-tab="wire" data-hi="pane-wire"><b>WIRE</b></button> - mill tcpdump (DEBUG | WIRE; details off by default).</li>
+      <li><b>FILTERS</b> - default chip mill. Office = everything (advanced). CUSTOM FILTER = owner, kind, dates.</li>
+    </ul>
+  </aside>
+  <div id="compose-overlay" hidden>
+    <div class="compose-backdrop" id="compose-backdrop"></div>
+    <aside id="compose-sheet" role="dialog" aria-modal="true" aria-labelledby="compose-title">
+      <header>
+        <h2 id="compose-title">COMPOSE</h2>
+        <button type="button" class="dismiss" id="compose-close" title="Close">close</button>
+      </header>
+      <form class="desk-form" id="desk-form">
+        <input id="desk-dst" list="mail-to-list" maxlength="64" placeholder="desk | role | product.* | *" value="coord" title="To: desks (live+known) | roles | product | * - not a human badge"><datalist id="mail-to-list"></datalist>
+        <textarea class="desk-body" id="desk-body" maxlength="500" rows="5" placeholder="note (coordinate anyone; instruct = your agent)" required></textarea>
+        <label class="desk-orders" title="Flag Needs human (human_required)"><input type="checkbox" id="desk-human-required"> Needs human.</label>
+        <button type="submit">send</button>
+        <input id="desk-src" maxlength="64" placeholder="your name" autocomplete="username">
+        <details id="compose-more">
+          <summary>more</summary>
+          <input id="desk-token" type="password" maxlength="128" placeholder="badge" title="from mill introduce" autocomplete="off">
+          <input id="desk-phrase" maxlength="128" placeholder="align phrase" title="said with your agent, not the board link" autocomplete="off">
+          <label class="desk-orders"><input type="checkbox" id="desk-orders"> standing orders for my agent</label>
+        </details>
+        <span class="desk-err" id="desk-err"></span>
+      </form>
+    </aside>
+  </div>
+  <div id="copy-toast" hidden>copied</div>
+  <link rel="stylesheet" href="gutter.css">
+  <!-- WALL_UI_LIB: shared chrome Path A PRODUCT package-data (pip wall_ui/**)
+     Markers: WALL_UI_LIB_POPUP WALL_UI_LIB_DATA WALL_UI_LIB_TABS WALL_UI_LIB_TABLE WALL_UI_LIB_GRAPH WALL_UI_LIB_THEME WALL_UI_LIB_KEYS WALL_UI_DEFAULT_BOARD_CSS WALL_UI_DEFAULT_BOOT -->
+<script src="lib/theme.js"></script>
+<script src="lib/popup.js"></script>
+<script src="lib/data.js"></script>
+<script src="lib/tabs.js"></script>
+<script src="lib/table.js"></script>
+<script src="lib/graph.js"></script>
+<script src="lib/keys.js"></script>
+<script src="gutter.js"></script>
+  <!-- WALL_UI_DEFAULT_DOMAINS: thin domain modules (cut 5 Path A) -->
+  <script src="mail/mail.js"></script>
+  <script src="score/score.js"></script>
+  <script src="floor/floor.js"></script>
+  
+
+  <!-- WALL_UI_LIB_KEYS help chrome (markup only; logic in lib/keys.js) -->
+  <div id="wall-keys-help" class="help-box wall-keys-help" hidden role="dialog" aria-label="Keyboard shortcuts">
+    <header data-help-drag>
+      <strong>Keys</strong>
+      <span class="wall-keys-profile-label"></span>
+      <button type="button" class="dismiss" id="wall-keys-help-dismiss" aria-label="close">x</button>
+    </header>
+    <div class="wall-keys-toolbar">
+      <label>Profile
+        <select id="wall-keys-profile" aria-label="keybinding profile"></select>
+      </label>
+      <button type="button" id="wall-keys-customize">Customize...</button>
+      <button type="button" id="wall-keys-reset-all">Reset all</button>
+    </div>
+    <div id="wall-keys-map" class="wall-keys-map"></div>
+    <div id="wall-keys-customize-panel" class="wall-keys-customize" hidden>
+      <label>Action
+        <select id="wall-keys-action"></select>
+      </label>
+      <label>Chord
+        <input id="wall-keys-chord" type="text" placeholder="Alt+1" autocomplete="off">
+      </label>
+      <button type="button" id="wall-keys-save-override">Save</button>
+      <button type="button" id="wall-keys-reset-one">Reset action</button>
+      <p id="wall-keys-warn" class="note" hidden></p>
+    </div>
+  </div>
+
+<script src="boot.js?v=wow155"></script>
+</body>
+</html>

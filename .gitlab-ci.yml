@@ -1,0 +1,161 @@
+# Pack build + fail-closed check. Publish only from release_pypi on a v* tag.
+# One pipeline per push: MR pipelines, the default branch, and tags. A branch
+# push with an open MR runs only its MR pipeline; a branch without an MR runs none.
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_TAG
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+stages:
+  - build
+  - check
+  - release
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  # Full history: check_pack's commit-message scans start at a cut older than the
+  # default depth of 20, and a shallow clone skipped them. The pack is a few MiB.
+  GIT_DEPTH: "0"
+
+cache:
+  key: "pip-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
+
+build_pack:
+  stage: build
+  image: python:3.12-bookworm
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install build
+    - python -m build
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+
+check_pack:
+  stage: check
+  image: python:3.12-bookworm
+  needs:
+    - build_pack
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install pip-audit
+    - python tools/check_pack.py dist
+    - python tools/write_pack_deps.py
+    - pip-audit -r pack-deps.txt
+
+mill_cli_smoke:
+  stage: check
+  image: python:3.12-bookworm
+  needs:
+    - build_pack
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install dist/the_mill-*.tar.gz
+    - python tools/mill_cli_smoke.py
+    # F34: the built env must run the book on the connector's C extension.
+    # bookworm has OpenSSL 3.0 like Ubuntu 24.04, so this also proves the restart fix.
+    - test "$(uname -m)" = "x86_64"
+    - python -m agent_coord.server.records.driver --require-c
+    - python tools/check_skill_copy.py --installed
+
+pytest_no_sql:
+  stage: check
+  image: python:3.12-bookworm
+  needs:
+    - build_pack
+  script:
+    # Node 24.21.0 is the desk runtime. html-validate needs ^22.22 or >=24.8.
+    # Bookworm's nodejs package is older than that, so the job installs the official tarball.
+    # deb.debian.org sometimes returns 502. Retry the mirror fetch, then install.
+    - |
+      set -eu
+      ok=0
+      i=1
+      while [ "$i" -le 5 ]; do
+        if apt-get -o Acquire::Retries=5 update \
+          && apt-get -o Acquire::Retries=5 install -y --no-install-recommends ca-certificates curl xz-utils; then
+          ok=1
+          break
+        fi
+        sleep $((i * 2))
+        i=$((i + 1))
+      done
+      test "$ok" = 1
+    - test "$(uname -m)" = "x86_64"
+    - curl -fsSL -o /tmp/node.tar.xz https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.xz
+    - echo "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6  /tmp/node.tar.xz" | sha256sum -c -
+    - tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1
+    - test "$(node -v)" = "v24.21.0"
+    - npm ci --prefix tools/wall-validators
+    - python -m pip install --upgrade pip
+    - python -m pip install dist/the_mill-*.tar.gz "pytest>=8" "httpx>=0.27"
+    - python -m pytest tests -m "not sql"
+
+pytest_sql:
+  stage: check
+  timeout: 25m
+  image: python:3.12-bookworm
+  needs:
+    - build_pack
+  services:
+    - name: mysql:8.4
+      alias: mysql
+  variables:
+    MYSQL_ROOT_PASSWORD: root
+    MYSQL_ROOT_HOST: "%"
+    AGENT_COORD_HOST: mysql
+    AGENT_COORD_USER: root
+    AGENT_COORD_PASSWORD: root
+  script:
+    - python -m pip install --upgrade pip
+    - python -m pip install dist/the_mill-*.tar.gz "pytest>=8" "httpx>=0.27"
+    - |
+      python -c "
+      import sys, time, mysql.connector
+      last = None
+      for _ in range(30):
+          try:
+              mysql.connector.connect(host='mysql', user='root', password='root', connection_timeout=5).close()
+              sys.exit(0)
+          except Exception as e:
+              last = e
+              time.sleep(2)
+      sys.exit('mysql not ready: %s' % last)
+      "
+    - python -m pytest tests -m sql
+
+# Ship path. Runs only on a pushed tag v*. Uploads the same dist/ that
+# build_pack built and check_pack scanned. PYPI_API_TOKEN is a protected,
+# masked CI variable; v* tags must be protected so the variable is exposed.
+release_pypi:
+  stage: release
+  image: python:3.12-bookworm
+  needs:
+    - build_pack
+    - check_pack
+    - mill_cli_smoke
+    - pytest_no_sql
+    - pytest_sql
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  variables:
+    TWINE_USERNAME: __token__
+    TWINE_NON_INTERACTIVE: "1"
+  script:
+    - test -n "${PYPI_API_TOKEN:-}" || { echo "PYPI_API_TOKEN not set (protected tag + protected variable needed)"; exit 1; }
+    - python -m pip install --upgrade pip
+    - python -m pip install twine
+    - |
+      set -eu
+      want="${CI_COMMIT_TAG#v}"
+      ls dist/the_mill-"$want"-py3-none-any.whl dist/the_mill-"$want".tar.gz
+      test "$(ls dist | wc -l)" = 2
+    - python tools/check_pack.py dist
+    - python -m twine check dist/*
+    - TWINE_PASSWORD="$PYPI_API_TOKEN" python -m twine upload dist/*

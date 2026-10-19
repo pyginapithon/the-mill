@@ -1,0 +1,121 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "the-mill"
+version = "0.7.6"
+description = "Office for AI desks: mill-wall HTTPS, mill connect, MAIL/TODO/HOLD. Agent skills (and mill to back them) so coordination is glanceable."
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "pyginapithon" }]
+requires-python = ">=3.10"
+dependencies = [
+  "mysql-connector-python>=9.0",
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.32",
+  "PyJWT[crypto]>=2.8",
+]
+
+[project.optional-dependencies]
+server = []
+dev = ["pytest>=8", "pytest-cov>=5", "httpx>=0.27"]
+
+[project.scripts]
+mill = "agent_coord.__main__:main"
+mill-hold = "agent_coord.client.hold:main"
+agent-coord = "agent_coord.__main__:main"
+mill-mcp = "agent_coord.server.mcp_mill:main"
+
+[tool.setuptools.packages.find]
+include = ["agent_coord*"]
+exclude = ["agent_coord.web.wall_ui_save", "agent_coord.web.wall_ui_save*"]
+
+[tool.setuptools.package-data]
+agent_coord = [
+  "web/static/*",
+  "web/wall_ui/**/*.html",
+  "web/wall_ui/**/*.css",
+  "web/wall_ui/**/*.js",
+  "web/wall_ui/**/*.md",
+  "web/wall_ui/**/*.svg",
+  "server/sql/*",
+  "install/scripts/*",
+]
+
+[tool.setuptools.exclude-package-data]
+agent_coord = [
+  "**/__pycache__/*",
+  "**/*.py[cod]",
+  "**/*.bak",
+  "**/*.bak-*",
+  "**/*.orig",
+  "**/*~",
+  "web/wall_ui_save",
+  "web/wall_ui_save/*",
+  "web/wall_ui_save/**",
+]
+
+[tool.setuptools.data-files]
+"share/the-mill" = ["README.md"]
+"share/the-mill/docs" = ["docs/HOST.md", "docs/JOIN.md"]
+"share/the-mill/docs/install" = ["docs/install/README.md", "docs/install/HOST.md", "docs/install/CLOUD.md"]
+"share/the-mill/docs/install/cloud" = ["docs/install/cloud/aws.md", "docs/install/cloud/azure.md", "docs/install/cloud/gcp.md", "docs/install/cloud/self.md"]
+"share/the-mill/docs/requirements" = ["docs/requirements/README.md", "docs/requirements/admin.md", "docs/requirements/invite.md", "docs/requirements/todo-claim.md", "docs/requirements/env-variables.md", "docs/requirements/install.md"]
+"share/the-mill/docs/protocol" = [
+  "docs/protocol/usecases.md",
+  "docs/protocol/verbs.md",
+  "docs/protocol/cli-desk.md",
+  "docs/protocol/cli-install.md",
+  "docs/protocol/cli-admin.md",
+  "docs/protocol/skill.md",
+  "docs/protocol/route.md",
+  "docs/protocol/spawn.md",
+  "docs/protocol/connect.md",
+  "docs/protocol/hints.md",
+  "docs/protocol/sync.md",
+  "docs/protocol/patterns.md",
+  "docs/protocol/howto-ai.md",
+  "docs/protocol/improve.md",
+  "docs/protocol/tree.md",
+  "docs/protocol/access.md",
+  "docs/protocol/grok-foreground.md",
+]
+"share/the-mill/docs/protocol/models" = ["docs/protocol/models/README.md"]
+"share/the-mill/docs/protocol/models/grok-bot" = ["docs/protocol/models/grok-bot/SKILL.md"]
+"share/the-mill/docs/protocol/hint-handler" = ["docs/protocol/hint-handler/COLD.md"]
+"share/the-mill/docs/skills" = [
+  "docs/skills/README.md",
+  "docs/skills/TEMPLATE.md",
+  "docs/skills/FUNCTION-LINGO.md",
+  "docs/skills/MILL-OFFICE-SKILL-SCOUT.md",
+  "docs/skills/REMEASURE.md",
+]
+"share/the-mill/docs/skills/office-engineering" = ["docs/skills/office-engineering/SKILL.md", "docs/skills/office-engineering/RESEARCH.md", "docs/skills/office-engineering/TOY.md"]
+"share/the-mill/docs/skills/office-finance" = ["docs/skills/office-finance/SKILL.md", "docs/skills/office-finance/RESEARCH.md", "docs/skills/office-finance/TOY.md"]
+"share/the-mill/docs/skills/office-legal" = ["docs/skills/office-legal/SKILL.md", "docs/skills/office-legal/RESEARCH.md", "docs/skills/office-legal/TOY.md"]
+"share/the-mill/docs/skills/office-marketing" = ["docs/skills/office-marketing/SKILL.md", "docs/skills/office-marketing/RESEARCH.md", "docs/skills/office-marketing/TOY.md"]
+"share/the-mill/docs/skills/office-ops" = ["docs/skills/office-ops/SKILL.md", "docs/skills/office-ops/RESEARCH.md", "docs/skills/office-ops/TOY.md"]
+"share/the-mill/docs/skills/office-people" = ["docs/skills/office-people/SKILL.md", "docs/skills/office-people/RESEARCH.md", "docs/skills/office-people/TOY.md"]
+"share/the-mill/docs/skills/office-qa" = ["docs/skills/office-qa/SKILL.md", "docs/skills/office-qa/RESEARCH.md", "docs/skills/office-qa/TOY.md"]
+"share/the-mill/docs/skills/office-research" = ["docs/skills/office-research/SKILL.md", "docs/skills/office-research/RESEARCH.md", "docs/skills/office-research/TOY.md"]
+"share/the-mill/docs/skills/office-sales" = ["docs/skills/office-sales/SKILL.md", "docs/skills/office-sales/RESEARCH.md", "docs/skills/office-sales/TOY.md"]
+"share/the-mill/docs/skills/office-support" = ["docs/skills/office-support/SKILL.md", "docs/skills/office-support/RESEARCH.md", "docs/skills/office-support/TOY.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q"
+markers = [
+  "mill_live: probes against live agent_coord; require MILL_LIVE=1",
+  "sql: needs a MySQL server",
+]
+
+[tool.coverage.run]
+source = ["agent_coord"]
+omit = ["agent_coord/web/static/*"]
+branch = false
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false

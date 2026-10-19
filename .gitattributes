@@ -1,0 +1,2 @@
+# board.html stays CRLF in every checkout. The well-formed test reads those bytes.
+agent_coord/web/wall_ui/default/board.html text eol=crlf

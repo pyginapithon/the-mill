@@ -1,0 +1,182 @@
+/* WALL_UI_LIB_THEME - default Wall theme CSS variables (Path A).
+ * SoR: docs/acceptance/ACCEPTANCE-WALL-JS-LIB.md (theme amend).
+ * Packs/lib consume vars; knobs css_vars (Cut 6 DB) may override --* later.
+ * Marker: WALL_UI_LIB_THEME
+ * Sanitize: only --* custom properties; no ;{} smuggling in applied overlays.
+ */
+:root {
+  /* Quiet mill: warm lamp on dark shop - human glance, not SOC terminal */
+  --bg: #080a0d;
+  --panel: #12171e;
+  --edge: #5c7088;
+  --ink: #e8eef5;
+  --dim: #c5d2e0;
+  --amber: #e4b56a;
+  --green: #4fdd9b;
+  --red: #ff6d6d;
+  --cyan: #5ee1d0;
+  --mag: #c4a4f7;
+  --lamp: #f3d7a0;
+  --line: var(--edge);
+  --shop: #0d131a;
+  --shop-2: #16202b;
+  --deep: #0a0e14;
+  --well: #121820;
+
+  --font-ui: "Segoe UI Variable Text", "Segoe UI", "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+  --font-family: var(--font-ui);
+  --font-size: 14px;
+  --font-sm: 0.875rem;
+  --font-lg: 1.08rem;
+  --line-height: 1.45;
+  --letter-tight: .04em;
+  --letter-wide: .1em;
+  --letter-title: .2em;
+
+  --h1-size: 13px;
+  --h1-weight: 700;
+  --h1-color: var(--amber);
+  --h2-size: 13px;
+  --h2-weight: 600;
+  --h2-color: var(--ink);
+  --h3-size: 12px;
+  --h3-weight: 600;
+  --h3-color: var(--cyan);
+
+  --row-pad: 0.55rem;
+  --pane-gap: 0.65rem;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --shadow: 0 12px 36px rgba(0,0,0,.4);
+}
+
+html, body {
+  font-family: var(--font-family);
+  font-size: var(--font-size);
+  line-height: var(--line-height);
+  color: var(--ink);
+  background: var(--bg);
+}
+
+h1, header h1 {
+  font-size: var(--h1-size);
+  font-weight: var(--h1-weight);
+  color: var(--h1-color);
+  letter-spacing: var(--letter-title);
+}
+
+h2 {
+  font-size: var(--h2-size);
+  font-weight: var(--h2-weight);
+  color: var(--h2-color);
+}
+
+h3 {
+  font-size: var(--h3-size);
+  font-weight: var(--h3-weight);
+  color: var(--h3-color);
+  letter-spacing: var(--letter-wide);
+}
+
+code, kbd, pre, .sg-node {
+  font-family: var(--font-mono);
+}
+
+/* wow164: palette keys off data-theme=light|dark (JS resolves Auto).
+ * data-theme=auto media queries are no-JS fallback only; do not key light
+ * palette off data-theme-pref alone (would fight resolved dark). */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #080a0d;
+  --panel: #12171e;
+  --edge: #5c7088;
+  --ink: #e8eef5;
+  --dim: #c5d2e0;
+  --amber: #e4b56a;
+  --green: #4fdd9b;
+  --red: #ff6d6d;
+  --cyan: #5ee1d0;
+  --mag: #c4a4f7;
+  --lamp: #f3d7a0;
+  --shop: #0d131a;
+  --shop-2: #16202b;
+  --deep: #0a0e14;
+  --well: #121820;
+  --shadow: 0 12px 36px rgba(0,0,0,.4);
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4efe6;
+  --panel: #fffdf8;
+  --edge: #c9bba4;
+  --ink: #14110c;
+  --dim: #3f3a33;
+  --amber: #8a5410;
+  --green: #146644;
+  --red: #b13228;
+  --cyan: #0a4e49;
+  --mag: #5a3a8a;
+  --lamp: #9a7420;
+  --shop: #f7f1e6;
+  --shop-2: #ece3d4;
+  --deep: #efe8dc;
+  --well: #faf6ee;
+  --shadow: 0 12px 36px rgba(80, 50, 20, .12);
+}
+html[data-theme="auto"] { color-scheme: light dark; }
+@media (prefers-color-scheme: light) {
+  html[data-theme="auto"] {
+    color-scheme: light;
+  --bg: #f4efe6;
+  --panel: #fffdf8;
+  --edge: #c9bba4;
+  --ink: #14110c;
+  --dim: #3f3a33;
+  --amber: #8a5410;
+  --green: #146644;
+  --red: #b13228;
+  --cyan: #0a4e49;
+  --mag: #5a3a8a;
+  --lamp: #9a7420;
+  --shop: #f7f1e6;
+  --shop-2: #ece3d4;
+  --deep: #efe8dc;
+  --well: #faf6ee;
+  --shadow: 0 12px 36px rgba(80, 50, 20, .12);
+  }
+}
+@media (prefers-color-scheme: dark) {
+  html[data-theme="auto"] {
+    color-scheme: dark;
+  --bg: #080a0d;
+  --panel: #12171e;
+  --edge: #5c7088;
+  --ink: #e8eef5;
+  --dim: #c5d2e0;
+  --amber: #e4b56a;
+  --green: #4fdd9b;
+  --red: #ff6d6d;
+  --cyan: #5ee1d0;
+  --mag: #c4a4f7;
+  --lamp: #f3d7a0;
+  --shop: #0d131a;
+  --shop-2: #16202b;
+  --deep: #0a0e14;
+  --well: #121820;
+  --shadow: 0 12px 36px rgba(0,0,0,.4);
+  }
+}
+
+/* WALL_UI_LIB_KEYS chrome */
+.wall-keys-help {
+  position: fixed; z-index: 80; left: 1rem; top: 4rem; width: min(520px, 92vw);
+  max-height: 80vh; overflow: auto; background: var(--bg, #0f141a); color: var(--ink, #e7ecf1);
+  border: 1px solid var(--edge, #2a3540); border-radius: var(--radius, 4px); padding: .6rem .75rem;
+  box-shadow: 0 8px 28px rgba(0,0,0,.45);
+}
+.wall-keys-help header { display: flex; align-items: center; gap: .4rem; cursor: grab; margin-bottom: .4rem; }
+.wall-keys-toolbar { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-bottom: .5rem; }
+.wall-keys-table { width: 100%; border-collapse: collapse; font-size: var(--font-sm, 12px); }
+.wall-keys-table th, .wall-keys-table td { border-bottom: 1px solid var(--edge, #2a3540); padding: .2rem .3rem; text-align: left; }
+.wall-keys-customize { display: flex; flex-wrap: wrap; gap: .4rem; align-items: end; margin-top: .5rem; }

@@ -1,0 +1,896 @@
+"""Mill schema ensure. Init and Coord both run this. No session tokens here.
+
+Fresh office / attempt 2: apply agent_coord/server/sql/ (wipe + tables + fn_ + sp_).
+sql/ is not a migrate ladder.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+from typing import Any
+
+_IDENT = re.compile(r"^[A-Za-z0-9_]{1,64}$")
+
+_ALTER_TABLE = re.compile(
+    r"^ALTER\s+TABLE\s+(`?[A-Za-z0-9_]+`?)\s+(.+)$",
+    re.IGNORECASE | re.DOTALL,
+)
+_ADD_COLUMN = re.compile(
+    r"ADD\s+COLUMN\s+(`?[A-Za-z0-9_]+`?)\s+(.+?)(?=,\s*ADD\s+|\s*$)",
+    re.IGNORECASE | re.DOTALL,
+)
+_ADD_KEY = re.compile(
+    r"ADD\s+(?:CONSTRAINT\s+`?[A-Za-z0-9_]+`?\s+)?"
+    r"(?:UNIQUE\s+)?(?:KEY|INDEX)\s+(`?[A-Za-z0-9_]+`?)\s*\(([^)]+)\)",
+    re.IGNORECASE,
+)
+
+
+def _split_sql(blob: str) -> list[str]:
+    cleaned: list[str] = []
+    for line in blob.splitlines():
+        s = line.strip()
+        if s.startswith("--"):
+            continue
+        if "--" in line:
+            line = line[: line.index("--")]
+        cleaned.append(line)
+    out: list[str] = []
+    for stmt in "\n".join(cleaned).split(";"):
+        stmt = stmt.strip()
+        if stmt:
+            out.append(stmt)
+    return out
+
+
+def schema_path() -> Path:
+    """0.4 book is sql/tables.sql (v1 schema.sql is gone)."""
+    return sql_dir() / "tables.sql"
+
+
+def sql_dir() -> Path:
+    return Path(__file__).resolve().parent.parent / "server" / "sql"
+
+
+def sql_apply_order() -> list[Path]:
+    """Files in sql/apply_order.txt. Missing names skipped."""
+    root = sql_dir()
+    order = root / "apply_order.txt"
+    names: list[str] = []
+    if order.is_file():
+        for line in order.read_text(encoding="utf-8-sig").splitlines():
+            s = line.strip()
+            if s and not s.startswith("#"):
+                names.append(s)
+    else:
+        names = sorted(p.name for p in root.glob("*.sql"))
+    out: list[Path] = []
+    for name in names:
+        p = root / name
+        if p.is_file():
+            out.append(p)
+    return out
+
+
+def split_script(blob: str) -> list[str]:
+    """Split SQL; honor DELIMITER (client-only, not sent to the server)."""
+    delim = ";"
+    buf: list[str] = []
+    stmts: list[str] = []
+    for raw in blob.splitlines():
+        line = raw
+        stripped = line.strip()
+        if stripped.upper().startswith("DELIMITER "):
+            chunk = "".join(buf).strip()
+            if chunk:
+                stmts.append(chunk if not chunk.endswith(delim) else chunk[: -len(delim)].strip())
+            buf = []
+            delim = stripped.split(None, 1)[1].strip() or ";"
+            continue
+        if stripped.startswith("--"):
+            continue
+        buf.append(line)
+        buf.append("\n")
+        joined = "".join(buf)
+        if delim and joined.rstrip().endswith(delim):
+            stmt = joined.rstrip()[: -len(delim)].strip()
+            if stmt:
+                stmts.append(stmt)
+            buf = []
+    tail = "".join(buf).strip()
+    if tail:
+        stmts.append(tail)
+    return stmts
+
+
+def apply_records(cn, *, wipe: bool = False) -> dict[str, Any]:
+    """Apply agent_coord/server/sql/. wipe=True runs wipe.sql first (drops v1 mill-loop tables)."""
+    cur = cn.cursor()
+    applied: list[str] = []
+    try:
+        try:
+            cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")
+        except Exception:
+            pass
+        dropped_functions = False
+        for path in sql_apply_order():
+            if path.name == "wipe.sql" and not wipe:
+                continue
+            # MySQL stores the CREATE spelling. Drop every function, then the
+            # fn_ files create them again (ALL CAPS). The clock is absent until
+            # fn_now.sql runs.
+            if not wipe and not dropped_functions and path.stem.startswith("fn_"):
+                n = _drop_functions(cur)
+                applied.append(f"functions(drop {n})")
+                dropped_functions = True
+            blob = path.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                _apply_stmt(cur, stmt)
+            applied.append(path.name)
+        cn.commit()
+        return {"applied": applied}
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+
+
+def _drop_functions(cur) -> int:
+    cur.execute(
+        "SELECT ROUTINE_NAME FROM information_schema.ROUTINES "
+        "WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_TYPE = 'FUNCTION'"
+    )
+    names = [row[0] for row in cur.fetchall() if row and row[0]]
+    for name in names:
+        cur.execute(f"DROP FUNCTION IF EXISTS `{_ident(str(name))}`")
+    return len(names)
+
+
+def _ident(name: str) -> str:
+    name = name.strip().strip("`")
+    if not _IDENT.match(name):
+        raise ValueError(f"bad SQL identifier: {name!r}")
+    return name
+
+
+def _table_exists(cur, table: str) -> bool:
+    cur.execute(
+        "SELECT 1 FROM information_schema.TABLES "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME=%s LIMIT 1",
+        (table,),
+    )
+    return cur.fetchone() is not None
+
+
+def _column_exists(cur, table: str, col: str) -> bool:
+    cur.execute(
+        "SELECT 1 FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME=%s AND COLUMN_NAME=%s "
+        "LIMIT 1",
+        (table, col),
+    )
+    return cur.fetchone() is not None
+
+
+def _index_exists(cur, table: str, name: str) -> bool:
+    cur.execute(
+        "SELECT 1 FROM information_schema.STATISTICS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME=%s AND INDEX_NAME=%s "
+        "LIMIT 1",
+        (table, name),
+    )
+    return cur.fetchone() is not None
+
+
+def _apply_stmt(cur, stmt: str) -> None:
+    """Execute one SQL statement; skip ADD COLUMN / ADD KEY that already exist.
+
+    MySQL DDL often auto-commits, so a multi-statement apply can leave columns
+    applied while agent_schema_meta.version stays behind - re-run must not 1060.
+    """
+    m = _ALTER_TABLE.match(stmt.strip())
+    if not m:
+        cur.execute(stmt)
+        return
+    table = _ident(m.group(1))
+    clause_blob = m.group(2).strip()
+    if not re.match(r"^ADD\s+", clause_blob, re.IGNORECASE):
+        cur.execute(stmt)
+        return
+
+    cols = list(_ADD_COLUMN.finditer(clause_blob))
+    keys = list(_ADD_KEY.finditer(clause_blob))
+    if not cols and not keys:
+        cur.execute(stmt)
+        return
+
+    new_clauses: list[str] = []
+    for am in cols:
+        col = _ident(am.group(1))
+        if _column_exists(cur, table, col):
+            continue
+        spec = am.group(2).strip().rstrip(",").strip()
+        new_clauses.append(f"ADD COLUMN `{col}` {spec}")
+    for km in keys:
+        name = _ident(km.group(1))
+        if _index_exists(cur, table, name):
+            continue
+        col_list = km.group(2).strip()
+        new_clauses.append(f"ADD KEY `{name}` ({col_list})")
+
+    if not new_clauses:
+        return
+    cur.execute(f"ALTER TABLE `{table}` " + ", ".join(new_clauses))
+
+
+def _ensure_watcher_hint(cn) -> list[str]:
+    """Alpha additive: watcher.hint + mill_watcher_* refresh (no full wipe)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        _apply_stmt(
+            cur,
+            "ALTER TABLE watcher ADD COLUMN hint "
+            "VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL",
+        )
+        if _column_exists(cur, "watcher", "hint"):
+            applied.append("watcher.hint")
+        # Refresh watcher procedures from sp_activity.sql (set_hint + select hint)
+        sp = sql_dir() / "sp_activity.sql"
+        if sp.is_file():
+            blob = sp.read_text(encoding="utf-8-sig")
+            keep = (
+                "mill_watcher_put",
+                "mill_watcher_roster",
+                "mill_watcher_delete",
+                "mill_watcher_select",
+                "mill_watcher_set_hint",
+            )
+            for stmt in split_script(blob):
+                s = stmt.strip()
+                low = s.lower()
+                if any(k in low for k in ("drop procedure if exists mill_watcher", "create procedure mill_watcher")):
+                    if any(k in low for k in keep) or "mill_watcher" in low:
+                        _apply_stmt(cur, stmt)
+            applied.append("sp_watcher_hint")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+
+# Whole-file procedure refresh. Every DROP/CREATE PROCEDURE in these files is
+# re-applied on each ensure. mill_join_upsert and mill_member_put/delete once
+# called mill_watcher_put/delete('name', ...). Tip mill_watcher_* take
+# ENUM('todo','join','hold','score'), so a stale caller fails the seat mint.
+# sp_name.sql rides along (name_type shape: mill_name_host/delete/rename/reclaim).
+# Order: after _ensure_watcher_hint so the callees are tip first.
+# sp_hold.sql: an existing book must pick up the #194 re-hold refresh in mill_hold_upsert.
+# sp_label.sql: mill_label_delete must refuse an unknown name (#202).
+# sp_mail.sql: mill_mail_select takes the desk only (#201). A 3-arg leftover must be replaced.
+# sp_mail/sp_todo/sp_score (#216): payload-first inserts and no FOREIGN_KEY_CHECKS toggles
+# in any writer, so every procedure in those files must reach an existing book.
+_SP_FULL_REFRESH: tuple[str, ...] = (
+    "sp_name.sql",
+    "sp_member.sql",
+    "sp_mail.sql",
+    "sp_todo.sql",
+    "sp_join.sql",
+    "sp_hold.sql",
+    "sp_score.sql",
+    "sp_label.sql",
+    "sp_tree.sql",
+)
+
+# #216: activity is the timeline, not a parent. A payload row is written first and its
+# table assigns the id, so these FKs from payload to activity are dropped on an existing
+# book. fk_label_activity and fk_tree_activity stay (they point at a row that exists).
+_PAYLOAD_ACTIVITY_FKS: tuple[tuple[str, str], ...] = (
+    ("mail", "fk_mail_activity"),
+    ("todo", "fk_todo_activity"),
+    ("join", "fk_join_activity"),
+    ("hold", "fk_hold_activity"),
+    ("score", "fk_score_activity"),
+)
+
+
+def _fk_exists(cur, table: str, name: str) -> bool:
+    cur.execute(
+        "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND CONSTRAINT_NAME = %s "
+        "AND CONSTRAINT_TYPE = 'FOREIGN KEY'",
+        (table, name),
+    )
+    row = cur.fetchone()
+    return bool(row and int(row[0]) > 0)
+
+
+def _ensure_payload_fk_drop(cn) -> list[str]:
+    """#216: drop payload -> activity FKs when present. Idempotent (no-op once gone)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        for table, name in _PAYLOAD_ACTIVITY_FKS:
+            if not _table_exists(cur, table):
+                continue
+            if _fk_exists(cur, table, name):
+                cur.execute(f"ALTER TABLE `{_ident(table)}` DROP FOREIGN KEY `{_ident(name)}`")
+                applied.append(f"drop:{name}")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_sp_full(cn) -> list[str]:
+    """Alpha: refresh every procedure in _SP_FULL_REFRESH from tip (no tables, no wipe)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        for path_name in _SP_FULL_REFRESH:
+            sp = sql_dir() / path_name
+            if not sp.is_file():
+                continue
+            blob = sp.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                low = stmt.strip().lower()
+                if low.startswith("drop procedure") or low.startswith("create procedure"):
+                    _apply_stmt(cur, stmt)
+            applied.append(path_name)
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_activity_soft_delete(cn) -> list[str]:
+    """Alpha additive: activity.deleted + soft-delete *_delete + mill_activity_select/mill_between state."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        _apply_stmt(
+            cur,
+            "ALTER TABLE activity ADD COLUMN deleted "
+            "DATETIME(6) NULL AFTER updated",
+        )
+        if _column_exists(cur, "activity", "deleted"):
+            applied.append("activity.deleted")
+        # BEFORE DELETE tree guards (human addendum / soft-delete #89).
+        tables = sql_dir() / "tables.sql"
+        if tables.is_file():
+            blob = tables.read_text(encoding="utf-8-sig")
+            keep = (
+                "todo_no_delete_in_tree",
+                "mail_no_delete_in_tree",
+                "hold_no_delete_in_tree",
+                "hold_no_delete",
+                "join_no_delete_in_tree",
+                "score_no_delete_in_tree",
+                "name_no_delete",
+            )
+            for stmt in split_script(blob):
+                low = stmt.strip().lower()
+                if not (
+                    low.startswith("drop trigger") or low.startswith("create trigger")
+                ):
+                    continue
+                if any(k in low for k in keep):
+                    _apply_stmt(cur, stmt)
+            applied.append("no_delete_in_tree_triggers")
+        # Refresh delete + select procedures (bucket/span untouched).
+        for path_name, keep in (
+            # 0.6.13 writer gaps: mail insert (payload first, LAST_INSERT_ID, then activity #216; project|role),
+            # to_put (no project mint), hold release + reclaim gate, score delete (p_id, p_desk).
+            ("sp_mail.sql", ("mill_mail_delete", "mill_mail_insert", "mill_mail_to_put")),
+            # Delete SPs take the card off every tree plan (mill_tree_detach, children move up).
+            ("sp_tree.sql", ("mill_tree_remove", "mill_tree_detach")),
+            ("sp_todo.sql", ("mill_todo_delete", "mill_todo_select", "mill_todo_insert", "mill_todo_insert_attached")),
+            ("sp_score.sql", (
+                "mill_score_delete",
+                "mill_score_upsert",
+                "mill_score_admin_upsert",
+                "mill_score_select",
+                "mill_score_event",
+                "mill_wall_event",
+                "mill_score_evidence_purge",
+            )),  # F2 revive in upsert; #204 purge is not part of the write
+            ("sp_join.sql", ("mill_join_reset",)),
+            ("sp_hold.sql", ("mill_hold_delete",)),
+            ("sp_name.sql", ("mill_name_reclaim",)),
+            ("sp_floor_scope.sql", ("mill_floor_part",)),  # perf: JOIN mill_floor_desk, mail dests
+            ("sp_activity.sql", ("mill_activity_select", "mill_activity_get", "mill_between")),  # state any type (#91)
+        ):
+            sp = sql_dir() / path_name
+            if not sp.is_file():
+                continue
+            blob = sp.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                s = stmt.strip()
+                low = s.lower()
+                if not (
+                    low.startswith("drop procedure") or low.startswith("create procedure")
+                ):
+                    continue
+                if any(k in low for k in keep):
+                    _apply_stmt(cur, stmt)
+            applied.append(path_name + ":soft_delete_state")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+
+# FK delete rules flipped on an existing book (tables.sql covers a new book).
+# (table, constraint, columns, ref_table, ref_columns, rule)
+# Every mill FK to name is RESTRICT. Payloads have no FK to activity (#216, see
+# _PAYLOAD_ACTIVITY_FKS); do not list one here or ensure would add it back.
+# Kept as they are: fk_label_activity (CASCADE), fk_mail_to_mail (CASCADE), human_* FKs.
+_FK_RULES: tuple[tuple[str, str, str, str, str, str], ...] = (
+    ("join", "fk_join_desk", "desk_id", "name", "id", "RESTRICT"),  # #96
+    ("score_evidence", "fk_score_evidence_score", "score_id", "score", "id", "RESTRICT"),  # #95
+    ("score_point", "fk_score_point_score", "score_id", "score", "id", "RESTRICT"),  # #288
+    ("score_point", "fk_score_point_desk", "desk_id", "name", "id", "RESTRICT"),  # #288
+    ("activity", "fk_activity_desk", "desk_id", "name", "id", "RESTRICT"),  # F1
+    ("activity", "fk_activity_roster", "roster_id", "name", "id", "RESTRICT"),
+    ("member", "fk_member_name", "name_id", "name", "id", "RESTRICT"),
+    ("member", "fk_member_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("label", "fk_label_name", "name_id", "name", "id", "RESTRICT"),
+    ("tree", "fk_tree_name", "name_id", "name", "id", "RESTRICT"),
+    ("tree", "fk_tree_activity", "type,id", "activity", "type,id", "RESTRICT"),
+    ("watcher", "fk_watcher_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("mail", "fk_mail_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("mail", "fk_mail_roster", "roster_id", "name", "id", "RESTRICT"),
+    ("mail_to", "fk_mail_to_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("todo", "fk_todo_roster", "roster_id", "name", "id", "RESTRICT"),
+    ("todo", "fk_todo_updated", "updated_id", "name", "id", "RESTRICT"),
+    ("todo", "fk_todo_creator", "creator_id", "name", "id", "RESTRICT"),
+    ("todo", "fk_todo_assigned", "assigned_id", "name", "id", "RESTRICT"),
+    ("hold", "fk_hold_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("hold", "fk_hold_res", "resource_id", "name", "id", "RESTRICT"),
+    ("score", "fk_score_roster", "roster_id", "name", "id", "RESTRICT"),
+    ("score", "fk_score_desk", "desk_id", "name", "id", "RESTRICT"),
+    ("push_queue", "fk_push_queue_desk", "desk_id", "name", "id", "RESTRICT"),
+)
+
+
+def _cols(spec: str) -> str:
+    return ", ".join(f"`{_ident(c)}`" for c in spec.split(","))
+
+
+def _fk_delete_rule(cur, table: str, name: str) -> str | None:
+    cur.execute(
+        "SELECT DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS "
+        "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME=%s AND CONSTRAINT_NAME=%s "
+        "LIMIT 1",
+        (table, name),
+    )
+    row = cur.fetchone()
+    return None if row is None else str(row[0]).upper()
+
+
+def _ensure_fk_rules(cn) -> list[str]:
+    """Alpha: drop + re-add FKs whose ON DELETE rule changed (#95 / #96 / F1 / name RESTRICT). Idempotent."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        for table, name, col, ref, ref_col, rule in _FK_RULES:
+            if not _table_exists(cur, table):
+                continue
+            have = _fk_delete_rule(cur, table, name)
+            if have == rule or (rule == "RESTRICT" and have == "NO ACTION"):
+                continue
+            if have is not None:
+                cur.execute(f"ALTER TABLE `{table}` DROP FOREIGN KEY `{name}`")
+            cur.execute(
+                f"ALTER TABLE `{table}` ADD CONSTRAINT `{name}` FOREIGN KEY ({_cols(col)}) "
+                f"REFERENCES `{ref}` ({_cols(ref_col)}) ON DELETE {rule}"
+            )
+            applied.append(f"{name}:{rule}")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_mail_sp(cn) -> list[str]:
+    """Alpha: refresh mill_mail_* (fail-closed empty mail_to)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        sp = sql_dir() / "sp_mail.sql"
+        if sp.is_file():
+            blob = sp.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                low = stmt.strip().lower()
+                if "mill_mail" in low and (
+                    low.startswith("drop procedure") or low.startswith("create procedure")
+                ):
+                    _apply_stmt(cur, stmt)
+            applied.append("sp_mail")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+
+def _ensure_push_expired(cn) -> list[str]:
+    """Widen push_queue.kind with expired and refresh mill_push_put, mill_push_take, mill_push_expire."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "push_queue"):
+            _apply_stmt(
+                cur,
+                "ALTER TABLE push_queue MODIFY kind "
+                "ENUM('hint','mail','receipt','expired') NOT NULL",
+            )
+            applied.append("push_queue.kind.expired")
+        sp = sql_dir() / "sp_push.sql"
+        if sp.is_file():
+            blob = sp.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                low = stmt.strip().lower()
+                if low.startswith("drop procedure") or low.startswith("create procedure"):
+                    _apply_stmt(cur, stmt)
+            applied.append("sp_push")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_join_token_hash(cn) -> list[str]:
+    """Index join.token_hash so bearer lookup is not a full seat scan."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "join") and _column_exists(cur, "join", "token_hash"):
+            if not _index_exists(cur, "join", "idx_token_hash"):
+                _apply_stmt(
+                    cur,
+                    "ALTER TABLE `join` ADD KEY idx_token_hash (token_hash)",
+                )
+                applied.append("join.idx_token_hash")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+_TREE_READ_SQL = (
+    "CREATE TABLE IF NOT EXISTS tree_read ("
+    " desk_id BIGINT UNSIGNED NOT NULL,"
+    " tree_id BIGINT UNSIGNED NOT NULL,"
+    " last_id BIGINT UNSIGNED NOT NULL,"
+    " updated DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)"
+    " ON UPDATE CURRENT_TIMESTAMP(6),"
+    " PRIMARY KEY (desk_id, tree_id),"
+    " KEY idx_tree (tree_id),"
+    " CONSTRAINT fk_tree_read_desk FOREIGN KEY (desk_id)"
+    " REFERENCES name (id) ON DELETE RESTRICT,"
+    " CONSTRAINT fk_tree_read_tree FOREIGN KEY (tree_id)"
+    " REFERENCES name (id) ON DELETE RESTRICT"
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"
+)
+
+
+def _ensure_mail_to_unread(cn) -> list[str]:
+    """Inbox unread page index: mail_to (desk_id, opened, id). Additive; no wipe."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "mail_to") and not _index_exists(cur, "mail_to", "idx_desk_unread"):
+            cur.execute("ALTER TABLE mail_to ADD KEY idx_desk_unread (desk_id, opened, id)")
+            applied.append("mail_to.idx_desk_unread")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+_SCORE_POINT_SQL = (
+    "CREATE TABLE IF NOT EXISTS score_point ("
+    " score_id BIGINT UNSIGNED NOT NULL,"
+    " id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,"
+    " created DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),"
+    " desk_id BIGINT UNSIGNED NOT NULL,"
+    " value DOUBLE NOT NULL,"
+    " note VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',"
+    " PRIMARY KEY (score_id, id),"
+    " UNIQUE KEY idx_id (id),"
+    " KEY idx_desk (desk_id),"
+    " KEY idx_score_at (score_id, created, id),"
+    " CONSTRAINT fk_score_point_score FOREIGN KEY (score_id)"
+    " REFERENCES score (id) ON DELETE RESTRICT,"
+    " CONSTRAINT fk_score_point_desk FOREIGN KEY (desk_id)"
+    " REFERENCES name (id) ON DELETE RESTRICT"
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci"
+)
+
+
+def _ensure_score_series(cn) -> list[str]:
+    """#288 step 1: score.better, score.unit and the score_point table. Additive; no wipe."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "score"):
+            if not _column_exists(cur, "score", "better"):
+                cur.execute(
+                    "ALTER TABLE score ADD COLUMN better ENUM('up','down') NOT NULL DEFAULT 'up'"
+                    " AFTER note"
+                )
+                applied.append("score.better")
+            if not _column_exists(cur, "score", "unit"):
+                cur.execute(
+                    "ALTER TABLE score ADD COLUMN unit VARCHAR(16) CHARACTER SET utf8mb4"
+                    " COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '' AFTER better"
+                )
+                applied.append("score.unit")
+            if not _table_exists(cur, "score_point"):
+                _apply_stmt(cur, _SCORE_POINT_SQL)
+                applied.append("score_point")
+            elif not _index_exists(cur, "score_point", "idx_score_at"):
+                # 0.7.6 (#308): points read newest by time (--at), not by insert order.
+                cur.execute("ALTER TABLE score_point ADD KEY idx_score_at (score_id, created, id)")
+                applied.append("score_point.idx_score_at")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_score_one_name(cn) -> list[str]:
+    """0.7.6 (#305): one live score per name on a roster after the 0.7.5 series.
+
+    A 0.7.4 write left desk-owned rows (desk_id = a desk) beside the 0.7.5
+    roster-owned definition. Off the Office roster (host and system KPIs stay
+    per desk there), for each live desk-owned row of a name: retire it when the
+    roster already owns that name or the row is empty (no value, no points);
+    else the newest one becomes the roster's definition and any others retire.
+    Retire is mill_score_delete (soft; the row and its evidence stay). A second
+    run finds nothing.
+    """
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if not (_table_exists(cur, "score") and _table_exists(cur, "score_point")):
+            return applied
+        cur.execute(
+            "SELECT s.id, s.roster_id, s.kpi, s.value,"
+            " EXISTS (SELECT 1 FROM score_point sp WHERE sp.score_id = s.id) AS has_pt,"
+            " EXISTS (SELECT 1 FROM score r WHERE r.roster_id = s.roster_id AND r.desk_id = s.roster_id"
+            "         AND r.kpi = s.kpi) AS has_def"
+            " FROM score s"
+            " JOIN name dn ON dn.id = s.desk_id AND dn.type = 'desk'"
+            " JOIN name rn ON rn.id = s.roster_id AND rn.name <> 'Office'"
+            " JOIN activity a ON a.type = 'score' AND a.id = s.id AND a.deleted IS NULL"
+            " ORDER BY s.roster_id, s.kpi, s.updated DESC, s.id DESC"
+        )
+        rows = list(cur.fetchall())
+        retire: list[int] = []
+        adopt: list[int] = []
+        taken: set[tuple[int, str]] = set()
+        for sid, rid, kpi, value, has_pt, has_def in rows:
+            key = (int(rid), str(kpi))
+            if has_def or key in taken or (str(value or "") == "" and not has_pt):
+                retire.append(int(sid))
+            else:
+                adopt.append(int(sid))
+                taken.add(key)
+        for sid in adopt:
+            cur.execute("UPDATE score SET desk_id = roster_id WHERE id = %s", (sid,))
+        cn.commit()
+        from agent_coord.server.records.db import call
+
+        for sid in retire:
+            call(cn, "mill_score_delete", [sid, ""])
+        if adopt:
+            applied.append(f"score.one_name(adopt {len(adopt)})")
+        if retire:
+            applied.append(f"score.one_name(retire {len(retire)})")
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_tree_read(cn) -> list[str]:
+    """Per-desk tree read cursor (#155). Additive on a live book. No wipe."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if not _table_exists(cur, "tree_read"):
+            _apply_stmt(cur, _TREE_READ_SQL)
+            applied.append("tree_read")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def _ensure_label_ord(cn) -> list[str]:
+    """#196: label.ord and idx_label_ord. Add the new index before dropping idx_name.
+
+    fk_label_name needs a name_id-leading index. Dropping idx_name first makes
+    MySQL refuse the drop. Each step is skipped when it is already done.
+    """
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if not _table_exists(cur, "label"):
+            return applied
+        if not _column_exists(cur, "label", "ord"):
+            cur.execute(
+                "ALTER TABLE label ADD COLUMN ord "
+                "SMALLINT UNSIGNED NOT NULL DEFAULT 65535 AFTER name_id"
+            )
+            applied.append("label.ord")
+        if not _index_exists(cur, "label", "idx_label_ord"):
+            cur.execute(
+                "ALTER TABLE label ADD KEY idx_label_ord (name_id, ord, created)"
+            )
+            applied.append("label.idx_label_ord")
+        if _index_exists(cur, "label", "idx_name"):
+            cur.execute("ALTER TABLE label DROP INDEX idx_name")
+            applied.append("label.drop_idx_name")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+ROSTER_070 = "migrate_070_roster.sql"
+
+
+def roster_070_needed(cn) -> bool:
+    """True when the book still has project/role name types or an old tag column."""
+    cur = cn.cursor()
+    try:
+        cur.execute(
+            "SELECT COLUMN_TYPE FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'name' AND COLUMN_NAME = 'type'"
+        )
+        row = cur.fetchone()
+        ctype = row[0] if row else ""
+        if isinstance(ctype, (bytes, bytearray)):
+            ctype = ctype.decode("utf-8")
+        if "'project'" in str(ctype or ""):
+            return True
+        old_col = "affil" + "iation_id"  # the pre-0.7.0 column name, spelled apart for the grep gate
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = %s",
+            (old_col,),
+        )
+        return int(cur.fetchone()[0] or 0) > 0
+    finally:
+        cur.close()
+
+
+def reload_routines(cn) -> list[str]:
+    """Drop every function, then apply each fn_/sp_ file in apply order (no tables, no wipe)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        try:
+            cur.execute("SET GLOBAL log_bin_trust_function_creators = 1")
+        except Exception:
+            pass
+        n = _drop_functions(cur)
+        applied.append(f"functions(drop {n})")
+        for path in sql_apply_order():
+            if not (path.stem.startswith("fn_") or path.stem.startswith("sp_")):
+                continue
+            for stmt in split_script(path.read_text(encoding="utf-8-sig")):
+                _apply_stmt(cur, stmt)
+            applied.append(path.name)
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
+def apply_roster_070(cn) -> list[str]:
+    """0.7.0: one roster name type and roster_id columns, then reload every routine.
+
+    Runs migrate_070_roster.sql through split_script (same statements the mysql
+    client runs whole-file). A same-name project/role refuses before any change.
+    """
+    if not roster_070_needed(cn):
+        return []
+    cur = cn.cursor()
+    try:
+        for stmt in split_script((sql_dir() / ROSTER_070).read_text(encoding="utf-8-sig")):
+            cur.execute(stmt)
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return [ROSTER_070] + reload_routines(cn)
+
+
+def ensure(cn) -> dict[str, Any]:
+    """0.4 book. Skip if activity exists (do not re-apply SPs). Else apply sql/."""
+    import os
+
+    cur = cn.cursor()
+    applied: list[str] = []
+    try:
+        wipe = (os.environ.get("MILL_RECORDS_WIPE") or "").strip() == "1"
+        if _table_exists(cur, "activity") and not wipe:
+            cur.close()
+            # 0.7.0 roster first: later steps name roster_id and the roster type.
+            applied.extend(apply_roster_070(cn))
+            # Column before the procedure refresh, so mill_label_select can read l.ord.
+            applied.extend(_ensure_label_ord(cn))
+            applied.extend(_ensure_score_series(cn))
+            applied.extend(_ensure_payload_fk_drop(cn))
+            applied.extend(_ensure_watcher_hint(cn))
+            applied.extend(_ensure_sp_full(cn))
+            applied.extend(_ensure_mail_sp(cn))
+            applied.extend(_ensure_push_expired(cn))
+            applied.extend(_ensure_activity_soft_delete(cn))
+            applied.extend(_ensure_fk_rules(cn))
+            applied.extend(_ensure_join_token_hash(cn))
+            applied.extend(_ensure_tree_read(cn))
+            applied.extend(_ensure_mail_to_unread(cn))
+            # After the routine reload: retire goes through mill_score_delete.
+            applied.extend(_ensure_score_one_name(cn))
+            return {"version": 1, "applied": applied, "book": "activity"}
+        rec = apply_records(cn, wipe=wipe)
+        applied.extend(rec.get("applied") or [])
+        cn.commit()
+        return {"version": 1, "applied": applied, "book": "activity"}
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()

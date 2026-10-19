@@ -1,0 +1,114 @@
+# Contributing to the mill repo: merge requests
+
+This is for agents and people who change the mill git tree. Mill users
+(JOIN, skill, desk speech) are not affected and do not need this.
+
+`main` is protected. Nobody pushes to `main` directly, Builder included.
+Every change, version bumps too, lands through a merge request (MR).
+
+## Steps
+
+0. Once per checkout, turn on the repo hooks:
+
+       git config core.hooksPath .githooks
+
+   `pre-commit` runs `tools/precommit_hygiene.py staged` on the staged
+   blobs (the index, not the working tree): addresses, home paths with a
+   login name, emails outside placeholder domains, typographic marks, and
+   Title-case name tokens in comments, docstrings and Markdown prose.
+   `commit-msg` runs the same rules on the message. Each hit names
+   `file:line` and the kind. Words that are ordinary elsewhere in the tree,
+   or listed in `tools/hygiene_words.txt`, are not names. The hooks need
+   `python3`, `python` or `py` on PATH (Git Bash on Windows is fine).
+   `git commit --no-verify` skips them; CI `check_pack` still fails the MR.
+   `python tools/precommit_hygiene.py tree` runs the comment scan over the
+   whole tip.
+
+1. Start from a fresh `main`:
+
+       git fetch origin
+       git switch -c fix/223-short-slug origin/main
+
+   One branch per change. Name it after the card: `fix/<card>-<slug>`
+   (or `feat/`, `docs/`, `speech/` when that fits better).
+
+2. Commit. Every commit message cites the card, e.g.
+   `#223 Skip login name box in local-name scan`.
+   Run the local hygiene first: `python tools/check_pack.py dist` after
+   `python -m build`, plus the tests you touched.
+
+3. Push the branch and open the MR in one step (no glab needed):
+
+       git push -u origin fix/223-short-slug \
+         -o merge_request.create \
+         -o merge_request.target=main \
+         -o merge_request.title="#223 Short title"
+
+   Git prints the MR URL. Optional extra push options:
+   `-o merge_request.description="..."`,
+   `-o merge_request.remove_source_branch`.
+
+   Alternative with glab, if your seat has it:
+
+       glab auth login --hostname gitlab.com --stdin < <your token file>
+       glab mr create --target-branch main --fill
+
+   Feed glab the desk's own token from its credential file. Never paste
+   a token into chat, mail, a URL, a file in the repo or a commit.
+
+4. CI must pass: `build_pack`, `check_pack` (hygiene), `mill_cli_smoke`,
+   `pytest_no_sql`, `pytest_sql`. A red pipeline is not reviewed.
+
+5. Tell Builder the MR number in the card's thread. Builder reviews and
+   merges. Do not merge your own MR.
+
+6. If Builder asks for a rebase:
+
+       git fetch origin
+       git rebase origin/main
+       git push --force-with-lease
+
+   Force-push only your own branch. Never force-push `main` or another
+   desk's branch.
+
+## Moving an old branch that carries commits main already has
+
+If your branch was cut from an old `main` (or carries commits that are
+already merged), do not open the MR from it. Make a fresh branch and take
+only your own commits:
+
+    git fetch origin
+    git cherry -v origin/main old-branch
+    git switch -c fix/<card>-<slug> origin/main
+    git cherry-pick <sha> [<sha>...]
+
+`git cherry -v` marks with `+` the commits main does not have yet (yours
+to keep) and with `-` the ones already on main (skip them). Cherry-pick
+only the `+` commits. Or squash the whole diff into one commit:
+
+    git switch -c fix/<card>-<slug> origin/main
+    git checkout old-branch -- <paths you changed>
+    git commit -m "#<card> ..."
+
+Check that `git cherry -v origin/main fix/<card>-<slug>` lists only your
+commits, then push the new branch with the push options above.
+
+## Kept by Builder
+
+- Version bumps (also through an MR, merged by Builder).
+- Collecting ship GO consensus (BUILD.md, CI ship path) and the GO to the shipper.
+- Merging to `main`.
+
+## A refused push to main
+
+A direct push to `main` now fails like this:
+
+    remote: GitLab: You are not allowed to push code to protected branches
+    on this project.
+    ! [remote rejected] main -> main (pre-receive hook declined)
+
+Nothing is lost. Move the commits to a branch and open an MR:
+
+    git switch -c fix/<card>-<slug>
+    git push -u origin fix/<card>-<slug> -o merge_request.create -o merge_request.target=main
+    git switch main && git reset --hard origin/main
