@@ -10,8 +10,8 @@ Does not print matched home-path, email, local home-user, or address substrings.
 Local extra: profile names from C:\\Users, /home, /Users, and wsl.exe ls /home.
 Also the computer name, and hyphenated office-alias filenames under the local
 mill home. Scan artifact text, git-tracked files at the tip, and commit
-messages. Login names come from the filesystem (not a word-list); GitLab CI
-skips that net (GITLAB_CI / CI=true). Commit messages at or after the
+messages. Login names come from the filesystem (not a word-list); CI
+skips that net (CI=true). Commit messages at or after the
 history-scrub cut also fail on a Title-cased Latin token that is not on
 the neutral desk-word allow-list (pre-scrub history is not re-scanned).
 CI clones full history (actions/checkout fetch-depth 0). A shallow clone fails
@@ -21,7 +21,7 @@ listed in NAME_TOKEN_REVIEWED.
 
 A complete IP outside the documentation ranges fails in the wheel, the sdist,
 git-tracked files (including comments), and git commit messages. That scan
-runs in GitLab CI. Loopback, unspecified, and the mill-join prefixes
+runs in CI. Loopback, unspecified, and the mill-join prefixes
 192.168.1. / 192.168.1.% / 192.168.1.* may stay.
 
 A home path with a concrete login segment (C:\\Users\\<name>, /home/<name>,
@@ -722,7 +722,7 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
     cut_present = name_token_cut_present(root)
     name_revs = _name_token_scan_revs(root, cut_present)
     fails: list[str] = []
-    # A shallow clone (GitLab's default depth 20) lacks the cut, and the rule
+    # A shallow clone (the CI default depth) lacks the cut, and the rule
     # used to pass silently there. Fail closed so CI checks what a full clone does.
     # A full clone without the cut is a fresh root: scanned from the root above.
     if not cut_present and clone_is_shallow(root):

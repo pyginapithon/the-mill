@@ -1,10 +1,15 @@
-# Contributing to the mill repo: merge requests
+# Contributing to the mill repo: pull requests
 
 This is for agents and people who change the mill git tree. Mill users
 (JOIN, skill, desk speech) are not affected and do not need this.
 
-`main` is protected. Nobody pushes to `main` directly, Builder included.
-Every change, version bumps too, lands through a merge request (MR).
+The repo lives on GitHub: `https://github.com/pyginapithon/the-mill`.
+The old GitLab project is a read-only archive; do not open merge requests
+there.
+
+`main` is protected by a ruleset: no direct pushes, no force pushes, no
+deletion, linear history, and every change lands through a pull request
+(PR) whose required checks are green. Version bumps too.
 
 ## Steps
 
@@ -20,7 +25,7 @@ Every change, version bumps too, lands through a merge request (MR).
    `file:line` and the kind. Words that are ordinary elsewhere in the tree,
    or listed in `tools/hygiene_words.txt`, are not names. The hooks need
    `python3`, `python` or `py` on PATH (Git Bash on Windows is fine).
-   `git commit --no-verify` skips them; CI `check_pack` still fails the MR.
+   `git commit --no-verify` skips them; CI `check_pack` still fails the PR.
    `python tools/precommit_hygiene.py tree` runs the comment scan over the
    whole tip.
 
@@ -33,34 +38,34 @@ Every change, version bumps too, lands through a merge request (MR).
    (or `feat/`, `docs/`, `speech/` when that fits better).
 
 2. Commit. Every commit message cites the card, e.g.
-   `#223 Skip login name box in local-name scan`.
+   `#223 Skip login name box in local-name scan`. Commit with a role
+   identity and a noreply address, never a personal email.
    Run the local hygiene first: `python tools/check_pack.py dist` after
    `python -m build`, plus the tests you touched.
 
-3. Push the branch and open the MR in one step (no glab needed):
+3. Push the branch and open the PR:
 
-       git push -u origin fix/223-short-slug \
-         -o merge_request.create \
-         -o merge_request.target=main \
-         -o merge_request.title="#223 Short title"
+       git push -u origin fix/223-short-slug
 
-   Git prints the MR URL. Optional extra push options:
-   `-o merge_request.description="..."`,
-   `-o merge_request.remove_source_branch`.
+   Then open the PR against `main` in the GitHub web UI (git prints the
+   link), or with the GitHub CLI if your seat has it:
 
-   Alternative with glab, if your seat has it:
+       gh pr create --base main --fill
 
-       glab auth login --hostname gitlab.com --stdin < <your token file>
-       glab mr create --target-branch main --fill
+   Authenticate the CLI or git with the desk's own token from its
+   credential file (a credential helper or `gh auth login --with-token`).
+   Never paste a token into chat, mail, a URL, a file in the repo or a
+   commit.
 
-   Feed glab the desk's own token from its credential file. Never paste
-   a token into chat, mail, a URL, a file in the repo or a commit.
+4. CI must pass. The required checks are the `ci` jobs `build_pack`,
+   `check_pack` (hygiene and pip-audit), `mill_cli_smoke`,
+   `pytest_no_sql`, `pytest_sql`, and the CodeQL jobs `analyze (python)`
+   and `analyze (actions)`. A red PR is not reviewed. A PR from a fork
+   runs CI only after a maintainer approves the run.
 
-4. CI must pass: `build_pack`, `check_pack` (hygiene), `mill_cli_smoke`,
-   `pytest_no_sql`, `pytest_sql`. A red pipeline is not reviewed.
-
-5. Tell Builder the MR number in the card's thread. Builder reviews and
-   merges. Do not merge your own MR.
+5. Tell Builder the PR number in the card's thread. Builder reviews and
+   merges with squash or rebase (merge commits are off, so history stays
+   linear). The head branch is deleted on merge. Do not merge your own PR.
 
 6. If Builder asks for a rebase:
 
@@ -74,7 +79,7 @@ Every change, version bumps too, lands through a merge request (MR).
 ## Moving an old branch that carries commits main already has
 
 If your branch was cut from an old `main` (or carries commits that are
-already merged), do not open the MR from it. Make a fresh branch and take
+already merged), do not open the PR from it. Make a fresh branch and take
 only your own commits:
 
     git fetch origin
@@ -91,24 +96,30 @@ only the `+` commits. Or squash the whole diff into one commit:
     git commit -m "#<card> ..."
 
 Check that `git cherry -v origin/main fix/<card>-<slug>` lists only your
-commits, then push the new branch with the push options above.
+commits, then push the new branch and open the PR as in step 3.
+
+## Dependabot
+
+Dependabot opens version-update PRs from `.github/dependabot.yml` and
+security-update PRs. They run the same checks. Its commits carry a fixed
+sign-off trailer that `check_pack` accepts exactly (regression row S-8).
+Ask it to rebase with a PR comment `@dependabot rebase`.
 
 ## Kept by Builder
 
-- Version bumps (also through an MR, merged by Builder).
+- Version bumps (also through a PR, merged by Builder).
 - Collecting ship GO consensus (BUILD.md, CI ship path) and the GO to the shipper.
 - Merging to `main`.
 
 ## A refused push to main
 
-A direct push to `main` now fails like this:
+A direct push to `main` fails with a ruleset error like this:
 
-    remote: GitLab: You are not allowed to push code to protected branches
-    on this project.
-    ! [remote rejected] main -> main (pre-receive hook declined)
+    remote: error: GH013: Repository rule violations found for refs/heads/main.
+    ! [remote rejected] main -> main (push declined due to repository rule violations)
 
-Nothing is lost. Move the commits to a branch and open an MR:
+Nothing is lost. Move the commits to a branch and open a PR:
 
     git switch -c fix/<card>-<slug>
-    git push -u origin fix/<card>-<slug> -o merge_request.create -o merge_request.target=main
+    git push -u origin fix/<card>-<slug>
     git switch main && git reset --hard origin/main

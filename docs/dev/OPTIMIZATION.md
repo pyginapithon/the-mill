@@ -44,7 +44,7 @@ Entry format:
     - Rows: fetched -> used
     - Before: ms   After (expected or measured): ms
     - Fix: the SQL or code change
-    - Status: open | fixed in <version> (<MR>)
+    - Status: open | fixed in <version> (<PR>)
 
 ### 1. Room read fetches the whole room to answer yes/no questions
 - Pattern: 1, 2, 3
