@@ -5,6 +5,7 @@ takeaway
 jira
 copilot
 dependabot
+debian
 zendesk
 voice
 spell
