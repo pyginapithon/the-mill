@@ -45,15 +45,14 @@ def ws_auth_close(exc: BaseException) -> tuple[int, str]:
     return 1011, ""
 
 
-def _note_connect(c: Any, want: str, desk: str) -> None:
+def _note_connect(c: Any, want: str) -> None:
     """Record the /ws connect (JOIN fanout). Only a connect that sits is recorded (#332)."""
     from agent_coord.server.records import join as rec_join
-    from agent_coord.server.redact import redact_format
 
     try:
         rec_join.note_connect(c._cn, want)
     except Exception as e:
-        _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
+        _log.warning("ws connect activity err=%s", type(e).__name__)
 
 
 def latency_snapshot() -> dict[str, float | int]:
@@ -502,7 +501,7 @@ def make_asgi_app(
                 if rec_join.token_matches(c._cn, want, digest):
                     ok = True
                     if not refuse:
-                        _note_connect(c, want, desk)
+                        _note_connect(c, want)
             if not ok:
                 _log.warning("ws auth bad token desk=%s", desk)
                 try:
@@ -539,9 +538,9 @@ def make_asgi_app(
                 from agent_coord.server.book import Book
 
                 with Book() as c:
-                    _note_connect(c, desk_name(desk), desk)
+                    _note_connect(c, desk_name(desk))
             except Exception as e:
-                _log.warning("%s", redact_format("ws connect activity desk=%s err=%s", desk, e))
+                _log.warning("ws connect activity err=%s", type(e).__name__)
         try:
             from agent_coord.helpers.ident import desk_name
             from agent_coord.server.book import Book
