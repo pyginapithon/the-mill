@@ -109,3 +109,12 @@ def test_ci_and_codeql_never_publish() -> None:
         text = _code(WF / name)
         assert "id-token: write" not in text, name
         assert "pypi-publish" not in text and "twine upload" not in text, name
+
+
+def test_tree_hygiene_runs_wherever_check_pack_runs() -> None:
+    """S-11: whole-tree hygiene drift fails CI, not only the local hook."""
+    ci = _job((WF / "ci.yml").read_text(encoding="utf-8"), "check_pack")
+    verify = _job((WF / "release.yml").read_text(encoding="utf-8"), "verify")
+    for name, job in (("ci check_pack", ci), ("release verify", verify)):
+        assert "python tools/check_pack.py dist" in job, name
+        assert "python tools/precommit_hygiene.py tree" in job, name
