@@ -10,9 +10,9 @@ Assume **regression tests already pass**. Then:
 
 1. **Local hygiene** - bump version, `python -m build`, `python tools/check_pack.py dist`, `python tools/mill_cli_smoke.py` (install the **tarball** from a non-git cwd). Human pass on tracked `.md` / `.txt`. Do not push a dirty `dist/`.
 2. **Commit** the version bump + hygiene fixes.
-3. **Push** through a merge request: `main` is protected, see [CONTRIBUTING-MR.md](CONTRIBUTING-MR.md).
-4. **Pipeline** - wait for GitLab `build_pack` -> `check_pack` -> `mill_cli_smoke` -> `pytest_no_sql` and `pytest_sql` (and pip-audit). `pytest_no_sql` installs Node.js, runs `npm ci --prefix tools/wall-validators` so stylelint, eslint, and html-validate check the wall files, then runs `pytest tests -m "not sql"`. `pytest_sql` starts MySQL 8.4 beside the job and runs `pytest tests -m sql`, with `AGENT_COORD_HOST=mysql`. SQL suites use per-process throwaway DB names (`tests/sql_isolate.py`) so concurrent local runners cannot wipe a shared mill_records_test. Branch and `main` pipelines do **not** publish.
-5. **If pipeline GO** - after ship GO consensus at the exact sha (see [CI ship path](#ci-ship-path)), push an annotated tag `v<version>` on that sha (`git tag -a`). The tag pipeline reruns every job, then `release_pypi` uploads the same wheel + sdist it scanned. See [CI ship path](#ci-ship-path).
+3. **Push** through a pull request on GitHub: `main` is protected by a ruleset, see [CONTRIBUTING-PR.md](CONTRIBUTING-PR.md).
+4. **Pipeline** - wait for the GitHub Actions `ci` jobs `build_pack` -> `check_pack` -> `mill_cli_smoke` -> `pytest_no_sql` and `pytest_sql` (and pip-audit). `pytest_no_sql` installs Node.js, runs `npm ci --prefix tools/wall-validators` so stylelint, eslint, and html-validate check the wall files, then runs `pytest tests -m "not sql"`. `pytest_sql` starts MySQL 8.4 beside the job and runs `pytest tests -m sql`, with `AGENT_COORD_HOST=mysql`. SQL suites use per-process throwaway DB names (`tests/sql_isolate.py`) so concurrent local runners cannot wipe a shared mill_records_test. PR and `main` runs do **not** publish.
+5. **If pipeline GO** - after ship GO consensus at the exact sha (see [CI ship path](#ci-ship-path)), push an annotated tag `v<version>` on that sha (`git tag -a`). The tag starts `release.yml`, which reruns every `ci` job, then publishes the same wheel + sdist they scanned to PyPI through trusted publishing. See [CI ship path](#ci-ship-path).
 6. **`mill update`** - from a **non-git cwd**: stop mill-wall and wait until it is STOPPED, then `pip install -U the-mill` (or `mill update`), then start mill-wall. Do not pip while mill-wall is still running (`sc stop` on Windows returns at STOP_PENDING; wait for STOPPED). Refuse the install when another process is `mill connect` holding `Scripts\mill.exe`; stop that connect first. The installer does not kill it. After pip, import the package and the ASGI app before starting mill-wall. If pip or that import fails, leave mill-wall stopped. `mill -V` is the installed mill. A live office book does not pick up new stored procedures from that recycle. Apply them on the host as in [HOST.md](../install/HOST.md#update-a-running-host). Wall serve + MySQL pool/gzip/cache and what recycle vs SQL apply means: [HOST.md mill-wall and MySQL](../install/HOST.md#mill-wall-and-mysql-operator-config). The pipeline does not touch a customer book. **Gate:** the A/B in [HOST.md](../install/HOST.md#stored-procedures) gates a live SQL apply (lan or aws); CI `pytest_sql` covers writing the SQL.
 7. **skill.md** - copy the pack's `docs/protocol/skill.md` (`mill join` prints its path after `skill`) over the desk's mill-desk `SKILL.md`, then **restart the TUI**. `python tools/check_skill_copy.py PATH` exits 0 when that copy matches the source; CI runs it with `--installed` on the pack (regression row F33, skill-copy). `mill briefing skill` is a terminal rendering, not a copy. mill on PATH is not the skill.
 
@@ -65,7 +65,7 @@ python tools/pack_local.py --install --notify
 
 The scanner reports *that* a home path, email, local home-user, or non-documentation address hit, not the matched substring.
 
-**Local extra:** profile folder names from `C:\Users`, `/home` (Linux/WSL), `/Users` (macOS), and `wsl.exe ls /home` when check_pack runs on Windows with WSL. The same net includes the computer name and hyphenated office-alias filenames under the local mill home. A plain alias with no hyphen is not part of this net. Case-insensitive word-boundary scan of **wheel + sdist**, **`git ls-files`**, and commit messages. GitLab shows tracked `docs/dev/` even when not in the wheel. Documented prefixes (`C:\Users\`, `/home/`) in BUILD.md are allowed; a **login name**, computer name, or hyphenated office alias in a tracked file fails. Names are read from disk - not a word-list in `check_pack.py`. **GitLab CI skips** this net (`GITLAB_CI` / `CI=true`) so the runner login is not scanned. Skip Public / Default / Administrator / root / Guest / Shared. The address scan is not part of that skip. It runs on the wheel, the sdist, `git ls-files`, and commit messages in CI too.
+**Local extra:** profile folder names from `C:\Users`, `/home` (Linux/WSL), `/Users` (macOS), and `wsl.exe ls /home` when check_pack runs on Windows with WSL. The same net includes the computer name and hyphenated office-alias filenames under the local mill home. A plain alias with no hyphen is not part of this net. Case-insensitive word-boundary scan of **wheel + sdist**, **`git ls-files`**, and commit messages. GitHub shows tracked `docs/dev/` even when not in the wheel. Documented prefixes (`C:\Users\`, `/home/`) in BUILD.md are allowed; a **login name**, computer name, or hyphenated office alias in a tracked file fails. Names are read from disk - not a word-list in `check_pack.py`. **CI skips** this net (`CI=true`) so the runner login is not scanned. Skip Public / Default / Administrator / root / Guest / Shared. The address scan is not part of that skip. It runs on the wheel, the sdist, `git ls-files`, and commit messages in CI too.
 
 `wall.local` in install/TLS copy is the product cert hostname. That stays.
 
@@ -83,31 +83,50 @@ Delete leftover backups and `__pycache__` from the tree **before** `python -m bu
 
 ## Pipeline hygiene
 
-`.gitlab-ci.yml` publishes only from `release_pypi` on a `v*` tag. Its `workflow:` rules run one pipeline per push: the merge request pipeline for a branch with an open MR, the default branch after a merge or direct push, and tags. A branch with no open MR runs no pipeline. On every pipeline:
+Three workflows live under `.github/workflows/`. Every action is pinned to a
+full commit sha (the repo also requires sha pinning), no workflow uses
+`pull_request_target`, no job runs on a self-hosted runner, and the default
+`GITHUB_TOKEN` is read-only.
 
-1. `build_pack` - `python -m build` -> `dist/`
-2. `check_pack` - `python tools/check_pack.py dist`, then `pip-audit` on pack deps
-3. `mill_cli_smoke` - install the sdist, run `python tools/mill_cli_smoke.py` (`mill -V`, `mill connect --help`, no retired verbs on `--help`, and the real-path rows in `RUN_ROWS`: `mill connect` runs its whole body against a closed local port and must reach the socket loop with no traceback)
-4. `pytest_no_sql` and `pytest_sql` - the test suites (see step 4 of Release order)
-5. `release_pypi` - on a `v*` tag only, after the jobs above pass
+- `ci.yml` runs on every pull request, every push to `main`, and when
+  `release.yml` calls it. It never publishes. Jobs:
+  1. `build_pack` - `python -m build` -> `dist/` (uploaded as the `dist` artifact)
+  2. `check_pack` - `python tools/check_pack.py dist`, then `pip-audit` on pack deps
+  3. `mill_cli_smoke` - install the sdist, run `python tools/mill_cli_smoke.py` (`mill -V`, `mill connect --help`, no retired verbs on `--help`, and the real-path rows in `RUN_ROWS`: `mill connect` runs its whole body against a closed local port and must reach the socket loop with no traceback), then `tools/check_skill_copy.py --installed`
+  4. `pytest_no_sql` and `pytest_sql` - the test suites (see step 4 of Release order)
+
+  `check_pack`, `pytest_no_sql` and `pytest_sql` check out full history
+  (`fetch-depth: 0`): they scan commit messages, and a shallow clone fails
+  closed (regression row S-8).
+- `codeql.yml` runs CodeQL (`analyze (python)`, `analyze (actions)`) on pull
+  requests, pushes to `main` and weekly.
+- `release.yml` runs only on a pushed `v*` tag (PyPI) or a manual
+  `workflow_dispatch` from `main` (TestPyPI rehearsal). A push to `main`
+  never starts it.
+
+The `ci` and CodeQL jobs above are the required status checks on `main`.
 
 Same scanner locally (step 1 of Release order): `python tools/check_pack.py dist`.
 
 ## CI ship path
 
-The release ships from GitLab CI, not from an office host.
+The release ships from GitHub Actions (`release.yml`), not from an office host,
+and uses PyPI trusted publishing (OIDC). No PyPI token is stored anywhere.
 
-1. The version bump is merged on `main` and the pipeline on that sha is green.
+1. The version bump is merged on `main` and `ci` on that sha is green.
 2. Ship GO consensus on that exact sha: each desk your office assigns to the builder, validator and shipper roles sends GO naming the sha. A silent desk is not a GO; there is no timeout and no quorum. A NOGO blocks. When desks are unavailable or a NOGO is stuck, the human office owner judges and may override.
-3. Push an annotated tag `v<version>` (same as `pyproject.toml`) on that sha: `git tag -a v<version> -m "the mill <version>" <sha>`, then `git push origin v<version>`. An annotated tag records who tagged and when; a lightweight tag does not.
-4. The tag pipeline runs `build_pack`, `check_pack`, `mill_cli_smoke`, `pytest_no_sql`, `pytest_sql`, then `release_pypi`.
-5. `release_pypi` refuses if `PYPI_API_TOKEN` is unset, if `dist/` is not exactly `the_mill-<version>` wheel + sdist, if `tools/check_pack.py dist` fails, or if `twine check` fails. Then it runs `twine upload dist/*` with `TWINE_USERNAME=__token__`.
+3. Push an annotated tag `v<version>` (same as `pyproject.toml`) on that sha: `git tag -a v<version> -m "the mill <version>" <sha>`, then `git push origin v<version>`. An annotated tag records who tagged and when; a lightweight tag does not. The tag ruleset lets only the repository admin create, move or delete `v*` tags.
+4. `release.yml` calls `ci.yml` (every job above), then `verify` refuses unless `dist/` is exactly the `the_mill-<version>` wheel + sdist for the tag, `tools/check_pack.py dist` passes and `twine check --strict` passes.
+5. `publish_pypi` runs in the `pypi` environment, which waits for the required reviewer (the human office owner) to approve the deployment and accepts only `v*` tags. It then uploads `dist/` with `pypa/gh-action-pypi-publish` using a short-lived OIDC token.
 6. Hosts then update from PyPI as in step 6 of Release order.
 
-Setup, once per project:
+Rehearsal: run `release.yml` by hand (`workflow_dispatch`) on `main`. It builds and verifies the same way, then `publish_testpypi` uploads to TestPyPI in the `testpypi` environment (`main` only). A version already on TestPyPI is skipped, not failed.
 
-- CI/CD variable `PYPI_API_TOKEN`: a PyPI API token scoped to the `the-mill` project. Flags: Protected, Masked (and hidden). Environment scope `*`. Never put the token in a commit, doc, card or mail.
-- Protected tag rule `v*` so only maintainers can push it and the protected variable is exposed to the tag pipeline.
+Setup, once per project (the human office owner):
+
+- On PyPI, project `the-mill` -> Publishing -> add a trusted publisher (GitHub): owner `pyginapithon`, repository `the-mill`, workflow `release.yml`, environment `pypi`. On TestPyPI the same with environment `testpypi` (a pending publisher if the project does not exist there yet). The workflow file name and the environment names are part of the trust; renaming either breaks publishing.
+- After the first trusted release, revoke any old PyPI API token for the project.
+- GitHub environments `pypi` (required reviewer, deployment tags `v*`) and `testpypi` (branch `main`), and the `main` and `v*` rulesets. These are repo settings, not files.
 
 A failed upload leaves PyPI unchanged for that file; fix and rerun the job. PyPI never accepts the same version twice, so a bad release needs a new version and tag.
 

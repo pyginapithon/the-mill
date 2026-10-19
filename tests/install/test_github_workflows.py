@@ -73,3 +73,31 @@ def test_publish_jobs_use_oidc_not_tokens() -> None:
     assert "id-token: write" in text
     assert "secrets." not in text
     assert "password:" not in text
+
+
+def _on(text: str) -> str:
+    """The top-level on: block of a workflow."""
+    return text.split("\non:\n", 1)[1].split("\n\n", 1)[0]
+
+
+def test_release_runs_only_on_v_tags_or_by_hand() -> None:
+    """S-9: a push to main or a PR never starts release.yml."""
+    on = _on((WF / "release.yml").read_text(encoding="utf-8"))
+    assert re.search(r'^  push:\n    tags: \["v\*"\]$', on, re.M), on
+    assert "branches" not in on and "pull_request" not in on and "schedule" not in on
+    assert set(re.findall(r"^  (\w+):", on, re.M)) == {"push", "workflow_dispatch"}
+
+
+def test_publish_jobs_are_gated_by_environment_and_event() -> None:
+    text = _code(WF / "release.yml")
+    pypi = _job(text, "publish_pypi")
+    assert "name: pypi" in pypi and "startsWith(github.ref, 'refs/tags/v')" in pypi
+    test = _job(text, "publish_testpypi")
+    assert "name: testpypi" in test and "workflow_dispatch" in test
+
+
+def test_ci_and_codeql_never_publish() -> None:
+    for name in ("ci.yml", "codeql.yml"):
+        text = _code(WF / name)
+        assert "id-token: write" not in text, name
+        assert "pypi-publish" not in text and "twine upload" not in text, name

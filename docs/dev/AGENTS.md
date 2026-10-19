@@ -15,7 +15,7 @@ Adapted from https://github.com/forrestchang/andrej-karpathy-skills (MIT), which
 
 1. Think before coding. Reproduce the problem live first and write down what you saw. State assumptions; when a card can be read two ways, ask the filer before building.
 2. Simplicity first. The smallest change that fixes the card. No speculative flags, aliases or layers (the mill is alpha: make hard breaks). Validate params up front and exit nonzero.
-3. Surgical changes. One card, one branch, one MR. Make the smallest change at the right layer and touch only the lines it needs. When the right layer is outside the card's files (often the SQL), say so on the card, widen the scope to that layer and fix it there. Unrelated problems get a new card.
+3. Surgical changes. One card, one branch, one PR. Make the smallest change at the right layer and touch only the lines it needs. When the right layer is outside the card's files (often the SQL), say so on the card, widen the scope to that layer and fix it there. Unrelated problems get a new card.
 4. Goal-driven execution. Define the check before the change: an edge test that fails first and a regression matrix row per param. SQL is checked the same way: CI `pytest_sql` covers writing it, and the A/B in [HOST.md](../install/HOST.md#stored-procedures) gates only the live apply. Done means CI is green and the check passes. Steps the office repeats every time belong in code, a job or CI with a clear pass or fail; agents handle only what needs judgment.
 
 Queries and read paths: [OPTIMIZATION.md](OPTIMIZATION.md) (filter in SQL, not in a loop; log each case you fix).
