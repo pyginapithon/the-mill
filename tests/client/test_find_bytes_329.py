@@ -44,9 +44,12 @@ def test_find_reports_the_printed_size(wall, capsys):
     assert row["wire_bytes"] > 100_000  # the whole board still crossed the wire
 
 
-def test_grouped_board_reports_the_printed_size(wall, capsys):
-    line, row = _run(capsys)
+@pytest.mark.parametrize("by", ["roster", "label"])
+def test_grouped_board_reports_the_printed_size(wall, capsys, by):
+    line, row = _run(capsys, group_by=by)
+    assert not isinstance(row["result"], list)  # the reply really was regrouped
     assert row["bytes"] == len(line.encode("utf-8"))
+    assert row["wire_bytes"] != row["bytes"]
 
 
 def test_reply_without_bytes_gets_none(monkeypatch, capsys):
