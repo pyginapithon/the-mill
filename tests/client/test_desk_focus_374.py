@@ -177,122 +177,152 @@ def test_without_mine_the_board_is_unchanged(monkeypatch, capsys):
     assert calls == [] and len(items) == 7 and all("focus" not in r for r in items)
 
 
-# --- connect focus block ---------------------------------------------------
+# --- connect focus block (#536: one board read, any roster) ------------------
 
-def _peek(cards):
-    by_id = {c["id"]: c for c in cards}
+class Wall:
+    """A small model of the 0.7.8 wall for the reads connect makes.
 
-    def call(body):
-        if body["verb"] == "trail":
-            return _label_reply([(c["id"], k) for k, c in enumerate(cards)])
-        assert body == {"verb": "todo", "project": "", "need": str(int(body["need"]))}
-        return {"ok": True, "result": [by_id[int(body["need"])]]}
+    member lists the desk's rosters; todo with rosters reads those boards (done
+    hidden); a todo peek with an empty project reads the-mill only, as the wall
+    defaults it; trail --label answers ord then created.
+    """
 
-    return call
+    def __init__(self, cards, rank, rosters=("Office", "fx-r9"), fail=None):
+        self.cards, self.rank, self.rosters, self.fail = list(cards), list(rank), list(rosters), fail or {}
+        self.verbs: list = []
+
+    def __call__(self, body):
+        verb = body["verb"]
+        self.verbs.append(verb)
+        if verb in self.fail:
+            err = self.fail[verb]
+            if isinstance(err, BaseException):
+                raise err
+            return {"ok": False, "error": err}
+        if verb == "member":
+            return {"ok": True, "result": [{"slot": r} for r in self.rosters]}
+        if verb == "trail":
+            return _label_reply(sorted(self.rank, key=lambda t: t[1]))
+        if verb == "todo" and "rosters" in body:
+            on = [c for c in self.cards if c["project_id"] in body["rosters"] and c["status"] != "done"]
+            return {"ok": True, "result": {"cards": on, "rosters": len(body["rosters"])}}
+        if verb == "todo":
+            roster = body.get("project") or "the-mill"
+            hit = [c for c in self.cards if c["project_id"] == roster and str(c["id"]) == str(body.get("need"))]
+            return {"ok": True, "result": hit} if hit else {"ok": False, "error": f"todo: no card {body.get('need')} in {roster}"}
+        raise AssertionError(verb)
+
+
+def _fx(i, volunteer="", status="open", roster="fx-r9", labels=("desk-a",)):
+    return dict(_card(i, volunteer, status, labels=labels), project_id=roster)
+
+
+def test_block_reads_focus_cards_on_any_roster_of_the_desk():
+    # The A/B fixture: focus cards on the desk's own roster, not the-mill.
+    wall = Wall([_fx(i) for i in (41, 42, 43, 44, 45, 46)], [(43, 0), (41, 5), (46, 10), (42, 15), (44, 20), (45, 25)])
+    block = focus.connect_block(wall, "desk-a")
+    assert [c["id"] for c in block["cards"]] == [43, 41, 46, 42, 44]
+    assert block["cards"][0] == {"id": 43, "project_id": "fx-r9", "need_id": "need-43", "status": "open",
+                                 "volunteer": "", "rank": 0}
+    assert wall.verbs == ["member", "todo", "trail"]
 
 
 def test_block_top_five_actionable_in_rank_order():
     status = {2: "done", 3: "parked"}
     who = {4: "desk-b"}  # held by another desk
-    cards = [_card(i, who.get(i, "desk-a" if i % 2 else ""), status.get(i, "claimed" if i % 2 else "open"),
-                   labels=["desk-a"]) for i in range(1, 10)]
-    block = focus.connect_block(_peek(cards), "desk-a")
+    cards = [_fx(i, who.get(i, "desk-a" if i % 2 else ""), status.get(i, "claimed" if i % 2 else "open"))
+             for i in range(1, 10)]
+    block = focus.connect_block(Wall(cards, [(c["id"], c["id"] - 1) for c in cards]), "desk-a")
     assert block["kind"] == "focus" and block["label"] == "desk-a"
     assert [c["id"] for c in block["cards"]] == [1, 5, 6, 7, 8]
-    first = block["cards"][0]
-    assert first == {"id": 1, "project_id": "the-mill", "need_id": "need-1", "status": "claimed",
-                     "volunteer": "desk-a", "rank": 0}
     assert [c["rank"] for c in block["cards"]] == [0, 4, 5, 6, 7]
-
-
-def test_block_rank_is_ord_then_card_id():
-    cards = {i: _card(i, "", "open", labels=["desk-a"]) for i in (21, 22, 23)}
-
-    def call(body):
-        if body["verb"] == "trail":
-            return _label_reply([(23, 1), (22, 1), (21, 9)])
-        return {"ok": True, "result": [cards[int(body["need"])]]}
-
-    block = focus.connect_block(call, "desk-a")
-    assert [(c["id"], c["rank"]) for c in block["cards"]] == [(22, 1), (23, 1), (21, 9)]
     assert "mill todo --mine" in block["rest"]
 
 
-def test_block_none_when_no_focus_or_all_done():
-    assert focus.connect_block(_peek([]), "desk-a") is None
-    done = [_card(i, "", "done", labels=["desk-a"]) for i in range(1, 4)]
-    assert focus.connect_block(_peek(done), "desk-a") is None
+def test_block_rank_is_ord_then_card_id():
+    wall = Wall([_fx(i) for i in (21, 22, 23)], [(23, 1), (22, 1), (21, 9)])
+    block = focus.connect_block(wall, "desk-a")
+    assert [(c["id"], c["rank"]) for c in block["cards"]] == [(22, 1), (23, 1), (21, 9)]
 
 
-def test_block_peeks_are_capped():
-    cards = [_card(i, "", "done", labels=["desk-a"]) for i in range(1, 40)]
-    seen: list = []
-    base = _peek(cards)
-
-    def call(body):
-        seen.append(body["verb"])
-        return base(body)
-
-    assert focus.connect_block(call, "desk-a") is None
-    assert seen.count("todo") == focus.FOCUS_PEEKS
+def test_block_none_when_nothing_to_work_on():
+    assert focus.connect_block(Wall([_fx(1, labels=())], []), "desk-a") is None
+    held = [_fx(1, "desk-b", "claimed"), _fx(2, "", "parked"), _fx(3, "", "done")]
+    assert focus.connect_block(Wall(held, [(1, 0), (2, 1), (3, 2)]), "desk-a") is None
 
 
-def test_block_survives_errors_and_missing_cards():
-    def call(body):
-        if body["verb"] == "trail":
-            return _label_reply([(7, 0), (8, 1)])
-        if body["need"] == "7":
-            return {"ok": False, "error": "todo: no card 7"}
-        raise OSError("gone")
+def test_block_skips_the_label_read_when_no_card_wears_it():
+    wall = Wall([_fx(1, "desk-a", "claimed", labels=())], [])
+    assert focus.connect_block(wall, "desk-a") is None
+    assert wall.verbs == ["member", "todo"]
 
-    assert focus.connect_block(call, "desk-a") is None
 
-    def bad(body):
-        raise http.CoordError("socket not ready")
+def test_card_on_a_roster_the_desk_is_not_on_is_not_focus():
+    wall = Wall([_fx(1, roster="elsewhere"), _fx(2)], [(1, 0), (2, 1)])
+    assert [c["id"] for c in focus.connect_block(wall, "desk-a")["cards"]] == [2]
 
-    assert focus.connect_block(bad, "desk-a") is None
+
+@pytest.mark.parametrize("verb,err,said", [
+    ("member", "member: refused", "member: refused"),
+    ("todo", "todo: unknown project fx-r9", "todo: unknown project fx-r9"),
+    ("trail", "trail: owner required", "trail: owner required"),
+    ("todo", OSError("timed out"), "timed out"),
+])
+def test_block_names_the_failed_read(verb, err, said):
+    wall = Wall([_fx(1)], [(1, 0)], fail={verb: err})
+    with pytest.raises(focus.FocusError) as e:
+        focus.connect_block(wall, "desk-a")
+    assert said in str(e.value) and verb in str(e.value)
+
+
+def _socket(monkeypatch, wall, project_reply=None):
+    def fake(who, body, **k):
+        if body["verb"] == "project":
+            return project_reply or {"ok": True, "result": {"ok": True}}
+        return wall(body)
+
+    monkeypatch.setattr(ws_mod, "own_bridge_call", fake)
 
 
 def test_connect_prints_the_block_after_the_project_check(monkeypatch, capsys):
-    cards = [_card(1, "desk-a", "claimed", labels=["desk-a"])]
-    peek = _peek(cards)
-
-    def fake(who, body, **k):
-        if body["verb"] == "project":
-            return {"ok": True, "result": {"ok": True}}
-        return peek(body)
-
-    monkeypatch.setattr(ws_mod, "own_bridge_call", fake)
+    _socket(monkeypatch, Wall([_fx(1, "desk-a", "claimed")], [(1, 0)]))
     stop = threading.Event()
     ws_mod.hold_sync_lines()
     ws_mod.gate_line('{"kind": "sync", "sync": []}')
-    http.seat_then_focus("desk-a", "the-mill", stop, {})
-    lines = capsys.readouterr().out.strip().splitlines()
+    http.seat_then_focus("desk-a", "fx-r9", stop, {})
+    cap = capsys.readouterr()
+    lines = cap.out.strip().splitlines()
     assert json.loads(lines[0])["kind"] == "sync"
     block = json.loads(lines[1])
     assert block["kind"] == "focus" and block["cards"][0]["id"] == 1
+    assert cap.err == ""
+
+
+def test_connect_says_why_when_focus_cannot_be_read(monkeypatch, capsys):
+    _socket(monkeypatch, Wall([_fx(1)], [(1, 0)], fail={"trail": "trail: owner required"}))
+    stop = threading.Event()
+    outcome: dict = {}
+    ws_mod.hold_sync_lines()
+    http.seat_then_focus("desk-a", "fx-r9", stop, outcome)
+    cap = capsys.readouterr()
+    assert "focus" not in cap.out
+    assert cap.err.count("\n") == 1
+    assert cap.err.startswith("connect: focus not shown: ") and "trail: owner required" in cap.err
+    # Focus never fails or stops a connect.
+    assert not stop.is_set() and "exit" not in outcome
 
 
 def test_connect_prints_nothing_without_focus_or_after_refusal(monkeypatch, capsys):
-    def fake(who, body, **k):
-        if body["verb"] == "project":
-            return {"ok": True, "result": {"ok": True}}
-        return _label_reply([])
-
-    monkeypatch.setattr(ws_mod, "own_bridge_call", fake)
+    _socket(monkeypatch, Wall([], []))
     stop = threading.Event()
     ws_mod.hold_sync_lines()
-    http.seat_then_focus("desk-a", "the-mill", stop, {})
-    assert capsys.readouterr().out == ""
+    http.seat_then_focus("desk-a", "fx-r9", stop, {})
+    cap = capsys.readouterr()
+    assert cap.out == "" and cap.err == ""
 
-    asked: list = []
-
-    def refuse(who, body, **k):
-        asked.append(body["verb"])
-        return {"ok": False, "error": "connect: no such project x"}
-
-    monkeypatch.setattr(ws_mod, "own_bridge_call", refuse)
+    wall = Wall([_fx(1)], [(1, 0)])
+    _socket(monkeypatch, wall, {"ok": False, "error": "connect: no such project x"})
     stop = threading.Event()
     ws_mod.hold_sync_lines()
     http.seat_then_focus("desk-a", "x", stop, {})
-    assert asked == ["project"] and "focus" not in capsys.readouterr().out
+    assert wall.verbs == [] and "focus" not in capsys.readouterr().out
