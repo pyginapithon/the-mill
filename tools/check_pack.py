@@ -11,7 +11,9 @@ Local extra: profile names from C:\\Users, /home, /Users, and wsl.exe ls /home.
 Also the computer name, and hyphenated office-alias filenames under the local
 mill home. Scan artifact text, git-tracked files at the tip, and commit
 messages. Login names come from the filesystem (not a word-list); CI
-skips that net (CI=true). Commit messages at or after the
+has none of those, so there the names come from the MILL_PRIVATE_NAMES
+secret (one per line, read at runtime, never printed) and an empty list
+fails closed (#339). Off CI that variable is optional and adds names. Commit messages at or after the
 history-scrub cut also fail on a Title-cased Latin token that is not on
 the neutral desk-word allow-list (pre-scrub history is not re-scanned).
 CI clones full history (actions/checkout fetch-depth 0). A shallow clone fails
@@ -603,6 +605,29 @@ def local_home_user_names() -> tuple[str, ...]:
     return tuple(sorted(set(out), key=str.casefold))
 
 
+PRIVATE_NAMES_ENV = "MILL_PRIVATE_NAMES"
+
+
+def on_ci() -> bool:
+    return bool(os.environ.get("GITLAB_CI")) or os.environ.get("CI") == "true"
+
+
+def private_names() -> tuple[str, ...]:
+    """Names from MILL_PRIVATE_NAMES, one per line (#339).
+
+    In CI this is a repository secret, read at runtime: the names never sit in
+    the repo, and reports name the kind and the path or commit, never the name.
+    Off CI it is optional and adds to the names read from disk.
+    """
+    out = [ln.strip() for ln in os.environ.get(PRIVATE_NAMES_ENV, "").splitlines()]
+    return tuple(sorted({n for n in out if n and not n.startswith("#") and _keep_home_name(n)}, key=str.casefold))
+
+
+def private_names_required() -> bool:
+    """On CI the list must be there; a fork PR (no secrets) sets the env to 0."""
+    return on_ci() and os.environ.get(PRIVATE_NAMES_ENV + "_REQUIRED", "1") != "0"
+
+
 def _home_user_regexes(names: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
     pats: list[re.Pattern[str]] = []
     for n in names:
@@ -1049,11 +1074,21 @@ def main(argv: list[str] | None = None) -> int:
     all_fails: list[str] = []
     all_notes: list[str] = []
     home_names = local_home_user_names()
-    home_pats = _home_user_regexes(home_names)
+    secret_names = private_names()
+    home_pats = _home_user_regexes(tuple(sorted(set(home_names) | set(secret_names), key=str.casefold)))
     if home_names:
         print(f"Local name scan: {len(home_names)} name(s) from profile folders, the computer name, and hyphenated office aliases")
     else:
         print("Local home-user scan: skipped (no C:\\Users)")
+    if secret_names:
+        print(f"Private-name scan: {len(secret_names)} name(s) from {PRIVATE_NAMES_ENV}")
+    elif private_names_required():
+        all_fails.append(
+            f"[ci] private-name list is empty: CI needs the {PRIVATE_NAMES_ENV} secret"
+            " for the local-name scan; it fails closed without it"
+        )
+    elif on_ci():
+        print(f"Private-name scan: skipped ({PRIVATE_NAMES_ENV}_REQUIRED=0, a fork PR has no secrets; the push to main scans)")
 
     for label, path, kind in (("wheel", whl, "wheel"), ("sdist", sdist, "sdist")):
         print(f"Scanning {label}: {path.name}")
