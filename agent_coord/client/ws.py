@@ -44,6 +44,11 @@ async def _notify_drop(ws: Any, frame: dict[str, Any]) -> None:
         _bc_log(f"hint drop notify err={type(e).__name__}")
 
 
+def refuse_url(url: str, refuse: bool) -> str:
+    """mill connect -r asks the office not to take a held seat (#332)."""
+    return url + "?refuse=1" if refuse else url
+
+
 def mill_ws_url(desk: str) -> str:
     from agent_coord.config import settings
     from agent_coord.client.http import mill_url
@@ -520,8 +525,11 @@ def _is_push_frame(msg: dict[str, Any]) -> bool:
     return bool(hint or typ in ("heartbeat", "session"))
 
 
-# 4401 seat rejected and 4000 superseded end the sit. Other closes reconnect.
-_TERMINAL_CLOSE = frozenset({4401, 4000})
+# Server close code for a refused mill connect -r (#332); same as push.WS_IN_USE.
+WS_IN_USE_CLOSE = 4409
+
+# 4401 seat rejected, 4000 superseded and 4409 seat in use end the sit. Other closes reconnect.
+_TERMINAL_CLOSE = frozenset({4401, 4000, WS_IN_USE_CLOSE})
 _RECONNECT_CAP_S = 60.0
 _RECONNECT_HEALTHY_S = 30.0
 
@@ -569,7 +577,7 @@ def reconnect_delay_s(attempt: int, *, jitter: float | None = None) -> float:
 def reconnect_stopped(code: int | None, outcome: dict | None) -> bool:
     """True when this close must not start another sit.
 
-    4401 and 4000 stop. Other closes keep the 60s cap. A sit that already
+    4401, 4000 and 4409 stop. Other closes keep the 60s cap. A sit that already
     stored one of those exits stops too.
     """
     if outcome is not None and code in _CLOSE_EXIT and "exit" not in outcome:
@@ -721,17 +729,36 @@ def foreground_close_result(exc: BaseException, desk: str) -> dict[str, Any] | N
 
     ConnectionClosed is not an OSError. Both must become ok:false, not a traceback (#140).
     """
+    if close_code_of(exc) == WS_IN_USE_CLOSE:
+        return {"ok": False, "error": close_error(WS_IN_USE_CLOSE, exc, desk), "desk": desk,
+                "exit": _CLOSE_EXIT[WS_IN_USE_CLOSE]}
     if isinstance(exc, OSError) or "ConnectionClosed" in type(exc).__name__:
         return {"ok": False, "error": "connect closed", "desk": desk}
     return None
 
 
-# Distinct from exit 0 (clean sit) and from each other (#136).
-_CLOSE_EXIT = {4401: 4, 4000: 5}
+# Distinct from exit 0 (clean sit) and from each other (#136, #332).
+_CLOSE_EXIT = {4401: 4, 4000: 5, WS_IN_USE_CLOSE: 6}
 _CLOSE_ERROR = {
     4401: "token rejected (4401): mill join again or ask the office to reset this seat",
     4000: "superseded (4000): another connect took this seat",
+    WS_IN_USE_CLOSE: "seat in use (4409): another connect holds this seat",
 }
+
+
+def close_error(code: int, exc: BaseException | None, desk: str) -> str:
+    """Error line for a terminal close. A refused -r names the command that takes the seat."""
+    text = _CLOSE_ERROR[code]
+    if code != WS_IN_USE_CLOSE:
+        return text
+    reason = str(getattr(getattr(exc, "rcvd", None), "reason", "") or "")
+    reason = reason.removeprefix("seat in use: ")
+    if reason:
+        text = f"{text} ({reason})"
+    return (
+        f"{text}; plain mill connect {desk} (without -r) takes the seat "
+        "and disconnects the holder"
+    )
 
 
 def bridge_close_error(exc: BaseException | None) -> str:
@@ -848,8 +875,12 @@ async def _sit_session(
     bridge_host: str = "127.0.0.1",
     reconnect: Any = None,
     outcome: dict | None = None,
+    first_frame: str | None = None,
 ) -> None:
     """One sitting /ws: multiplex HINT vs RPC; thread TCP bridge for mill_ws_call.
+
+    first_frame is a frame the caller already read (connect -r reads the first
+    frame before this bridge is published, #332); it is handled first.
 
     reconnect, when set, is an async callable that returns a new socket.
     A recoverable close keeps this bridge up and calls it after backoff.
@@ -1128,6 +1159,13 @@ async def _sit_session(
     clear_connect_starting(who, pid=my_pid)
     note_bridge_ready(who)
     _bc_log(f"ws rpc bridge up desk={who} port={port}")
+    if first_frame is not None:
+        try:
+            first = json.loads(first_frame)
+        except json.JSONDecodeError:
+            first = None
+        if isinstance(first, dict):
+            await on_frame(first)
     attempt = 0
     opened = time.monotonic()
     mux_task: asyncio.Task | None = None
@@ -1181,7 +1219,7 @@ async def _sit_session(
     finally:
         if terminal_code in _CLOSE_EXIT:
             print(
-                json.dumps({"ok": False, "error": _CLOSE_ERROR[terminal_code]}),
+                json.dumps({"ok": False, "error": close_error(terminal_code, err_box.get("exc"), who)}),
                 flush=True,
             )
             if outcome is not None:
@@ -1214,6 +1252,7 @@ def run_ws_loop(
     stop: threading.Event,
     buf: HintBuf | None = None,
     outcome: dict | None = None,
+    refuse: bool = False,
 ) -> None:
     """Recv thread: sit /ws, serve localhost RPC bridge, enqueue HINTs. Reconnect on drop."""
     try:
@@ -1226,7 +1265,7 @@ def run_ws_loop(
         return
     import asyncio
 
-    url = mill_ws_url(desk)
+    url = refuse_url(mill_ws_url(desk), refuse)
     hdrs = {}
     if token:
         hdrs["Authorization"] = "Bearer " + token
@@ -1271,8 +1310,14 @@ def run_ws_loop(
             sit_url = url.split("?")[0]
             print(_json_line({"backchannel": "ws", "url": sit_url, "desk": who}), flush=True)
             _bc_log(f"ws recv sit desk={who} url={sit_url}")
+            # connect -r: the office sends the sync only once the seat is ours, so
+            # read it before publishing a bridge; a refusal (4409) raises here and
+            # never touches the holder's bridge file on this computer (#332).
+            first = await ws.recv() if refuse else None
             try:
-                await _sit_session(ws, who, stop, buf, reconnect=_reopen, outcome=outcome)
+                await _sit_session(
+                    ws, who, stop, buf, reconnect=_reopen, outcome=outcome, first_frame=first
+                )
             finally:
                 for ctx in extras:
                     try:
@@ -1297,7 +1342,7 @@ def run_ws_loop(
                     code = close_code_of(e)
                     if code in _CLOSE_ERROR:
                         print(
-                            json.dumps({"ok": False, "error": _CLOSE_ERROR[code]}),
+                            json.dumps({"ok": False, "error": close_error(code, e, slug_desk(desk))}),
                             flush=True,
                         )
                     stop.set()
@@ -1329,6 +1374,7 @@ def wait_one_hint(
     skip_kinds: Collection[str] | None = None,
     hold_empty_sync: bool = False,
     parent_pid: int | None = None,
+    refuse: bool = False,
 ) -> dict[str, Any]:
     """Block on /ws until one work frame, then return.
 
@@ -1352,7 +1398,7 @@ def wait_one_hint(
 
     from agent_coord.client.inbound import ignore
 
-    url = mill_ws_url(desk)
+    url = refuse_url(mill_ws_url(desk), refuse)
     who = slug_desk(desk)
     hdrs: dict[str, str] = {}
     if token:
@@ -1470,6 +1516,7 @@ def start_ws_thread(
     token: str,
     stop: threading.Event,
     outcome: dict | None = None,
+    refuse: bool = False,
 ) -> threading.Thread:
     buf = HintBuf(desk)
     who = slug_desk(desk)
@@ -1479,7 +1526,7 @@ def start_ws_thread(
     drain.start()
     t = threading.Thread(
         target=run_ws_loop,
-        args=(desk, token, stop, buf, outcome),
+        args=(desk, token, stop, buf, outcome, refuse),
         name=f"mill-ws-{who}",
         daemon=True,
     )

@@ -78,6 +78,8 @@ Regression row F28 (connect-wait-holds).
 
 Seatless connect: `mill connect NAME` when this computer holds no seat for NAME prints one line on stderr and exits 2, before anything connects: `mill connect: no seat for NAME on this computer; a desk joins once with mill join '<welcome-link>' from the office host (a roster is not a desk: mill connected ROSTER lists its desks)`. The line is the same for a roster, an unknown name and an unjoined desk, and the client asks the office nothing, so the refusal never tells which names exist. Regression row F30 (connect-seatless).
 
+Seat in use: one desk has one live connect; a new `mill connect DESK` takes the seat and the older one exits 5 (superseded). `mill connect -r DESK` (also `connect-wait -r`) refuses instead while another live connect holds the seat: the holder stays, the office closes the newcomer with 4409, and it prints `seat in use (4409): ... plain mill connect DESK (without -r) takes the seat and disconnects the holder` and exits 6. A dead holder does not block it once the office drops that socket. Regression row F43 (connect-refuse).
+
 **Model skill.** Grok Bot cannot leave `mill connect-wait` running. That delta is [models/grok-bot/SKILL.md](models/grok-bot/SKILL.md). Grok Build foreground is [grok-foreground.md](grok-foreground.md). Do not copy this page into a model skill.
 
 ## What to tell the human
