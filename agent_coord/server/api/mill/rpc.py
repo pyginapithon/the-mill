@@ -1580,8 +1580,8 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     # before the claim is written (#232).
     eta_raw = str(body.get("eta") or "").strip()
     msg = str(body.get("msg") or "")
-    if len(msg) > 4096:
-        raise CoordError("claim: msg would be %s chars (max 4096)" % len(msg))
+    if len(msg) > rec_todo.BODY_MAX:
+        raise CoordError("claim: msg would be %s chars (max %s)" % (len(msg), rec_todo.BODY_MAX))
     eta_at = None
     if eta_raw:
         try:
@@ -1611,11 +1611,14 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     note = msg.strip()
     lines = ([f"took over from {prior}"] if prior else []) + ([note] if note else [])
     if lines:
-        from agent_coord.helpers.bounds import append_note_detail
-
-        payload["detail"] = append_note_detail(
-            str(payload.get("detail") or ""), "\n".join(lines), replace=False
-        )
+        # The card's stored column is the only bound, as for note (#360).
+        before = dict(payload)
+        prev = str(payload.get("detail") or "")
+        extra = "\n".join(lines)
+        payload["detail"] = extra if not prev.strip() else prev + "\n" + extra
+        refusal = rec_todo.over_budget(before, payload, "claim")
+        if refusal:
+            raise CoordError(refusal)
     body_s = rec_todo.stored_body(payload) if (eta_at is not None or lines) else None
     rec_todo.update(
         c._cn,
@@ -1664,13 +1667,11 @@ def _h_open(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     # #188: same rule as an oversize note. Refuse. Do not keep a silent prefix.
     import json
 
-    from agent_coord.protocol.mail import MAIL_BODY_MAX
-
     detail_raw = str(body.get("detail") or "")
-    if len(detail_raw) > MAIL_BODY_MAX:
+    if len(detail_raw) > rec_todo.BODY_MAX:
         raise CoordError(
             "todo: detail would be %s chars (max %s); refused, nothing stored"
-            % (len(detail_raw), MAIL_BODY_MAX)
+            % (len(detail_raw), rec_todo.BODY_MAX)
         )
     detail = detail_raw
     # Create accepts parked or open only. An empty status is open (#231).
@@ -1932,7 +1933,6 @@ def _supersede_line(
     Append-only: nothing is deleted. Asker or Admin. One exact whole-line match
     (spaces at the ends ignored); none or several is refused before any write.
     """
-    from agent_coord.helpers.bounds import NOTE_MAX
     from agent_coord.server.admin.guard import is_role_admin
 
     if replace:
@@ -1953,10 +1953,8 @@ def _supersede_line(
     i = hits[0]
     # Ends are ignored only to match; the kept line is the original, unchanged.
     lines[i : i + 1] = [SUPERSEDED + lines[i], new]
-    joined = "\n".join(lines)
-    if len(joined) > NOTE_MAX:
-        raise CoordError(f"note: detail would be {len(joined)} chars (max {NOTE_MAX}); shorten")
-    return joined
+    # The card's stored column is the bound, checked once in _h_note (#360).
+    return "\n".join(lines)
 
 
 def _h_hold(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:

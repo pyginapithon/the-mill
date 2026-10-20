@@ -44,7 +44,9 @@ def unpack(body: str, fallback_id: Any) -> dict[str, Any]:
     }
 
 
-# mill_todo_insert / mill_todo_update: IN p_body VARCHAR(4096)
+# The card's whole budget is its column: todo.body VARCHAR(4096) utf8mb4 in
+# tables.sql and IN p_body VARCHAR(4096) in sp_todo.sql. The stored body is
+# json.dumps (ASCII), so characters and bytes agree. One limit, no per-note cap (#360).
 BODY_MAX = 4096
 
 
@@ -64,7 +66,7 @@ def budget_left(payload: dict[str, Any]) -> int:
     return BODY_MAX - len(json.dumps(dict(payload)))
 
 
-def over_budget(before: dict[str, Any], after: dict[str, Any]) -> str:
+def over_budget(before: dict[str, Any], after: dict[str, Any], verb: str = "note") -> str:
     """The refusal when a note would take the card past BODY_MAX, else "" (#360).
 
     Every note on a card shares one budget, so the refusal says how much this
@@ -75,10 +77,10 @@ def over_budget(before: dict[str, Any], after: dict[str, Any]) -> str:
     left = max(0, budget_left(before))
     need = len(json.dumps(dict(after))) - len(json.dumps(dict(before)))
     return (
-        "note: refused, nothing written: this note needs %d characters and the card has %d left "
+        "%s: refused, nothing written: this note needs %d characters and the card has %d left "
         "of its %d (every note on a card shares one budget). Put the long text in a room letter "
         "(mill reply <mail_id> --body-file PATH) and note just its mail id here."
-        % (need, left, BODY_MAX)
+        % (verb, need, left, BODY_MAX)
     )
 
 
