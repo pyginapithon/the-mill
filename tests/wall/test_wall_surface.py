@@ -9,6 +9,8 @@ stylelint, eslint, and html-validate are the tools/wall-validators package.
 Install from the repo root: npm ci --prefix tools/wall-validators
 A copy already on PATH is used when that directory has no node_modules.
 Node.js itself is required. If it is not on PATH, the test fails and names Node.js.
+The Node range is package.json engines (html-validate needs fs.globSync: ^22.22 or
+>=24.8); npm ci refuses an older Node and the validators fail naming the range (#610).
 The wall files are the checkout that contains this test, wherever it sits.
 """
 from __future__ import annotations
@@ -18,6 +20,8 @@ import json
 import re
 import shutil
 import subprocess
+
+import pytest
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -224,6 +228,30 @@ def _rel(path: Path) -> str:
         return path.name
 
 
+def _ver(text: str) -> tuple[int, int, int]:
+    parts = (re.findall(r"\d+", text) + ["0", "0", "0"])[:3]
+    return int(parts[0]), int(parts[1]), int(parts[2])
+
+
+def _node_in_range(version: str, engines: str) -> bool:
+    """True when version meets one ^X.Y.Z or >=X.Y.Z alternative of engines (#610)."""
+    have = _ver(version)
+    for alt in engines.split("||"):
+        alt = alt.strip().replace(" ", "")
+        if alt.startswith("^") and have[0] == _ver(alt)[0] and have >= _ver(alt):
+            return True
+        if alt.startswith(">=") and have >= _ver(alt):
+            return True
+    return False
+
+
+def _node_engines() -> str:
+    pkg = _TOOLS / "package.json"
+    if not pkg.is_file():
+        return ""
+    return str(json.loads(pkg.read_text(encoding="utf-8")).get("engines", {}).get("node") or "")
+
+
 def _validator(tool: str, script: str, config: str, files: list[Path], extra: list[str] | None = None) -> None:
     config_path = _TOOLS / config
     assert config_path.is_file(), "missing " + _rel(config_path)
@@ -233,6 +261,14 @@ def _validator(tool: str, script: str, config: str, files: list[Path], extra: li
         raise AssertionError(
             "Node.js is not on PATH, so " + tool + " cannot run."
         )
+    engines = _node_engines()
+    if engines:
+        have = subprocess.run([node, "--version"], capture_output=True, text=True).stdout.strip()
+        if not _node_in_range(have, engines):
+            raise AssertionError(
+                "Node.js " + engines + " is needed for the wall validators (tools/wall-validators"
+                " package.json engines); this node is " + have + "."
+            )
     local = _TOOLS / "node_modules" / script
     if local.is_file():
         cmd = [node, str(local)]
@@ -324,3 +360,51 @@ def test_html_validate_board():
         "html-validate.config.mjs",
         [BOARD],
     )
+
+
+# #610: html-validate needs fs.globSync (Node 22). The package declares the Node
+# range in engines, npm ci refuses an older Node, and the validators name it.
+ENGINES = "^22.22.0 || >=24.8.0"
+
+
+def test_validators_declare_the_node_range():
+    pkg = json.loads((_TOOLS / "package.json").read_text(encoding="utf-8"))
+    assert pkg.get("engines", {}).get("node") == ENGINES
+    rc = (_TOOLS / ".npmrc").read_text(encoding="utf-8").split()
+    assert "engine-strict=true" in rc
+
+
+@pytest.mark.parametrize("ver,ok", [
+    ("v20.19.2", False), ("v22.21.9", False), ("v22.22.0", True), ("v23.11.0", False),
+    ("v24.7.9", False), ("v24.8.0", True), ("v24.21.0", True), ("v26.0.0", True),
+])
+def test_node_range(ver, ok):
+    assert _node_in_range(ver, ENGINES) is ok
+
+
+def test_ci_node_pin_is_in_range():
+    ci = (_REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    pins = re.findall(r"NODE_VERSION:\s*(v[0-9.]+)", ci)
+    assert pins
+    for pin in pins:
+        assert _node_in_range(pin, ENGINES), pin
+
+
+def test_old_node_names_the_range(monkeypatch):
+    monkeypatch.setattr(subprocess, "run", _fake_node_version("v20.19.2\n"))
+    message = _html_validate_message()
+    assert message == (
+        "Node.js " + ENGINES + " is needed for the wall validators (tools/wall-validators"
+        " package.json engines); this node is v20.19.2."
+    )
+
+
+def _fake_node_version(out: str):
+    real = subprocess.run
+
+    def run(cmd, *a, **k):
+        if list(cmd)[1:] == ["--version"]:
+            return subprocess.CompletedProcess(cmd, 0, stdout=out, stderr="")
+        return real(cmd, *a, **k)
+
+    return run
