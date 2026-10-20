@@ -37,7 +37,9 @@ def _live_kind(cn, name: str, body: dict[str, Any] | None = None, *, verb: str =
         return want
     bare = name.strip()
     found: list[str] = []
-    for r in rows_done(cn, "SELECT DISTINCT type FROM name WHERE name=%s AND deleted IS NULL", (bare,)):
+    # Reclaim acts on a retired name (#608); the other verbs on a live one.
+    state = "IS NOT NULL" if verb == "reclaim" else "IS NULL"
+    for r in rows_done(cn, f"SELECT DISTINCT type FROM name WHERE name=%s AND deleted {state}", (bare,)):
         t = r.get("type")
         t = t.decode("utf-8") if isinstance(t, (bytes, bytearray)) else str(t)
         if t not in found:

@@ -106,7 +106,8 @@ BEGIN
   DECLARE v_desk BIGINT UNSIGNED;
   START TRANSACTION;
   SET v_ts = MILL_NOW();
-  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  -- #608: a retired desk resolves too, so reset still revokes its seat.
+  SELECT id INTO v_desk FROM name WHERE type = 'desk' AND name = TRIM(p_desk) LIMIT 1;
   -- #96: reset is a disconnect stamp. Never DELETE join or its activity.
   UPDATE `join` SET token_hash = NULL, doing = '', time_disconnect = v_ts WHERE desk_id = v_desk;
   SET v_id = (SELECT id FROM `join` WHERE desk_id = v_desk LIMIT 1);
