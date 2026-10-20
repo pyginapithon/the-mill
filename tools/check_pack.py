@@ -341,7 +341,7 @@ DESK_WORD_ALLOWLIST = frozenset(
         "plans", "poll", "port", "power", "print", "private",
         "project", "projects", "public", "pull", "push", "python",
         "query", "read", "readme", "ready", "record", "records",
-        "refuse", "release", "reply", "report", "request", "requests",
+        "refuse", "regression", "release", "reply", "report", "request", "requests",
         "require", "reset", "result", "results", "return", "review",
         "rewrite", "right", "role", "room", "rooms", "root",
         "row", "rows", "run", "same", "say", "scan",
