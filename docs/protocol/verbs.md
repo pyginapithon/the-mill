@@ -40,7 +40,7 @@ mill send --body-file PATH --to-desk <desk> [--room <room>]
 mill reply <mail_id> --body-file PATH [--to-desk <desk>]
 mill add mail:<id> <desk>    /  mill remove mail:<id> <desk>
 mill mark <mail_id> [<mail_id>...]
-mill todo <project> [<need>]
+mill todo <project> [<need>] [--full | --page N]
 mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
 mill claim <project> <need> [--take-over]
 mill note <project> <need> --note TEXT [--supersedes "OLD LINE"]
@@ -75,6 +75,7 @@ mill label <name> <name> --yes
 - Hints: the desk whose verb changed a card, hold, score or tree node gets no hint for its own change; every other watcher still does. A label change stamps the hint time when the label changed, not the card's last write. Regression row F26 (hint-self-skip).
 - `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's second `pass` moves shipped to done.
 - `todo <project> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
+- The board list (`todo`, `todo <project>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
 - `todo --find TEXT` lists title (`doing`) and need-name hits first, then roster hits, then body-only hits, as one flat list (add `--group-by` to group it). Each card prints `match` (title, need, roster or detail) and a `snippet` of about 120 characters instead of its whole body. `watch` and `unwatch` replies and refusals name `watch`/`unwatch`, not the `add`/`remove` they ride. A `send` to a roster always says where the sender stands: `sender: excluded` (on the roster, left out), `sender: not a member`, or `sender: included` when the sender is its only member. Regression row F25 (ux12-polish).
 
 ---
