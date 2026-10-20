@@ -61,7 +61,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `--ord`: 0 = pinned, 65535 = unplaced. Gaps stay; never renumber.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
-- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same.
+- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same. A hold goes by its name: `watch hold deploy`.
 - Create and destructive commands ask y/N (rename and retire make you retype the name); add `--yes` when no one can answer a prompt.
 
 - **Tree** - the outline under a letter or card: why, in order, dead ends kept. `trail mail:<id>` or `trail todo:<id>` reads it. `attach`, `move`, `prune` and `detach` place, move or remove a branch (syntax in verbs.md). A hidden plan name is 10 hex. A card on two plans fails closed until you name the tree.

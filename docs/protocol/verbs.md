@@ -244,7 +244,7 @@ Record design choices on the mill, not in private memory. Proposal = a finding-s
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>` |
+| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>`. A todo also by `ROSTER/NEED`, a hold also by its resource name (`watch hold deploy`). Regression row F-watch-hold-name. |
 | *"give that to ..."*, *"assign to ..."* | `assign` `<project> <need> <desk>` - only if unassigned; trust-gated (see Guards) |
 | *"tag it ..."* | `label <mail|todo> <id> <label> [--ord N]`; untag with `unlabel <mail|todo> <id> <label>` |
 | *"join that group"* | `add roster <group>` (no desks = you); put others on with `add roster <group> d1,d2` |

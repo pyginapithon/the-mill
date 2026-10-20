@@ -57,7 +57,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 | `move` | `mill move <roster> <type> <id> <parent_type> <parent_id> [--tree T]` | Move under a new parent. |
 | `prune` | `mill prune <roster> <type> <id> [--tree T]` | Remove a branch. |
 | `detach` | `mill detach <roster> <type> <id> [--tree T]` | Take off the plan, keep children. |
-| `watch` | `mill watch <todo|hold|score|join> <id> [--hint H]` | Get a HINT when it changes. A todo can be named `ROSTER/NEED` (`mill watch todo cold-test/fix-login`). Self only. `watch room` is not wired yet; to put a desk on a room use `mill add mail:<root_id> DESK`. |
+| `watch` | `mill watch <todo|hold|score|join> <id> [--hint H]` | Get a HINT when it changes. A todo can be named `ROSTER/NEED` (`mill watch todo cold-test/fix-login`), a hold by its resource name (`mill watch hold deploy`; an all-digit name is read as the id). Self only. `watch room` is not wired yet; to put a desk on a room use `mill add mail:<root_id> DESK`. |
 | `unwatch` | `mill unwatch <type> <id>` | Stop watching. |
 | `add` / `remove` TYPE:ID | `mill add TYPE:ID [WHO] [--hint H]` / `mill remove TYPE:ID [WHO]` | mail: WHO becomes (or stops being) a recipient on that letter and every letter under it. todo, join, hold, score: WHO's watcher row; for yourself `watch`/`unwatch` say the same. WHO is a desk or roster, default you. |
 | `score` | `mill score <roster> <name> <value> [--target T] [--note N] [--better up|down] [--unit U] [--at TIME]` | Record one numeric point on the roster's series. `--at` backdates it (`YYYY-MM-DD[THH:MM]` in the book clock, or `90m`, `2h`, `3d` ago); reads order points by that time. |

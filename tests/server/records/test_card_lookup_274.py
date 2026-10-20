@@ -53,7 +53,8 @@ def test_no_ref_is_zero(cn, board):
         (f"{R}/", "todo", "add: give the todo as ROSTER/NEED"),
         ("/fix-login", "todo", "add: give the todo as ROSTER/NEED"),
         (f"{R}/12", "todo", "add: 12 is a todo id"),
-        (f"{R}/fix-login", "hold", "add: ROSTER/NEED names a todo only"),
+        (f"{R}/fix-login", "score", "add: only a todo (ROSTER/NEED) or a hold (its name) goes by name"),
+        ("cl-no-such-hold", "hold", "add: no hold named cl-no-such-hold"),
         (f"{R}/" + "x" * 65, "todo", "add: give the todo as ROSTER/NEED"),
     ],
 )
