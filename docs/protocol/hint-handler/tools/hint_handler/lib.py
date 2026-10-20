@@ -1,8 +1,9 @@
 """hint_handler.lib - stdin HINT JSON -> event; thin mill-fetch leftovers.
 
 Protocol facts (do not invent):
-- route_key = f"{type}:{hint}"  (route.md / hints.md)
-- detail = watcher.hint or cheap default JSON (hints.md)
+- route key matches client route_chain.route_key: explicit route, else
+  mail:MAIL for {kind: mail}, else type:hint
+- detail = watcher.hint or cheap default JSON (hints.md). A letter has none.
 - MAIL leftovers -> mill inbox; TODO -> that card only (not full board)
 - exit 0 -> STOP; mill connect does not mill-update (connect.md)
 """
@@ -46,9 +47,30 @@ def parse_stdin(raw: Optional[str] = None) -> HintEvent:
     return parse_hint(obj)
 
 
+def _client_route_key(obj: Mapping[str, Any]) -> str:
+    """Same rule as agent_coord.client.route_chain.route_key."""
+    got = str(obj.get("route") or "").strip()
+    if got:
+        return got
+    kind = str(obj.get("kind") or "").strip().lower()
+    if kind == "mail":
+        return "mail:MAIL"
+    typ = str(obj.get("type") or "").strip()
+    hint = str(obj.get("hint") or "").strip()
+    if typ and hint:
+        return f"{typ}:{hint}"
+    return hint or typ or ""
+
+
 def parse_hint(obj: Mapping[str, Any]) -> HintEvent:
-    typ = str(obj.get("type") or "")
-    hint = str(obj.get("hint") or "").upper()
+    key = _client_route_key(obj)
+    if ":" in key:
+        typ, hint = key.split(":", 1)
+        typ, hint = typ.strip(), hint.strip()
+    else:
+        typ = str(obj.get("type") or "").strip()
+        hint = (key or str(obj.get("hint") or "")).strip()
+    hint = hint.upper()
     detail = obj.get("detail")
     if isinstance(detail, str):
         # Default detail is cheap JSON string or object - try parse

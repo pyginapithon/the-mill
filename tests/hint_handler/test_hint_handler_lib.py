@@ -9,6 +9,59 @@ from unittest.mock import patch
 import pytest
 
 
+def test_parse_real_mail_frame_is_mail(hh, monkeypatch):
+    """The frame mill connect hands a route program, not the {type, hint} shape."""
+    from agent_coord.client.dispatch import public_frame
+    from agent_coord.server.mail_push import compact_mail
+    from agent_coord.server.poke_key import letter_key
+
+    letter = {
+        "id": 4,
+        "created": "2026-01-01T00:00:00",
+        "desk": "sender",
+        "sender_roster": 1,
+        "body": "hello",
+    }
+    dests = [{"desk": "builder", "opened": None, "receipt": 0}]
+    raw = compact_mail(letter, dests, "builder")
+    raw["idem"] = letter_key(4, "builder")
+    raw["mill"] = "0.7.7"
+    # put_recv stamps desk and an empty route: inbound classify has no type/hint.
+    raw["desk"] = "builder"
+    raw["route"] = ""
+    frame = public_frame(raw, "builder")
+    assert frame.get("kind") == "mail"
+    assert frame.get("idem") == "letter:4:builder"
+    assert "body" not in frame
+    assert "type" not in frame
+    assert "hint" not in frame
+
+    ev = hh.parse_hint(frame)
+    assert ev.route_key == "mail:MAIL"
+    assert ev.type == "mail"
+    assert ev.hint == "MAIL"
+    assert ev.id == 4
+    assert ev.ignore is False
+
+    bare = {"id": 4, "idem": "letter:4:builder", "kind": "mail", "desk": "builder"}
+    ev2 = hh.parse_hint(bare)
+    assert ev2.route_key == "mail:MAIL"
+    assert ev2.ignore is False
+
+    monkeypatch.delenv("AGENT_COORD_OWNER", raising=False)
+
+    class R:
+        returncode = 0
+        stdout = '[{"id": 4}]'
+        stderr = ""
+
+    with patch.object(hh, "run_mill", return_value=R()) as run:
+        out = hh.leftovers(ev2)
+    assert out == '[{"id": 4}]'
+    run.assert_called_once()
+    assert run.call_args[0][0][:3] == ["inbox", "--limit", "3"]
+
+
 def test_parse_hint_route_key_and_upper_hint(hh):
     ev = hh.parse_hint({"type": "mail", "id": 12, "hint": "mail", "detail": None})
     assert ev.route_key == "mail:MAIL"
