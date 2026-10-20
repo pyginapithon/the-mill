@@ -1484,13 +1484,11 @@ def wait_one_hint(
                         from agent_coord.lib.proc import parent_gone
 
                         if parent_gone(int(parent_pid)):
-                            return {
-                                "ok": True,
-                                "mode": mode,
-                                "reason": "parent exited",
-                                "desk": who,
-                                "url": sit_url,
-                            }
+                            from agent_coord.client.session_errors import parent_exited_notice
+
+                            out = parent_exited_notice(who, url=sit_url)
+                            out["mode"] = mode
+                            return out
                     continue
                 try:
                     msg = json.loads(raw)
