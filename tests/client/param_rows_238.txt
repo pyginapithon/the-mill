@@ -297,6 +297,7 @@ note project
 note need
 note text
 note note
+note supersedes
 note eta
 note started
 note office
