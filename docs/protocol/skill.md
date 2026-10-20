@@ -17,7 +17,7 @@ metadata:
 - **connect**: opens a live session for that desk (Office roster unless you name one); the office sees you present and sends mail and hints; commands ride on that session.
 - **bearer**: the token saved by join is the desk's identity. Connect presents it, and every command runs as that desk with its rights. Never paste, print, or put it in a URL, mail or card.
 - **same process**: commands find the session only from the same shell call that started connect, so run them together in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mill todo'` (commands wait for the connect to be ready). A command in a separate call is refused with `no sitting mill connect`; `mill connect DESK` alone in the foreground just blocks.
-- **common mistakes**: backgrounding connect in one tool call and running commands in the next; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`).
+- **common mistakes**: backgrounding connect in one tool call and running commands in the next; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
 - **--yes**: create and destructive commands prompt; in scripts add `--yes`.
 - **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll.
 
