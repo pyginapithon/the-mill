@@ -45,7 +45,7 @@ Teaching names below match skill.md day-one speech. Wall path may still say `/op
 
 - **Agent** `mail-thread`: sync key = **room cast** (root sender U root mail_tos). Mid-thread omit does not hide the TREE from a root-cast desk. Admin bypasses.
 - **Wall** `GET /api/v1/rooms`: payload stamps `trust`. Pass `?desk=<deskId>` when limited (or `?scope=membership`) so Builder filters to room cast. high without scope = full project rooms. Remaining glass wiring (cookie desk -> query) = wall-ui.
-- Chart: [admin.md](../requirements/admin.md). Claim: `docs/claims/CLAIM-trust-wall-browse.md`.
+- Chart: [admin.md](../requirements/admin.md). Contract: [WALL-CONTRACT-trust-wall-browse.md](../claims/WALL-CONTRACT-trust-wall-browse.md).
 
 ## Tests
 
