@@ -404,6 +404,9 @@ def body_from_args(args: Any) -> dict[str, Any]:
                 ]
             else:
                 body["mail_tos"] = to_desk
+    if cmd in ("retire", "rename", "reclaim") and str(getattr(args, "kind", "") or "") in ("roster", "label", "desk"):
+        # #537: the wall acts on the type named; a label may share its desk's name.
+        body["name_type"] = str(args.kind)
     if verb == "todo" and bool(getattr(args, "done", False)):
         body["done"] = True
     if verb == "todo" and bool(getattr(args, "fixtures", False)):

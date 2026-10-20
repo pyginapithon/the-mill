@@ -379,9 +379,9 @@ Trust default **high**; Admin may set **limited** (or back to high). Show: `mill
 | verb | intent | CALL |
 |---|---|---|
 | **`create roster`** | `mill create roster N [--yes]` creates a roster name (typed once; prompts unless `--yes`). high: any seated desk; limited: Admin | `mill_name_host` |
-| **`reclaim`** | Admin: undelete a retired name (name twice + `--yes`) | `mill_name_reclaim` |
-| **`rename`** | Admin (or desk self-rename by hash) | `mill_name_rename` |
-| **`retire`** | Admin: flag `name.deleted` | `mill_name_retire` |
+| **`reclaim`** | Admin: undelete a retired name (name twice + `--yes`). Acts on the TYPE named (F60). | `mill_name_reclaim` |
+| **`rename`** | Admin (or desk self-rename by hash). Acts on the TYPE named (F60). | `mill_name_rename` |
+| **`retire`** | Admin: flag `name.deleted`. Acts on the TYPE named: `retire label d1` leaves desk `d1` alone, as a desk-focus label needs; a request with no type for a name two types share is refused with both forms (F60). | `mill_name_retire` |
 | **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only | `mill_member_put` |
 | **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident | `mill_member_delete` |
 | **`trust`** | show office trust (any seated desk). `mill trust high` / `mill trust limited` = Admin set. Pack/wall must ship verb first | - |
