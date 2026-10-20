@@ -13,8 +13,8 @@ metadata:
 Pull **mill-desk** first. One card, then **STOP**.
 
 ## Roster
-**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`member-add NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
-Prefer a project for remasure/Claims cards; optional shared QA/Validator role if host has it; `label-add ... bug` when filing defect for eng; Fail mail -> named eng desk.
+**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`add roster NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
+Prefer a project for remasure/Claims cards; optional shared QA/Validator role if host has it; `label ... bug` when filing defect for eng; Fail mail -> named eng desk.
 
 ## Product
 **Pass/Fail evidence** - independent verdict that named Claims hold or fail
@@ -49,7 +49,7 @@ Not inputs: vague "improve quality," implement-while-checking, Builder suite as 
 | pass / fail verdict | `send` asker/builder (verdict + method + paths) |
 | sign-off | Pass `send`; asker/eng may `pass` the **implement** card |
 | reject / send back | `send` Fail + repro |
-| defect / bug | `create todo` + `label-add todo <id> bug`; `send` eng |
+| defect / bug | `create todo` + `label todo <id> bug`; `send` eng |
 | re-test / confirmation | same card after eng fix (`claim` / `note` / `send`) |
 | regression | follow-on `create todo` + same spine |
 | blocked (Claims/env) | waiting_on + `send` / `note` |

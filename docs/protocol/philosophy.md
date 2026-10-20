@@ -29,7 +29,7 @@ Another desk that wants the doorbell attaches its own watcher with `mill add`. M
 
 The desk that watches writes a deterministic program at `~/.mill/handlers/DESK_<desk>/` and arms `mill route` for that `type:HINT`. The program stays. Dropping the route does not delete it. It is not package code.
 
-Order: write the program, `mill route add` (`--owner` before the key), `mill connect` up, `mill add` on that activity, then a later write is the trigger. Exit 0. Drop the route and stop connect when the collab ends.
+Order: write the program, bring `mill connect` up, `mill route add` from that same parent shell (the desk is the sitting connect), `mill add` on that activity, then a later write is the trigger. Exit 0. Drop the route and stop connect when the collab ends.
 
 The playbook is [hint-handler/SKILL.md](hint-handler/SKILL.md).
 

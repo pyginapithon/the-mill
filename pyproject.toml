@@ -84,6 +84,8 @@ agent_coord = [
 "share/the-mill/docs/protocol/models" = ["docs/protocol/models/README.md"]
 "share/the-mill/docs/protocol/models/grok-bot" = ["docs/protocol/models/grok-bot/SKILL.md"]
 "share/the-mill/docs/protocol/hint-handler" = ["docs/protocol/hint-handler/COLD.md"]
+"share/the-mill/docs/protocol/hint-handler/examples" = ["docs/protocol/hint-handler/examples/stub_handler.py"]
+"share/the-mill/docs/protocol/hint-handler/tools/hint_handler" = ["docs/protocol/hint-handler/tools/hint_handler/__init__.py", "docs/protocol/hint-handler/tools/hint_handler/lib.py"]
 "share/the-mill/docs/skills" = [
   "docs/skills/README.md",
   "docs/skills/TEMPLATE.md",

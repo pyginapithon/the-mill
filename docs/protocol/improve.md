@@ -60,7 +60,7 @@ At a glance the human must see: who mill connect is up for, the plan (TODO), mai
 
 - **leftover-as-doorbell** / mill leftover verb: retired. Idle is mill connect + HINT (`none` -> **STOP**). Do not invent cards when idle.
 - **conform.md**: never shipped. SoT remains `tables.sql` + `skill.md`.
-- **spawn.md**: deleted; use [route.md](route.md).
+- **spawn.md**: vendor-poke program fallback (`<desk>.spawn`, `AGENT_COORD_SPAWN`, config `spawn` / `bot_wake_cmd`). The arm is [route.md](route.md).
 - Deep state/sequence ownership: later job. [states.md](states.md) may lag skill.md - prefer skill + tables.sql when unsure.
 
 ## SQL apply gate
