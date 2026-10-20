@@ -1,4 +1,4 @@
-"""note --supersedes marks a detail line superseded and puts the new text under it (#333)."""
+"""note --supersedes marks a detail line superseded and puts the new text under it (#333). Regression row F45 (card-edit)."""
 from __future__ import annotations
 
 import json
