@@ -405,11 +405,53 @@ NAME_TOKEN_REVIEWED = frozenset(
 )
 
 
-def text_has_personal_name_token(text: str) -> bool:
-    """True when text holds a Title-cased Latin token off the desk-word allow-list."""
+# The first word of a line, after an optional bullet, list number or card
+# number ("- ", "1. ", "2) ", "#338 "). Sentence case puts a capital there.
+_LINE_START_RE = re.compile(r"^[ \t]*(?:(?:[-*+>]|\d+[.)]|#\d+:?)[ \t]+)*([A-Z][a-z]{2,20})\b", re.MULTILINE)
+_WORDS_FILE = Path(__file__).resolve().parent / "hygiene_words.txt"
+_LOWER_WORD_RE = re.compile(r"\b[a-z]{3,21}\b")
+
+
+def ordinary_words(root: Path | None = None, *, staged: bool = False) -> set[str]:
+    """Lower-case words in the HEAD tree (or the index), plus hygiene_words.txt.
+
+    A word the tree uses in lower case is an ordinary word; a name never is.
+    A git error leaves only the word file, which is stricter, never looser.
+    """
+    words: set[str] = set()
+    where = ["--cached", "-E", "[a-z]{3,21}"] if staged else ["-E", "[a-z]{3,21}", "HEAD"]
+    try:
+        raw = subprocess.check_output(
+            ["git", "grep", "-h", "-o", "-w", "-I", *where, "--", "."],
+            cwd=root or mill_root(),
+            stderr=subprocess.DEVNULL,
+        )
+        words.update(_LOWER_WORD_RE.findall(raw.decode("utf-8", "replace")))
+    except (OSError, subprocess.CalledProcessError):
+        pass
+    try:
+        for ln in _WORDS_FILE.read_text(encoding="utf-8").splitlines():
+            ln = ln.split("#", 1)[0].strip()
+            if ln:
+                words.add(ln.casefold())
+    except OSError:
+        pass
+    return words
+
+
+def text_has_personal_name_token(text: str, vocab: set[str] | frozenset[str] = frozenset()) -> bool:
+    """True when text holds a Title-cased Latin token off the desk-word allow-list.
+
+    The first word of a line (after a bullet, list number or card number) also
+    passes when its lower-case form is in vocab, the ordinary words of the tree
+    (#338). Mid-line tokens keep the allow-list rule only.
+    """
     if not text:
         return False
+    starts = {m.start(1) for m in _LINE_START_RE.finditer(text) if m.group(1).casefold() in vocab}
     for match in _NAME_TOKEN_RE.finditer(text):
+        if match.start() in starts:
+            continue
         if match.group(0).casefold() not in DESK_WORD_ALLOWLIST:
             return True
     return False
@@ -764,6 +806,7 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
         return []
     cut_present = name_token_cut_present(root)
     name_revs = _name_token_scan_revs(root, cut_present)
+    vocab = ordinary_words(root)
     fails: list[str] = []
     # A shallow clone (the CI default depth) lacks the cut, and the rule
     # used to pass silently there. Fail closed so CI checks what a full clone does.
@@ -795,7 +838,7 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
             rev in name_revs
             and rev not in NAME_TOKEN_REVIEWED
             and not bot
-            and text_has_personal_name_token(body)
+            and text_has_personal_name_token(body, vocab)
         ):
             fails.append(f"personal name token in git commit {rev[:12]}")
     return fails

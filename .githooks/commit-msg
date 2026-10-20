@@ -1,6 +1,11 @@
 #!/bin/sh
 # Hygiene on the commit message. Setup: git config core.hooksPath .githooks
-root=$(git rev-parse --show-toplevel) || exit 1
+# The repo is the one this hook lives in, so it gives a verdict from any cwd (#338).
+root=$(cd "$(dirname "$0")/.." && pwd) || { echo "commit-msg: cannot find the repo; failing closed" >&2; exit 1; }
+if [ ! -f "$root/tools/precommit_hygiene.py" ]; then
+  echo "commit-msg: tools/precommit_hygiene.py not found beside this hook; failing closed" >&2
+  exit 1
+fi
 for py in python3 python py; do
   if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys; sys.exit(sys.version_info < (3, 8))" >/dev/null 2>&1; then
     exec "$py" "$root/tools/precommit_hygiene.py" msg "$1"
