@@ -123,7 +123,7 @@ def test_text_progress_token_is_progress_not_diary(store):
 def test_text_from_file_appends_diary(store):
     r = _note({"text": "long diary line from @file"})
     assert r["detail"] == "seed\nlong diary line from @file"
-    assert r["progress"] == ""
+    assert "progress" not in r  # #330: never-set progress is left out
     assert store.updates == 1
 
 
