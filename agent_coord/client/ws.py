@@ -532,6 +532,9 @@ WS_IN_USE_CLOSE = 4409
 _TERMINAL_CLOSE = frozenset({4401, 4000, WS_IN_USE_CLOSE})
 _RECONNECT_CAP_S = 60.0
 _RECONNECT_HEALTHY_S = 30.0
+# After a drop the office can still hold this desk's old socket until its ping
+# timeout; a -r reconnect refused (4409) inside this window retries (#336).
+_STALE_SEAT_S = 45.0
 
 
 def close_code_of(exc: BaseException | None) -> int | None:
@@ -1170,6 +1173,7 @@ async def _sit_session(
     opened = time.monotonic()
     mux_task: asyncio.Task | None = None
     terminal_code: int | None = None
+    dropped_at: float | None = None
 
     async def _pause(code: int | None) -> None:
         nonlocal attempt, opened
@@ -1179,7 +1183,8 @@ async def _sit_session(
         delay = reconnect_delay_s(attempt)
         attempt += 1
         secs = retry_notice_seconds(delay)
-        print(f"server restarting, retrying in {secs}s", file=sys.stderr, flush=True)
+        what = "seat still held by the dropped socket" if code == WS_IN_USE_CLOSE else "server restarting"
+        print(f"{what}, retrying in {secs}s", file=sys.stderr, flush=True)
         _bc_log(f"ws reconnect desk={who} in {secs}s code={code}")
         deadline = time.monotonic() + secs
         while not stop.is_set() and time.monotonic() < deadline:
@@ -1195,10 +1200,17 @@ async def _sit_session(
                 break
             exc = err_box.get("exc")
             code = close_code_of(exc)
-            if reconnect is None or code in _TERMINAL_CLOSE or exc is None:
+            stale = (
+                code == WS_IN_USE_CLOSE
+                and dropped_at is not None
+                and time.monotonic() - dropped_at < _STALE_SEAT_S
+            )
+            if reconnect is None or (code in _TERMINAL_CLOSE and not stale) or exc is None:
                 if code in _TERMINAL_CLOSE:
                     terminal_code = code
                 break
+            if code != WS_IN_USE_CLOSE:
+                dropped_at = time.monotonic()
             await _pause(code)
             if stop.is_set():
                 break
