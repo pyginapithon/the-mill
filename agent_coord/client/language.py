@@ -72,9 +72,9 @@ def _desks(raw: str) -> list[str]:
 
 
 def card_ref(raw: str, typ: str, verb: str) -> int | str:
-    """An activity id (a number above 0), or for a todo also ROSTER/NEED (#274).
+    """An activity id (a number above 0), a todo as ROSTER/NEED (#274), or a hold by name (#327).
 
-    Returns the int id, or the "roster/need" string for the server to resolve.
+    Returns the int id, or the "roster/need" or hold name string for the server to resolve.
     """
     text = str(raw or "").strip()
     if text.isdigit() and int(text) > 0:
@@ -91,6 +91,11 @@ def card_ref(raw: str, typ: str, verb: str) -> int | str:
         raise CoordError(
             f"{verb} todo: give the todo id (a number above 0) or ROSTER/NEED (for example cold-test/fix-login)"
         )
+    # #327: a hold by its resource name; the server resolves it to the hold id.
+    if typ == "hold" and text and not text.isdigit():
+        from agent_coord.helpers.bounds import resource_name
+
+        return resource_name(text)
     raise CoordError(f"{verb} {typ}: give the {typ} id (a number above 0)")
 
 

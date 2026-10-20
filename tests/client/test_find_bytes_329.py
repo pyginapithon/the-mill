@@ -1,4 +1,4 @@
-"""The bytes field matches the reply as printed, after --find and grouping (#329)."""
+"""The bytes field matches the reply as printed, after --find and grouping (#329). Regression row F46 (find-bytes)."""
 from __future__ import annotations
 
 import json
