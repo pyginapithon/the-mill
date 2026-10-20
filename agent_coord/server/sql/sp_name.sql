@@ -37,6 +37,11 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name already retired';
   END IF;
   UPDATE name SET deleted = MILL_NOW() WHERE id = v_id;
+  IF p_type = 'desk' THEN
+    -- #608: a retired desk keeps no seat. Same stamp as mill_join_reset.
+    UPDATE `join` SET token_hash = NULL, doing = '', time_disconnect = MILL_NOW()
+     WHERE desk_id = v_id AND token_hash IS NOT NULL;
+  END IF;
   SELECT v_id AS id, TRIM(p_name) AS name, p_type AS name_type, 'deleted' AS op;
 END //
 

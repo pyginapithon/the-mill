@@ -173,7 +173,7 @@ def _fetchone(cn, sql: str, args: tuple):
 
 
 def desk_for_token_hash(cn, digest: str) -> str:
-    """Desk whose join.token_hash equals digest. Empty when none.
+    """Desk whose join.token_hash equals digest. Empty when none or retired (#608).
 
     Point lookup. Does not call mill_join_select.
     """
@@ -182,7 +182,7 @@ def desk_for_token_hash(cn, digest: str) -> str:
         return ""
     find_hash = (
         "SELECT d.name FROM `join` j "
-        "JOIN name d ON d.id = j.desk_id AND d.type = 'desk' "
+        "JOIN name d ON d.id = j.desk_id AND d.type = 'desk' AND d.deleted IS NULL "
         "WHERE j.token_hash = %s LIMIT 1"
     )
     row = _fetchone(cn, find_hash, (digest,))
@@ -192,7 +192,7 @@ def desk_for_token_hash(cn, digest: str) -> str:
 
 
 def token_hash_for_desk(cn, desk: str) -> str | None:
-    """Stored token_hash for this desk. None when that seat row is absent."""
+    """Stored token_hash for this desk. None when that seat row is absent or the desk is retired (#608)."""
     from agent_coord.server.records.name import bare
 
     desk_b = bare(desk, CONST_DESK) if (desk or "").strip() else ""
@@ -200,7 +200,7 @@ def token_hash_for_desk(cn, desk: str) -> str | None:
         return None
     find_desk = (
         "SELECT j.token_hash FROM `join` j "
-        "JOIN name d ON d.id = j.desk_id AND d.type = 'desk' "
+        "JOIN name d ON d.id = j.desk_id AND d.type = 'desk' AND d.deleted IS NULL "
         "WHERE d.name = %s LIMIT 1"
     )
     row = _fetchone(cn, find_desk, (desk_b,))
