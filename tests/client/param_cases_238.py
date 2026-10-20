@@ -65,7 +65,7 @@ KIND = {
     ("inbox", "limit"): "int",
     ("connected", "project"): "name", ("connected", "limit"): "int",
     ("todo", "project"): "name", ("todo", "need"): "name", ("todo", "status"): "enum",
-    ("todo", "find"): "text",
+    ("todo", "find"): "text", ("todo", "page"): "int",
     ("create todo", "project"): "name", ("create todo", "need"): "newname",
     ("create todo", "doing"): "text", ("create todo", "detail"): "text", ("create todo", "detail_file"): "name",
     ("create todo", "status"): "enum", ("create todo", "parent_type"): "enum",

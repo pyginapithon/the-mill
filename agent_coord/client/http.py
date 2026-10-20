@@ -717,11 +717,19 @@ def mill_http_from_args(args: Any) -> int:
     from agent_coord.client.outbound import body_from_args
 
     find = todo_find_text(args)
+    from agent_coord.client import todo_rows
+
+    # #295: the board lists short rows, paged; --full keeps today's reply.
+    short_rows = todo_rows.applies(args, find)
+    page_block: dict | None = None
     # Lock: never let argv --owner rewrite session active / Bearer.
     body = body_from_args(args)
     row = _todo_call(args, body)
     if find:
         row = _todo_find(row, find)
+    if short_rows and isinstance(row, dict) and row.get("ok") is True and isinstance(row.get("result"), list):
+        part, page_block = todo_rows.cut(row["result"], int(getattr(args, "page", 0) or 0))
+        row = dict(row, result=part)
     row = _said_verb(row, str(getattr(args, "said_verb", "") or ""))
     if bool(getattr(args, "raw", False)):
         row = _unwrap_cli_raw(row)
@@ -772,6 +780,9 @@ def mill_http_from_args(args: Any) -> int:
         row["result"] = res
         if note:
             row["note"] = note
+    if page_block is not None:
+        row = dict(row, result=todo_rows.short(row["result"], str(page_block.get("roster") or "")))
+        row["page"] = page_block
     refused_hold = isinstance(row, dict) and _refused_hold(args, row)
     if refused_hold:
         row = _hold_refusal(row)
