@@ -24,7 +24,7 @@ def _mill_home(tmp_path, monkeypatch):
 
 
 def _starting_then_sitting(monkeypatch, desk: str = "alice") -> dict:
-    """Not sitting on the first look; the connect sits a moment later."""
+    """Not sitting on the first look; the connect sits on a later look."""
     seen = {"n": 0}
 
     def bridge(parent_pid=None):
