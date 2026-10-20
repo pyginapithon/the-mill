@@ -17,7 +17,7 @@ def _letter(body: str) -> dict:
 
 
 def test_a_typical_lead_letter_arrives_whole():
-    body = ("Read all of it before you act on any card. " * 6) + "Card 531 is a decoy: do not work it."
+    body = ("Read all of it before you act on any card. " * 7) + "Card 531 is a decoy: do not work it."
     assert 300 < len(body) <= BODY_CAP
     item = compact_mail(_letter(body), DESTS, "d1")
     assert item["body"] == body

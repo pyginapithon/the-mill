@@ -99,7 +99,7 @@ HINT:
 {"kind": "hint", "type": "todo", "id": 12, "hint": "TODO", "detail": "", "outcome": "sent", "time": "2026-09-27T00:00:00"}
 ```
 
-MAIL, one per `mail_to` desk. `body` is at most 256 characters. `mail_tos` is every recipient, not only you. `opened` and `receipt` are your row. Sync MAIL item shape is not the lean letter cast (`sender` / `mail_tos` here are strings; cast uses objects).
+MAIL, one per `mail_to` desk. `body` is whole up to 1024 characters; a longer one is cut there and the item adds `body_trunc` true, `body_chars` and `read` (`mill mail-thread <id>`), F63. A receipt item marks a cut the same way. `mail_tos` is every recipient, not only you. `opened` and `receipt` are your row. Sync MAIL item shape is not the lean letter cast (`sender` / `mail_tos` here are strings; cast uses objects).
 
 ```json
 {
