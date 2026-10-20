@@ -44,13 +44,16 @@ CHART = [
 
 
 @pytest.fixture
-def cn():
+def cn(monkeypatch):
     import mysql.connector
 
     kw = _conn_kwargs()
     kw.pop("database", None)
     kw["autocommit"] = True
-    admin = mysql.connector.connect(**kw)
+    try:
+        admin = mysql.connector.connect(**kw)
+    except mysql.connector.Error as e:
+        pytest.skip(f"mysql mill records: {e}")
     cur = admin.cursor()
     cur.execute(
         f"CREATE DATABASE IF NOT EXISTS `{TEST_DB}` "
@@ -58,7 +61,7 @@ def cn():
     )
     cur.close()
     admin.close()
-    os.environ["AGENT_COORD_DATABASE"] = TEST_DB
+    monkeypatch.setenv("AGENT_COORD_DATABASE", TEST_DB)
     c = connect(TEST_DB)
     apply(c, wipe=True)
     yield c
