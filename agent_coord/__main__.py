@@ -148,8 +148,44 @@ def _welcome_desk_bare(url: str) -> str:
         (parts.scheme, parts.netloc, parts.path, urlencode(bare_pairs), parts.fragment)
     )
 
+_INVITE_SECRET_KEYS = ("token", "seat", "invite_url", "invite_path")
+
+
+def _invite_link_file(args, name: str, link: str) -> "Path":
+    """Write a welcome or invite link to a file only this user can read (#359).
+
+    Default: <mill home>/invites/<name>-<UTC stamp>.link, the folder 0700 and
+    the file 0600 (icacls on Windows), like the seat token. --link-file PATH
+    picks the file; an existing file is never overwritten.
+    """
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from agent_coord.client.tokens import _restrict_owner_only, mill_home
+
+    chosen = str(getattr(args, "link_file", "") or "").strip()
+    if chosen:
+        path = Path(chosen).expanduser()
+    else:
+        folder = mill_home() / "invites"
+        folder.mkdir(parents=True, exist_ok=True)
+        _restrict_owner_only(folder, is_dir=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        safe = "".join(ch if ch.isalnum() or ch in "-_." else "-" for ch in (name or "invite"))[:64]
+        path = folder / f"{safe}-{stamp}.link"
+    fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(link + "\n")
+    _restrict_owner_only(path)
+    return path
+
+
 def _invite_cmd(args) -> int:
-    """POST /mill/v1/invite. The wall opens the book. This machine does not."""
+    """POST /mill/v1/invite. The wall opens the book. This machine does not.
+
+    A minted link carries a secret (the seat or the invite key), so it goes to
+    a 0600 file and stdout names the file (#359); --print-link prints it.
+    """
     from agent_coord.client.outbound import body_from_args
     from agent_coord.client.http import mill_http_call
 
@@ -162,35 +198,57 @@ def _invite_cmd(args) -> int:
     if not isinstance(row, dict):
         print(json.dumps(row, default=str), flush=True)
         return 0
-    path = str(row.get("invite_path") or "")
-    token = row.pop("token", None)
-    seat = row.pop("seat", None)
-    invite_url = str(row.pop("invite_url", "") or "")
+    row = dict(row)
+    # The wall answers an envelope {ok, result: {...}}; older walls a flat row.
+    inner = dict(row["result"]) if isinstance(row.get("result"), dict) else row
+    found = {k: inner.pop(k, None) or row.pop(k, None) for k in _INVITE_SECRET_KEYS}
+    if inner is not row:
+        row["result"] = inner
+    path = str(found["invite_path"] or "")
+    token = found["token"]
+    seat = found["seat"]
+    invite_url = str(found["invite_url"] or "")
     if not path and token:
         path = "/?invite=" + str(token)
-    if row.get("desk"):
+    if inner.get("desk"):
         from agent_coord.helpers.ident import desk_name
 
-        row["desk"] = desk_name(str(row["desk"]))
-    public = {k: v for k, v in row.items() if k not in ("token", "seat")}
-    _print(public)
+        inner["desk"] = desk_name(str(inner["desk"]))
+    link = ""
     if invite_url:
-        print(_welcome_desk_bare(invite_url), flush=True)
+        link = _welcome_desk_bare(invite_url)
     elif path:
-        print(_invite_url(path), flush=True)
-    elif seat and row.get("desk"):
+        link = _invite_url(path)
+    elif seat and inner.get("desk"):
         from urllib.parse import urlencode
 
-        print(
-            _invite_url("/welcome?" + urlencode({"desk": row["desk"], "seat": seat})),
-            flush=True,
-        )
+        link = _invite_url("/welcome?" + urlencode({"desk": inner["desk"], "seat": seat}))
+    if link and bool(getattr(args, "print_link", False)):
+        _print(row)
+        print(link, flush=True)
+    elif link:
+        try:
+            where = _invite_link_file(args, str(inner.get("desk") or inner.get("key_id") or "invite"), link)
+        except OSError as e:
+            _print(row)
+            print(
+                f"mill invite: could not write the link file ({e.strerror or e}); "
+                "nothing printed. Rerun with --link-file PATH, or --print-link to print it",
+                file=sys.stderr,
+                flush=True,
+            )
+            return 1
+        inner["link_file"] = str(where)
+        inner["link"] = "written to link_file (owner-only); hand it over privately; --print-link prints it instead"
+        _print(row)
+    else:
+        _print(row)
     if body.get("mint") or body.get("rotate"):
         print(
-            f"mill invite --enable {row.get('key_id')}  # connect desk={body.get('owner') or ''}",
+            f"mill invite --enable {inner.get('key_id')}  # connect desk={body.get('owner') or ''}",
             flush=True,
         )
-    if row.get("ok") is False or row.get("error"):
+    if row.get("ok") is False or row.get("error") or inner.get("ok") is False:
         return 1
     return 0
 
@@ -1096,6 +1154,19 @@ def _build_parser() -> MillArgumentParser:
         help="with --seat: seat roster (default: that desk's one non-Office roster)",
     )
     inv.add_argument("--label", default="", help="label for --mint")
+    inv.add_argument(
+        "--link-file",
+        default="",
+        dest="link_file",
+        metavar="PATH",
+        help="with --seat/--mint/--rotate: write the link here (owner-only; default under ~/.mill/invites)",
+    )
+    inv.add_argument(
+        "--print-link",
+        action="store_true",
+        dest="print_link",
+        help="print the secret link on stdout instead of writing a file",
+    )
     inv.add_argument("--join", default="", metavar="KEY", help="record a join under key_id")
     inv.add_argument("--party", choices=["human", "agent"], default="human", help="with --join")
     inv.add_argument("party_id", nargs="?", default="", help="human/agent id for --join")

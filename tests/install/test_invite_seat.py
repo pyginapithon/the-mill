@@ -217,9 +217,15 @@ def test_cli_invite_seat_posts_invite_seat_verb(monkeypatch, capsys) -> None:
     assert seen["verb"] == "invite-seat"
     assert seen["desk"] == "bot3"
     assert seen["project"] == "the-mill"
-    assert "https://203.0.113.10/welcome?desk=bot3&seat=S3" in out
+    # #359: the welcome link goes to an owner-only file, not stdout.
+    assert "S3" not in out
     assert "DESK_bot3" not in out
-    assert '"seat"' not in out  # plaintext only on URL line
+    assert '"seat"' not in out
+    import json
+    from pathlib import Path
+
+    where = json.loads(out)["link_file"].replace("~", str(Path.home()), 1)
+    assert Path(where).read_text(encoding="utf-8").strip() == "https://203.0.113.10/welcome?desk=bot3&seat=S3"
 
 
 def test_post_invites_cognito_cookie_mints_on_high(monkeypatch) -> None:
