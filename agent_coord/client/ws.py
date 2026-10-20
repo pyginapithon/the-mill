@@ -875,8 +875,12 @@ async def _sit_session(
     bridge_host: str = "127.0.0.1",
     reconnect: Any = None,
     outcome: dict | None = None,
+    first_frame: str | None = None,
 ) -> None:
     """One sitting /ws: multiplex HINT vs RPC; thread TCP bridge for mill_ws_call.
+
+    first_frame is a frame the caller already read (connect -r reads the first
+    frame before this bridge is published, #332); it is handled first.
 
     reconnect, when set, is an async callable that returns a new socket.
     A recoverable close keeps this bridge up and calls it after backoff.
@@ -1155,6 +1159,13 @@ async def _sit_session(
     clear_connect_starting(who, pid=my_pid)
     note_bridge_ready(who)
     _bc_log(f"ws rpc bridge up desk={who} port={port}")
+    if first_frame is not None:
+        try:
+            first = json.loads(first_frame)
+        except json.JSONDecodeError:
+            first = None
+        if isinstance(first, dict):
+            await on_frame(first)
     attempt = 0
     opened = time.monotonic()
     mux_task: asyncio.Task | None = None
@@ -1299,8 +1310,14 @@ def run_ws_loop(
             sit_url = url.split("?")[0]
             print(_json_line({"backchannel": "ws", "url": sit_url, "desk": who}), flush=True)
             _bc_log(f"ws recv sit desk={who} url={sit_url}")
+            # connect -r: the office sends the sync only once the seat is ours, so
+            # read it before publishing a bridge; a refusal (4409) raises here and
+            # never touches the holder's bridge file on this computer (#332).
+            first = await ws.recv() if refuse else None
             try:
-                await _sit_session(ws, who, stop, buf, reconnect=_reopen, outcome=outcome)
+                await _sit_session(
+                    ws, who, stop, buf, reconnect=_reopen, outcome=outcome, first_frame=first
+                )
             finally:
                 for ctx in extras:
                     try:

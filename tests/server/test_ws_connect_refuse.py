@@ -168,3 +168,19 @@ def test_ws_refuse_sits_on_a_free_seat(client) -> None:
     with client.websocket_connect("/ws/alice?refuse=1", headers=HDR) as ws:
         assert json.loads(ws.receive_text())["kind"] == "sync"
         assert len(HUB.rooms.get("alice") or ()) == 1
+
+
+def test_ws_refuse_reason_fits_the_close_frame(client, monkeypatch) -> None:
+    """A close reason is at most 123 UTF-8 bytes; a long non-ASCII desk still gets 4409."""
+    long_desk = "\u00e9" * 100
+
+    async def _held(desk, ws, *, refuse=False):
+        return {"desk": long_desk, "since": "2026-10-19T23:00:00Z"}
+
+    monkeypatch.setattr(HUB, "add", _held)
+    with client.websocket_connect("/ws/alice?refuse=1", headers=HDR) as ws:
+        with pytest.raises(WebSocketDisconnect) as ei:
+            ws.receive_text()
+    assert ei.value.code == WS_IN_USE
+    assert len(ei.value.reason.encode("utf-8")) <= 123
+    assert ei.value.reason.startswith("seat in use: ")

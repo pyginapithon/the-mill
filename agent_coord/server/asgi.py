@@ -48,11 +48,12 @@ def ws_auth_close(exc: BaseException) -> tuple[int, str]:
 def _note_connect(c: Any, want: str) -> None:
     """Record the /ws connect (JOIN fanout). Only a connect that sits is recorded (#332)."""
     from agent_coord.server.records import join as rec_join
+    from agent_coord.server.redact import redact_format
 
     try:
         rec_join.note_connect(c._cn, want)
     except Exception as e:
-        _log.warning("ws connect activity err=%s", type(e).__name__)
+        _log.warning("%s", redact_format("ws connect activity err=%s", type(e).__name__))
 
 
 def latency_snapshot() -> dict[str, float | int]:
@@ -527,8 +528,10 @@ def make_asgi_app(
             _log.warning("%s", redact_format("ws add fail desk=%s err=%s", desk, e))
         if held:
             since = f" since {held['since']}" if held.get("since") else ""
+            # A close reason is at most 123 UTF-8 bytes.
+            reason = f"seat in use: {held['desk']}{since}".encode("utf-8")[:123].decode("utf-8", "ignore")
             try:
-                await websocket.close(code=WS_IN_USE, reason=f"seat in use: {held['desk']}{since}"[:120])
+                await websocket.close(code=WS_IN_USE, reason=reason)
             except Exception:
                 pass
             return
@@ -540,7 +543,7 @@ def make_asgi_app(
                 with Book() as c:
                     _note_connect(c, desk_name(desk))
             except Exception as e:
-                _log.warning("ws connect activity err=%s", type(e).__name__)
+                _log.warning("%s", redact_format("ws connect activity err=%s", type(e).__name__))
         try:
             from agent_coord.helpers.ident import desk_name
             from agent_coord.server.book import Book

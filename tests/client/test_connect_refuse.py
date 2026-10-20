@@ -133,3 +133,39 @@ def test_plain_connect_passes_refuse_to_the_socket(monkeypatch) -> None:
                            foreground=False, refuse=True)
     assert http_cli.mill_here_over_http(args) == 6
     assert seen["refuse"] is True
+
+
+def test_refused_connect_leaves_the_local_holder_bridge(monkeypatch, capsys) -> None:
+    """Holder and connect -r on one computer share the bridge file: a refusal must not touch it."""
+    holder = ws_cli.write_rpc_bridge("alice", port=40001, secret="holder", pid=1, parent_pid=1)
+    before = holder.read_text(encoding="utf-8")
+
+    class _Refused:
+        async def recv(self):
+            raise ConnectionClosedError(ws_cli.WS_IN_USE_CLOSE, REASON)
+
+        async def send(self, text):
+            pass
+
+    class _CM:
+        async def __aenter__(self):
+            return _Refused()
+
+        async def __aexit__(self, *a):
+            return False
+
+    seen: list[str] = []
+
+    def _connect(url, **kw):
+        seen.append(url)
+        return _CM()
+
+    monkeypatch.setattr(ws_cli, "mill_ws_url", lambda desk: "ws://127.0.0.1/ws/alice")
+    monkeypatch.setattr("websockets.connect", _connect)
+    stop = threading.Event()
+    outcome: dict = {}
+    ws_cli.run_ws_loop("alice", "seat", stop, None, outcome, True)
+    assert seen == ["ws://127.0.0.1/ws/alice?refuse=1"]
+    assert outcome["exit"] == 6
+    assert holder.read_text(encoding="utf-8") == before
+    assert '"ready"' not in capsys.readouterr().out
