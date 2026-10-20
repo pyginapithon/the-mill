@@ -169,3 +169,84 @@ def test_refused_connect_leaves_the_local_holder_bridge(monkeypatch, capsys) -> 
     assert outcome["exit"] == 6
     assert holder.read_text(encoding="utf-8") == before
     assert '"ready"' not in capsys.readouterr().out
+
+
+class _Seq:
+    """A socket whose recv raises one close, or blocks until stop when fail is None."""
+
+    def __init__(self, fail, stop):
+        self.fail, self.stop = fail, stop
+
+    async def send(self, text):
+        pass
+
+    async def recv(self):
+        if self.fail is not None:
+            raise self.fail
+        import asyncio as _a
+
+        while not self.stop.is_set():
+            await _a.sleep(0.01)
+        raise ConnectionClosedError(1000, "")
+
+
+@pytest.fixture
+def _fast_retry(monkeypatch):
+    monkeypatch.setattr(ws_cli, "reconnect_delay_s", lambda attempt, jitter=None: 0.0)
+    monkeypatch.setattr(ws_cli, "retry_notice_seconds", lambda delay: 0)
+
+
+def test_reconnect_retries_4409_from_its_own_stale_socket(_fast_retry, capsys) -> None:
+    """#336: after a drop, a 4409 inside the stale-socket window is retried, not exit 6."""
+    stop = threading.Event()
+    outcome: dict = {}
+    socks = [ConnectionClosedError(ws_cli.WS_IN_USE_CLOSE, REASON), None]
+    calls: list[int] = []
+
+    async def reopen():
+        calls.append(1)
+        fail = socks.pop(0)
+        if fail is None:
+            asyncio.get_running_loop().call_later(0.05, stop.set)
+        return _Seq(fail, stop)
+
+    async def go() -> None:
+        first = _Seq(ConnectionClosedError(1012, "restart"), stop)
+        await ws_cli._sit_session(first, "alice", stop, None, reconnect=reopen, outcome=outcome)
+
+    asyncio.run(go())
+    assert calls == [1, 1]
+    assert "exit" not in outcome
+    assert "seat in use" not in capsys.readouterr().out
+
+
+def test_reconnect_4409_after_the_window_exits_6(_fast_retry, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(ws_cli, "_STALE_SEAT_S", 0.0)
+    stop = threading.Event()
+    outcome: dict = {}
+
+    async def reopen():
+        return _Seq(ConnectionClosedError(ws_cli.WS_IN_USE_CLOSE, REASON), stop)
+
+    async def go() -> None:
+        first = _Seq(ConnectionClosedError(1012, "restart"), stop)
+        await ws_cli._sit_session(first, "alice", stop, None, reconnect=reopen, outcome=outcome)
+
+    asyncio.run(go())
+    assert outcome["exit"] == 6
+    assert "seat in use" in capsys.readouterr().out
+
+
+def test_first_sit_4409_is_not_retried(_fast_retry) -> None:
+    stop = threading.Event()
+    outcome: dict = {}
+
+    async def reopen():
+        raise AssertionError("a refused first sit must not reconnect")
+
+    async def go() -> None:
+        first = _Seq(ConnectionClosedError(ws_cli.WS_IN_USE_CLOSE, REASON), stop)
+        await ws_cli._sit_session(first, "alice", stop, None, reconnect=reopen, outcome=outcome)
+
+    asyncio.run(go())
+    assert outcome["exit"] == 6

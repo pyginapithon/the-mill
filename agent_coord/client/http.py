@@ -783,6 +783,17 @@ def mill_http_from_args(args: Any) -> int:
         row["ok"] = False
     if isinstance(row, dict):
         public = {k: v for k, v in row.items() if k != "token"}
+        if "bytes" in public:
+            # #329: --find, grouping and room pointers reshape the reply here, so
+            # bytes is the size of the line printed. When the wall sent more
+            # (--find filters on the desk), wire_bytes keeps what the read cost.
+            from agent_coord.server.mill_json import with_bytes
+
+            wire = public.pop("bytes")
+            printed, n = with_bytes(public)
+            if isinstance(wire, int) and wire != n:
+                printed, n = with_bytes(dict(public, wire_bytes=wire))
+            public = printed
         # Error JSON goes to stderr. A refused hold or drop stays on stdout
         # with ok false and exit 1 (#193, #227).
         failed = (
