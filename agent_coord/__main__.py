@@ -987,7 +987,10 @@ def _build_parser() -> MillArgumentParser:
 
     asn = sub.add_parser(
         "assign",
-        help="Chief/validator: mill assign PROJECT NEED DESK (claimed by dest). mill send optional.",
+        help=(
+            "Put DESK on an unassigned card: mill assign ROSTER NEED DESK. A claimed card is"
+            " refused; to hand off your own card, unclaim it first. Trust: high any desk, limited Admin."
+        ),
     )
     asn.add_argument("project")
     asn.add_argument("need")
