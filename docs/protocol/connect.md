@@ -72,9 +72,9 @@ flowchart LR
 
 Same Hub. Same `{type,id,hint,detail}`. `hint` stays `MAIL`/`TODO` (route key). **`detail`** is this desk's `watcher.hint` or the default ([hints.md](hints.md)).
 
-**Today:** background mill connect is the sibling process (route/spawn). **CLI foreground:** mill connect-wait blocks **that** mill process on /ws until **one** work HINT (skips PING) or a non-empty queue (an empty queue keeps waiting), prints it as JSON, exits - no mill route spawn. Build shells it as this turn, then mill-fetch. Break-out = interrupt that mill CLI (Ctrl+C). Esc still does **not** cancel mill connect. True in-chat inject (HINT turns the TUI without a mill CLI) is still **not** built. mill_wait is a short poll, not this. Do not sell in-TUI foreground until inject exists.
+**Today:** background mill connect is the sibling process (route/spawn). **CLI foreground:** mill connect-wait blocks **that** mill process on /ws until **one** work HINT (skips PING) or a non-empty queue (an empty queue keeps waiting; so does one whose items a live connect of this desk already got, outcome `sent`), prints it as JSON, exits - no mill route spawn. Build shells it as this turn, then mill-fetch. Break-out = interrupt that mill CLI (Ctrl+C). Esc still does **not** cancel mill connect. True in-chat inject (HINT turns the TUI without a mill CLI) is still **not** built. mill_wait is a short poll, not this. Do not sell in-TUI foreground until inject exists.
 
-Regression row F28 (connect-wait-holds).
+Regression row F28 (connect-wait-holds). Regression row F44 (connect-wait-sent).
 
 Seatless connect: `mill connect NAME` when this computer holds no seat for NAME prints one line on stderr and exits 2, before anything connects: `mill connect: no seat for NAME on this computer; a desk joins once with mill join '<welcome-link>' from the office host (a roster is not a desk: mill connected ROSTER lists its desks)`. The line is the same for a roster, an unknown name and an unjoined desk, and the client asks the office nothing, so the refusal never tells which names exist. Regression row F30 (connect-seatless).
 

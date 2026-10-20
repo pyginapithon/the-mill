@@ -1365,6 +1365,11 @@ def run_ws_loop(
         clear_connect_starting(desk, pid=os.getpid())
 
 
+def _undelivered(item: Any) -> bool:
+    """A sync item not already handed to a live socket of this desk (#328)."""
+    return not (isinstance(item, dict) and str(item.get("outcome") or "") == "sent")
+
+
 def wait_one_hint(
     desk: str,
     token: str,
@@ -1388,7 +1393,8 @@ def wait_one_hint(
 
     hold_empty_sync defaults false: an empty sync list returns. mill
     connect-wait and mill-hold pass true: an empty list keeps the socket
-    until the next hint or a non-empty list (card #278).
+    until the next hint or a non-empty list (card #278). A list whose items
+    were all sent live already counts as empty (card #328).
     """
     try:
         import websockets
@@ -1478,7 +1484,9 @@ def wait_one_hint(
                     items = msg.get("sync")
                     queued = items if isinstance(items, list) else []
                     # Whole list is the queue. Do not drop a missed JOIN inside it.
-                    if hold_empty_sync and not queued:
+                    # An item a sitting connect of this desk already got (outcome
+                    # sent) does not end the wait; an undelivered one does (#328).
+                    if hold_empty_sync and not any(_undelivered(it) for it in queued):
                         continue
                     return {
                         "ok": True,
