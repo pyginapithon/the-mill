@@ -320,7 +320,7 @@ DESK_WORD_ALLOWLIST = frozenset(
         "email", "empty", "end", "entry", "error", "errors",
         "every", "evidence", "example", "expect", "fail", "false",
         "fastapi", "fetch", "few", "file", "files", "find",
-        "first", "fix", "fixtures", "flag", "floor", "follow",
+        "first", "fix", "fixtures", "flag", "floor", "focus", "follow",
         "for", "from", "front", "full", "function", "functions",
         "garden", "gardener", "get", "git", "gitlab", "given",
         "glance", "go", "graph", "graphs", "group", "high",

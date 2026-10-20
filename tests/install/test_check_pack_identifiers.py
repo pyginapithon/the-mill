@@ -156,6 +156,7 @@ def test_commit_message_allowlisted_tokens_pass() -> None:
         "Add name-token scan to commit-message hygiene",
         "Speech for labels; Refuse an unknown project",
         "Without -r the newest connect wins. Regression row F43 (connect-refuse).",
+        "ranks a card for it. Focus cards are the ones the desk can work on.",
         "",
     ):
         assert not mod.text_has_personal_name_token(text), text
