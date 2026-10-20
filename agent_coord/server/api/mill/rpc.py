@@ -1856,7 +1856,7 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
 
     supersedes = str(body.get("supersedes") or "").strip()
     if "supersedes" in body and not supersedes:
-        # A blank OLD_LINE must not fall through to a plain note or a --replace overwrite.
+        # A blank OLD_LINE must not fall through to a plain note.
         raise CoordError("note: --supersedes needs the old line; copy it from mill todo")
     if supersedes and not note_s:
         raise CoordError("note: --supersedes needs the new text (--note TEXT)")
@@ -1866,16 +1866,19 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         raise CoordError(
             "note: nothing to write (give text such as 9/12 or 75%, @file, --note, --eta, or --started)"
         )
-    replace = bool(body.get("replace"))
+    if body.get("replace"):
+        # #539: notes are append-only; an overwrite would skip the history F45 keeps.
+        raise CoordError(
+            "note: notes append; there is no replace (to correct a line: mill note PROJECT NEED --supersedes OLD_LINE --note NEW)"
+        )
     if supersedes:
         payload["detail"] = _supersede_line(
-            c, hit, project, owner, str(payload.get("detail") or ""), supersedes, note_s, replace
+            c, hit, project, owner, str(payload.get("detail") or ""), supersedes, note_s
         )
     elif note_s:
         # The card's whole stored body is the bound, checked once below (#360).
         prev = str(payload.get("detail") or "")
-        base = "" if replace or not prev.strip() else prev
-        payload["detail"] = note_s if not base else base + "\n" + note_s
+        payload["detail"] = note_s if not prev.strip() else prev + "\n" + note_s
     progress = rec_todo.format_progress(prog_text)
     if progress:
         payload["progress"] = progress
@@ -1926,7 +1929,7 @@ SUPERSEDED = "[superseded] "
 
 
 def _supersede_line(
-    c: Book, hit: dict, project: str, owner: str | None, detail: str, old: str, new: str, replace: bool
+    c: Book, hit: dict, project: str, owner: str | None, detail: str, old: str, new: str
 ) -> str:
     """note --supersedes (#333): the matching detail line stays, marked, with the new text under it.
 
@@ -1935,8 +1938,6 @@ def _supersede_line(
     """
     from agent_coord.server.admin.guard import is_role_admin
 
-    if replace:
-        raise CoordError("note: --supersedes keeps history; not with --replace")
     who = _stored(owner or "")
     ask = _desk_slug(c._cn, hit, "asker", "creator")
     if who != ask and not is_role_admin(c._cn, owner or ""):
