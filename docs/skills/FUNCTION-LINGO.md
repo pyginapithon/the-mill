@@ -10,7 +10,7 @@ Industry verbiage for **what each office function ships** (product/artifact) and
 
 Sources (public glossaries): GitHub/PR & release terms; ISTQB testing glossary; SRE/incident (Google/Atlassian/incident.io); ITIL 4 service desk. Sales/people/legal rows use common CRM/ATS practice language.
 
-**Roster:** when mapping office lingo into mill todos/mail, pick one roster name (bare name; type `roster`); use `label-add` for classification (label `bug`, ...). See mill-desk Roster Guard + office-* Roster. If the ask omits one, ask the human which roster - do not invent.
+**Roster:** when mapping office lingo into mill todos/mail, pick one roster name (bare name; type `roster`); use `label` for classification (label `bug`, ...). See mill-desk Roster Guard + office-* Roster. If the ask omits one, ask the human which roster - do not invent.
 
 ## Legend - mill primitives (stable)
 

@@ -153,7 +153,7 @@ After `mill update` / `pip install -U the-mill`: **(1)** recopy skill.md to mill
 - **trust:** show `mill trust` = any seated desk. Set `mill trust high` / `mill trust limited` = Admin. Pack/wall must ship verb first. Chart: `docs/requirements/admin.md` (repo only; not in a day-one pack, not needed on day one).
 - **Asker/dest:** cast Asker wins over card.asker; send dest = desk name (type desk).
 - **Secrets:** warn your human coworker before putting SSN/national IDs, payment cards, passwords/tokens, or private home addresses into `note` / `send` / todo `detail` / `doing`. Transmit those over a secure channel (vault, Drive/doc link, HRIS/ATS/CLM/ERP). Mill may server-redact on paste. Public business addresses and non-secret URLs are fine.
-- **Roster:** one project name or one role name. `label-add` is not roster. Ask if the ask omits it.
+- **Roster:** one project name or one role name. `label` is not a roster. Ask if the ask omits it.
 
 ### Model skill
 
@@ -167,7 +167,7 @@ HINT recipes: `docs/protocol/hints.md` (repo only; not in a day-one pack, not ne
 
 Inbound frame: `{"type","id","hint","detail"?}`. `hint` is the type in capitals: TODO, HOLD, SCORE or JOIN (route key `type:hint`). Mail is not a hint frame: a send or reply arrives as `{kind: mail}`. `detail` is this desk's `watcher.hint` recipe, or a cheap default (what/when/tree crumbs/watcher count) when NULL. Match `type:hint`. Prefer acting from `detail` when present; else mill-fetch. A `sync` item uses the same route key when `kind` is `hint`. `kind: sync` is a JSON list, the push queue. A missed JOIN in that list is a queue item, not a frame to ignore. What this runtime does with that list is the model skill, not this file. A `kind` of `mail` is desk unread via `inbox` (not room catch-up; use `mail-thread` for TREE/rooms). A `kind` of `receipt` is news that your mail was opened.
 
-Activity kinds: **mail**, **todo**, **join**, **hold**, **score**. `name` is a catalog row, not an activity and not a watcher target. Hub PING is heartbeat keep-alive, not an activity. **label-add** and **tree** (`attach` / `move` / `prune` / `detach`) work on any of those five. A watcher is `todo`, `join`, `hold`, or `score`. Mail is not a watcher type. Label-add pokes the tagged activity. A plan is a tree name. A hidden plan is 10 hex. Tree is structure, not an activity kind. A card on two plans fails closed until a tree name is passed.
+Activity kinds: **mail**, **todo**, **join**, **hold**, **score**. `name` is a catalog row, not an activity and not a watcher target. Hub PING is heartbeat keep-alive, not an activity. **label** and **tree** (`attach` / `move` / `prune` / `detach`) work on any of those five. A watcher is `todo`, `join`, `hold`, or `score`. Mail is not a watcher type. Nothing emits `name:NAME`. `label` pokes the tagged activity when that activity has a watcher. A plan is a tree name. A hidden plan is 10 hex. Tree is structure, not an activity kind. A card on two plans fails closed until a tree name is passed.
 
 ### Outbound (human chat -> mill)
 
@@ -318,7 +318,7 @@ Lean MAIL letter: `id`, `created`, `sender {deskId, roster}`, `body`, `mail_tos[
 
 ### todo
 
-CLI `<project>` = activity **roster_id** - one project name or one role name. Labels via `label-add` are orthogonal (day-one: `bug`). Prefer a real project or role; do not invent one.
+CLI `<project>` = activity **roster_id** - one project name or one role name. Labels via `label` are orthogonal (day-one: `bug`). Prefer a real project or role; do not invent one.
 
 
 | verb | intent | CALL |
@@ -359,8 +359,8 @@ CLI `<project>` = activity **roster_id** - one project name or one role name. La
 
 | verb | intent | CALL |
 |---|---|---|
-| **`label-add`** | Tag an activity with a label name. Optional `--ord N` (0 pinned, 65535 unplaced). An unknown name is refused: `mill label NAME NAME --yes`. | `mill_label_put` |
-| **`label-remove`** | Drop a label. A missing node, an unknown label, or a label not on the node is refused on the call (#245). | `mill_label_delete` |
+| **`label`** | `mill label TYPE ID NAME [--ord N]`. Tag an activity. `--ord` is 0 pinned, 65535 unplaced. A new label is created on first use when trust is high; limited trust: `mill create label NAME` (Admin). | `mill_label_put` |
+| **`unlabel`** | `mill unlabel TYPE ID NAME`. Drop a label. A missing node, an unknown label, or a label not on the node is refused on the call (#245). | `mill_label_delete` |
 | **`score`** | record a point, set a target, read one series, list the roster, or retire a score (F31, F36-F40) | `mill_score_point_add` / `mill_score_define` / `mill_score_points` / `mill_score_retire` |
 | **`add`** | `mill add TYPE:ID [WHO] [--hint TEXT]`. TYPE:ID is always typed (ids repeat across kinds); a bare id exits 1 with the hint `TYPE is roster (mill add roster NAME [d1,d2]) or TYPE:ID (mill add todo:256)`. WHO is a desk or roster, default this desk; another desk or a roster follows the member-add trust rule. **mail:** WHO becomes a recipient on that letter and every letter under it in its room (the node; an off-room letter is its own node). Backfill: the node row is unread, rows on the letters below it are marked opened; a letter's own sender is skipped; a roster expands to its members now. One MAIL push to each new recipient of the node. Later replies under the node include WHO through reply-all. Mail never gets a watcher row and refuses `--hint`. **todo, join, hold, score:** one watcher row with an optional per-listener `--hint`; a roster watcher expands to its members when it wakes them. | `mill_mail_to_node_put` / `mill_watcher_set_hint` |
 | **`remove`** | `mill remove TYPE:ID [WHO]`. **mail:** drops WHO's recipient rows on the node and every letter under it; refuses (nothing changes) if a letter would be left with no recipient, or WHO is not a recipient there. Letters WHO sent stay. **Other kinds:** drops the watcher row; refused if WHO is not watching. | `mill_mail_to_node_delete` / `mill_watcher_delete` |

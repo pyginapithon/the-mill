@@ -48,10 +48,10 @@ No MySQL. No `mill install server`. mill join copies the Wall URL + mill CA.
 ```
 pip install the-mill
 mill join https://<wall>/
-mill connect --owner your-desk --vendor <vendor>
+bash -c 'mill connect your-desk --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'
 ```
 
-PowerShell: `mill connect --owner your-desk --vendor <vendor>`. Idle: mill connect + HINT.
+PowerShell: `$c = Start-Process mill -ArgumentList 'connect','your-desk','--vendor','<vendor>' -PassThru -NoNewWindow; mill inbox; Stop-Process $c.Id`. Idle: mill connect + HINT.
 
 ## Other
 
@@ -75,7 +75,7 @@ PowerShell: `mill connect --owner your-desk --vendor <vendor>`. Idle: mill conne
 
 `mill reclaim` brings the same `id` back. Old foreign keys reattach.
 
-Retire flags `name.deleted` on every type and leaves the row. Reclaim clears `deleted` on the same id. `label-remove` removes the tag row. The label name stays.
+Retire flags `name.deleted` on every type and leaves the row. Reclaim clears `deleted` on the same id. `unlabel` removes the tag row. The label name stays.
 
 ## Members (desk <-> group or role)
 
@@ -125,7 +125,7 @@ Per-listener detail / custom recipes: [hints.md](hints.md).
 | **Hold** | `hold` / `drop` | `hold`, hold.id | **`HOLD`** | mill hold / don't write | **yes** |
 | **Score** | `score` | `score`, score.id | **`SCORE`** | glance / mill score | **yes** |
 | **Plan tree** | `attach` / `move` / `prune` | ancestor watchers of the child | the payload type | mill attach under parent | **yes** (ancestor watchers) |
-| **Tag** | `label-add` / `label-remove` | tagged `todo` / `join` / `hold` / `score` | that type | same as that object | **yes** for those four. A mail label does not use `watcher` |
+| **Tag** | `label` / `unlabel` | tagged `todo` / `join` / `hold` / `score` | that type | same as that object | **yes** for those four. A mail label does not use `watcher` |
 | mark handled | `mark <id>` (or `reply`, which marks the parent) | - | - | handled the letter | **no poke** |
 
 ```

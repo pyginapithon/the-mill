@@ -6,7 +6,7 @@ Bind from AGENT_COORD_BOT_WAKE_URL (loopback HTTP only). Default:
 
   $env:AGENT_COORD_BOT_WAKE_URL = "http://127.0.0.1:18791/wake"
   python tools/bot_wake_listen.py
-  mill connect --owner DESK --vendor grok-bot
+  mill connect DESK --vendor grok-bot
 """
 from __future__ import annotations
 

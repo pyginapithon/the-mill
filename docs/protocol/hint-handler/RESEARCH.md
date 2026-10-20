@@ -1,6 +1,6 @@
 # RESEARCH - HINT handler playbook (Loop-1 pass 1 + remasure patch 1)
 
-Date: 2026-09-20 PT. Steward draft SoR: `/workspace/mill-docs/hint-handler/`.
+Date: 2026-09-20 PT. Playbook: `docs/protocol/hint-handler/`.
 Authoritative cites: pack `docs/protocol/{connect,route,hints,skill}.md` and `JOIN.md`. The mill-desk skill is a copy of `docs/protocol/skill.md`.
 
 ## Docs prove
@@ -13,7 +13,7 @@ Authoritative cites: pack `docs/protocol/{connect,route,hints,skill}.md` and `JO
 | JOIN.md | `.../share/the-mill/docs/JOIN.md` | OK |
 | mill-desk / skill.md | `.../workflows/mill-desk/SKILL.md` (= protocol/skill.md) | OK |
 
-Other checkouts were missing `connect.md` or had no protocol tree. This folder is the Loop-1 draft.
+Other checkouts were missing `connect.md` or had no protocol tree. This measure is the Loop-1 pass.
 
 ## Measure A-H (before this patch)
 
@@ -48,15 +48,21 @@ Search: no `hint-handler` / `HINT-HANDLER` / `tools/hint_handler` hits in mill t
 - **lib:** parse stdin JSON -> `HintEvent` (`route_key`, `detail` parse, ignore PING/JOIN); `leftovers()` = MAIL inbox / TODO that-card-or-"" (never full board); `run_mill` thin; exit helpers. Matches route.md "Is the HINT enough?" table + hints.md agent order.
 - **stub:** shorter than task-verb body; imports lib; cases `mail:MAIL` / `todo:TODO`; always exit 0 on success path. mill connect does **not** mill-update for exit 0 (connect.md).
 - **TEMPLATE:** contract table + skeleton; exit line aligned with connect.md (not "mill-pass only").
-- **Arm / route CLI:** shipped. `mill route add|rm|list` is the arm. `--owner` before the key. SKILL.md is the cold-desk playbook. Vendor poke runs only when no route hits.
+- **Arm / route CLI:** shipped. `mill route add|rm|list` is the arm. The desk is the sitting connect; commands run in that parent shell. SKILL.md is the cold-desk playbook. Vendor poke runs only when no route hits.
 - Dropped: `--spawn` wrong door (strawman); no teaching retained.
 
-## Landing note (Loop-2 / Builder)
+## Landing
 
-Draft lives under `/workspace/mill-docs/hint-handler/`. Package target: `docs/protocol/hint-handler/` (+ `tools/hint_handler/` beside existing tools, or under that protocol folder). Until landed: agents use this draft path; do not invent verbs from memory.
-
-See also: `LOOP-2-mill-route.md` - need Builder to land `mill route` CLI + package this folder.
+The playbook is `docs/protocol/hint-handler/`. `mill route add|rm|list` ships. The wheel includes `COLD.md`.
 
 ## Next remasure
 
-Cold-read SKILL + dry-run stub with sample MAIL/TODO/PING JSON (no live mill connect required). Then one-line mill-desk DO once folder is in package.
+Cold-read SKILL + dry-run stub with sample MAIL/TODO/PING JSON (no live mill connect required).
+
+## 2026-10-20 - mill todo #353
+
+- Deleted `REMEASURE-PATCH-1.md`, `LOOP-2-mill-route.md`, and `MILL-DESK-DO-LINE.md`. They still said `mill route` was blocked or not packaged. The verb ships.
+- `--owner` is not on `mill route` or `mill connect`. The desk is the sitting connect. Desk commands run in that same parent shell: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB'`.
+- Tag commands are `mill label` and `mill unlabel`.
+- A letter frame is `{kind: mail}` (no `type` or `hint`). Its route key is `mail:MAIL`. The lib follows `route_chain.route_key` (PR #31).
+- Vendor-poke fallback, in `spawn.md`: `AGENT_COORD_SPAWN`, then `<desk>.spawn` (`type:hint`, then `*`), then config `spawn`, then `bot_wake_cmd`. A letter does not match `mail:MAIL` on that map.

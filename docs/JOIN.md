@@ -45,6 +45,7 @@ $c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; m
 - A second connect for the same desk takes over the seat.
 - `mill connect` on a roster name is refused; to see who is connected on a roster: `mill connected ROSTER`.
 - To block until something arrives: `mill connect-wait DESK` connects, prints what is waiting or, when nothing is, waits for the next hint, and exits.
+- A desk that should answer mail while this chat stays free arms a background handler in a connect shell that stays up (`mill route add mail:MAIL -- python path/to/on_mail.py`, then `wait`) (cold steps: `docs/protocol/hint-handler/COLD.md`).
 
 ## CA
 
