@@ -94,7 +94,7 @@ def sitting_desk(body: dict) -> str:
     return desk
 
 
-def keep_mine(row: Any, desk: str, rank: list | None = None) -> Any:
+def keep_mine(row: Any, desk: str, rank: list | None = None, status_asked: str = "") -> Any:
     """The desk's cards: focus cards (label named desk) in rank order, then the
     cards whose volunteer is desk (exact name), each once (#373, #374).
 
@@ -105,7 +105,7 @@ def keep_mine(row: Any, desk: str, rank: list | None = None) -> Any:
         return row
     from agent_coord.client.focus import order_mine, set_focus_hint
 
-    keep, n_focus, n_claimed = order_mine(row["result"], desk, list(rank or []))
+    keep, n_focus, n_claimed = order_mine(row["result"], desk, list(rank or []), status_asked)
     out = dict(row)
     out["result"] = keep
     said = f"--mine: {n_focus} focus (label {desk}, rank order), then {n_claimed} claimed by {desk}"

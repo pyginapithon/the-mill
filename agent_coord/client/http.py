@@ -742,7 +742,7 @@ def mill_http_from_args(args: Any) -> int:
         if _focus.wears(row.get("result") or [], desk):
             # #374: one label read for the rank, only when a listed card wears the desk's label.
             rank = _focus.label_rank(lambda b: mill_http_call(dict(b, owner=desk)), desk)
-        row = todo_rows.keep_mine(row, desk, rank)
+        row = todo_rows.keep_mine(row, desk, rank, str(getattr(args, "status", "") or "").strip())
     if find:
         row = _todo_find(row, find)
     if short_rows and isinstance(row, dict) and row.get("ok") is True and isinstance(row.get("result"), list):

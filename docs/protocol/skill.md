@@ -62,7 +62,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `trail --label <label>` reads everything wearing it, in order. Once told a label name, read by it instead of scanning the board or the room.
   - Share the label name by mail, the same way as a hold name.
   - `--ord`: 0 = pinned, 65535 = unplaced. Gaps stay; never renumber.
-  - **Focus**: the label named after a desk is that desk's priority list; anyone ranks a card for it: `label todo <id> <desk> --ord 0`. Once seated, `connect` prints a `{"kind": "focus"}` line with the desk's top 5 not-done focus cards (id, roster, need, status, volunteer, rank), and `todo --mine` lists them first. Work the top one you can take.
+  - **Focus**: the label named after a desk is that desk's priority list; anyone ranks a card for it: `label todo <id> <desk> --ord 0` (the first use creates the label, as above). Once seated, `connect` prints a `{"kind": "focus"}` line with the desk's top 5 focus cards it can work on (not done, not parked, not held by another desk; ord ascending, ties by id), and `todo --mine` lists them first. Start the top one.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
 - **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same. A hold goes by its name: `watch hold deploy`.
