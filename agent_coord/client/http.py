@@ -722,6 +722,13 @@ def mill_http_from_args(args: Any) -> int:
     # #295: the board lists short rows, paged; --full keeps today's reply.
     short_rows = todo_rows.applies(args, find)
     page_block: dict | None = None
+    from agent_coord.client import mail_rows
+
+    # #295 follow-ups: inbox, mail-thread --room and the note reply.
+    inbox_short = mail_rows.inbox_applies(args)
+    room_short = mail_rows.room_applies(args)
+    note_short = mail_rows.note_applies(args)
+    mail_block: dict | None = None
     # Lock: never let argv --owner rewrite session active / Bearer.
     body = body_from_args(args)
     row = _todo_call(args, body)
@@ -749,6 +756,23 @@ def mill_http_from_args(args: Any) -> int:
         if rooms:
             row = dict(row)
             row["rooms"] = rooms
+        if inbox_short and isinstance(row.get("result"), list):
+            # Room pointers above cover every fetched letter; the page is cut after.
+            part, mail_block = mail_rows.cut(row["result"], int(getattr(args, "page", 0) or 0))
+            row = dict(row, result=part)
+    if (
+        room_short
+        and isinstance(row, dict)
+        and row.get("ok") is True
+        and isinstance(row.get("result"), dict)
+        and isinstance(row["result"].get("chain"), list)
+    ):
+        part, mail_block = mail_rows.cut_newest(row["result"]["chain"], int(getattr(args, "page", 0) or 0))
+        row = dict(row, result=mail_rows.short_room(dict(row["result"], chain=part)))
+        row["page"] = mail_block
+        mail_block = None
+    if note_short and isinstance(row, dict) and row.get("ok") is True:
+        row = dict(row, result=mail_rows.short_note(row.get("result")))
     if (
         str(getattr(args, "cmd", "") or "") == "trail"
         and not bool(getattr(args, "as_json", False))
@@ -783,6 +807,9 @@ def mill_http_from_args(args: Any) -> int:
     if page_block is not None:
         row = dict(row, result=todo_rows.short(row["result"], str(page_block.get("roster") or "")))
         row["page"] = page_block
+    if mail_block is not None:
+        row = dict(row, result=mail_rows.short_inbox(row["result"]))
+        row["page"] = mail_block
     refused_hold = isinstance(row, dict) and _refused_hold(args, row)
     if refused_hold:
         row = _hold_refusal(row)

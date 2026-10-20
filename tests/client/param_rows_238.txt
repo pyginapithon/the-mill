@@ -51,6 +51,8 @@ reply yes
 mail-thread (verb)
 mail-thread mail_id
 mail-thread scope
+mail-thread full
+mail-thread page
 mail-thread after
 mail-thread office
 mail-thread yes
@@ -76,6 +78,8 @@ inbox (verb)
 inbox all
 inbox limit
 inbox group_by
+inbox full
+inbox page
 inbox office
 inbox yes
 score (verb)
@@ -302,6 +306,7 @@ note note
 note supersedes
 note eta
 note started
+note full
 note office
 note yes
 claim (verb)

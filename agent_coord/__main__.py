@@ -265,6 +265,16 @@ def main(argv: list[str] | None = None) -> int:
     return _run_parsed(p, argv)
 
 
+class _ThreadFull(argparse._StoreTrueAction):
+    """mail-thread --full: alone, the whole branch (scope full) as before #295;
+    with --room, every field of every letter and no paging (#295)."""
+
+    def __call__(self, parser, namespace, values, option_string=None):  # type: ignore[override]
+        namespace.full = True
+        if not getattr(namespace, "scope", ""):
+            namespace.scope = "full"
+
+
 def _page_number(raw: str) -> int:
     """todo --page N: a whole number from 1 (#295)."""
     try:
@@ -440,7 +450,9 @@ def _build_parser() -> MillArgumentParser:
             "A later read leaves out a letter this desk sent, unless you asked for that letter. "
             "--full = the whole branch. "
             "--subtree = that letter and every reply under it. "
-            "--room = the whole room; --after <id> = only id > after "
+            "--room = the whole room in short rows, 50 letters a page, newest page first "
+            "(--page N reads page N; --room --full prints every field of every letter); "
+            "--after <id> = only id > after "
             "(implies --room). A room name with no flag = short summary "
             "(root, latest few, counts). Envelope latest_id, room_letters, hint. "
             "Not a participant? mill reply <root id> --body-file PATH joins. "
@@ -467,12 +479,17 @@ def _build_parser() -> MillArgumentParser:
         dest="scope",
         help="this letter and every reply under it",
     )
-    scope.add_argument(
+    mt.add_argument(
         "--full",
-        action="store_const",
-        const="full",
-        dest="scope",
-        help="whole branch, ignoring the read cursor",
+        action=_ThreadFull,
+        help="whole branch, ignoring the read cursor; with --room, every field of every letter, no paging",
+    )
+    mt.add_argument(
+        "--page",
+        type=_page_number,
+        default=0,
+        metavar="N",
+        help="--room in short rows, page N (1 = the newest %d letters)" % 50,
     )
     mt.add_argument(
         "--after",
@@ -552,6 +569,19 @@ def _build_parser() -> MillArgumentParser:
         default="",
         choices=("tree", "label", "roster"),
         help="group the list by tree (room) or roster (default: tree; mail has no labels yet)",
+    )
+    iview = i.add_mutually_exclusive_group()
+    iview.add_argument(
+        "--full",
+        action="store_true",
+        help="every field of every letter, no paging (default: short rows, 50 a page)",
+    )
+    iview.add_argument(
+        "--page",
+        type=_page_number,
+        default=0,
+        metavar="N",
+        help="short rows, page N (1 = first); the reply's page block names the next",
     )
 
     kp = sub.add_parser(
@@ -986,6 +1016,11 @@ def _build_parser() -> MillArgumentParser:
     )
     pg.add_argument("--eta", default="", help="20m / 2h / datetime so the other desk can see when you expect to finish")
     pg.add_argument("--started", action="store_true", help="set started_at to now")
+    pg.add_argument(
+        "--full",
+        action="store_true",
+        help="reply with the card's whole detail (default: detail_chars and the last line)",
+    )
 
     vo = sub.add_parser("claim", help="claim a card")
     vo.add_argument("project")
@@ -1240,6 +1275,11 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
         # A --group-by that can never apply to this list (#274): one line, exit 2.
         print(_never, file=sys.stderr, flush=True)
         return 2
+    if args.cmd == "mail-thread" and bool(getattr(args, "full", False)) and getattr(args, "scope", "") == "subtree":
+        # --full was one scope with --subtree before #295; the pair stays a usage error.
+        p.error("mail-thread: argument --full: not allowed with argument --subtree")
+    if args.cmd == "mail-thread" and bool(getattr(args, "full", False)) and int(getattr(args, "page", 0) or 0):
+        p.error("mail-thread: argument --page: not allowed with argument --full")
     try:
         from agent_coord.client.language import translate
 

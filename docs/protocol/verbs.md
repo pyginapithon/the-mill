@@ -34,8 +34,8 @@ Which tool each verb serves and when to use it: [skill.md](skill.md), section "C
 ```
 mill join '<welcome-link>'
 mill connect <desk>
-mill inbox
-mill mail-thread <mail_id|room> [--full | --subtree | --room]
+mill inbox [--full | --page N]
+mill mail-thread <mail_id|room> [--full | --subtree | --room] [--page N]
 mill send --body-file PATH --to-desk <desk> [--room <room>]
 mill reply <mail_id> --body-file PATH [--to-desk <desk>]
 mill add mail:<id> <desk>    /  mill remove mail:<id> <desk>
@@ -43,7 +43,7 @@ mill mark <mail_id> [<mail_id>...]
 mill todo <project> [<need>] [--full | --page N]
 mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
 mill claim <project> <need> [--take-over]
-mill note <project> <need> --note TEXT [--supersedes "OLD LINE"]
+mill note <project> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
 mill hold [<resource>]
 mill drop <resource>
 mill pass <project> <need>
@@ -76,6 +76,7 @@ mill label <name> <name> --yes
 - `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's second `pass` moves shipped to done.
 - `todo <project> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
 - The board list (`todo`, `todo <project>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
+- `inbox` and `mail-thread <id> --room` print short letter rows by default: `id`, `created`, `from` (desk), `parent_id`, `tree` (left out where the list or the room already names it) and `body`, the first 100 characters on one line, with `body_trunc` true when that is not the whole body. `mill mail-thread <id>` reads one letter whole. At most 50 letters a page with a `page` block (`n`, `of`, `size`, `letters`, `next` only when a next page exists). The inbox pages in the wall's order; a room's page 1 is its newest 50 letters, oldest first, and `--page 2` the 50 before them. Room pointers on the inbox cover every letter fetched (`--limit`), not only the page. `--full` (`--room --full` on mail-thread) prints the reply as before short rows; `--full` alone on mail-thread is still the whole branch. `--after`, `--subtree`, a branch read and a room summary are unchanged, and `--page` with them, or with `--raw`, is refused. The `note` reply prints `detail_chars` and `last_line` instead of the whole `detail`; `note --full` prints it. Regression row F53 (mail-short-rows).
 - `todo --find TEXT` lists title (`doing`) and need-name hits first, then roster hits, then body-only hits, as one flat list (add `--group-by` to group it). Each card prints `match` (title, need, roster or detail) and a `snippet` of about 120 characters instead of its whole body. `watch` and `unwatch` replies and refusals name `watch`/`unwatch`, not the `add`/`remove` they ride. A `send` to a roster always says where the sender stands: `sender: excluded` (on the roster, left out), `sender: not a member`, or `sender: included` when the sender is its only member. Regression row F25 (ux12-polish).
 
 ---
