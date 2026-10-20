@@ -78,7 +78,7 @@ Prefer **ids + field names** in the recipe over pasting secrets or full bodies i
 
 ## Agent order
 
-The cold-desk commands are in [hint-handler/SKILL.md](hint-handler/SKILL.md). Copy `examples/stub_handler.py`. One activity, one route, one program.
+The cold-desk commands are in [hint-handler/COLD.md](hint-handler/COLD.md). Copy `examples/stub_handler.py`. One activity, one route, one program.
 
 ## See also
 

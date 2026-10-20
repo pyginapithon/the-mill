@@ -33,7 +33,7 @@ flowchart TB
 | Job | `/ws` + **default spawn agent** | walk this desk's redirectors in order | chat HINT -> mill verb |
 | When | every redirector said not-mine, or no entry matched | agent added a route | human/TUI turn |
 | Lives | process `--vendor` | this desk's file on this PC, not the book | mill-desk skill |
-| Config | `--owner --vendor [--session]` | agent: add/rm routes, program paths | recopy after mill update |
+| Config | `mill connect [roster] DESK [--vendor V] [--session S]` | agent: add/rm routes, program paths | recopy after mill update |
 
 **Default spawn** (nothing handled): vendor poke - `grok -p -r`, `claude -p`, grok-bot POST, or stamp `DESK_*.wake.jsonl`. That wakes an agent. skill.md is that agent's chat map.
 
@@ -94,7 +94,7 @@ Agent order of work:
 
 ## Is the HINT enough?
 
-HINT is enough to **dispatch**, not always enough to **do the job**. Hub is dumb. Frame is `{type, id, hint, detail?}` (`hint` = `activity.type` uppercased; `detail` = `watcher.hint` or cheap default - [hints.md](hints.md)). mill connect may stamp `desk` and `route` (`mail:MAIL`). Full mail/todo bodies are **not** on the frame. skill.md: match `type:hint`; prefer `detail` when present; else mill-fetch.
+HINT is enough to **dispatch**, not always enough to **do the job**. Hub is dumb. A watcher frame is `{type, id, hint, detail?}` (`hint` = `activity.type` uppercased; `detail` = `watcher.hint` or cheap default - [hints.md](hints.md)). A letter is `{kind: mail, id, idem, desk}` with no `type` or `hint`; the route key is `mail:MAIL`. mill connect may stamp `desk`. Full mail/todo bodies are **not** on the frame. skill.md: match `type:hint`; prefer `detail` when present; else mill-fetch.
 
 | HINT | Enough to know | Still mill-fetch |
 | :--- | :--- | :--- |
@@ -111,13 +111,13 @@ A redirector gets the same doorbell. `*` can case on the route key. A per-key ex
 
 ## mill route CLI
 
-Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk must be connected. `--owner` goes before the key. Everything after the key is the program.
+Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). Everything after the key is the program. A flag after the key becomes part of the program argv.
 
 ```
-mill route list --owner <desk>
-mill route add --owner <desk> mail:MAIL -- python C:\work\on_mail.py
-mill route add --owner <desk> * -- python C:\work\desk.py
-mill route rm --owner <desk> mail:MAIL
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route list'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python path/to/on_mail.py'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add * -- python path/to/desk.py'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm mail:MAIL'
 ```
 
 - `add KEY -- PROGRAM` appends KEY. `add KEY --` with no program stores an empty value, which suppresses.
@@ -131,12 +131,12 @@ mill connect has no catch-all flag. A catch-all is the route key `*`: `mill rout
 
 ## Template
 
-Copy [route-template.py](route-template.py). Point a route at it:
+Copy [route-template.py](route-template.py). Point a route at it from the connect shell:
 
-`
-mill route add mail:MAIL -- python docs/protocol/route-template.py
-mill route add * -- python docs/protocol/route-template.py
-`
+```
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python docs/protocol/route-template.py'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add * -- python docs/protocol/route-template.py'
+```
 
 stdin = the frame JSON. The template handles MAIL and TODO with `mill inbox` / `mill todo` (or `python -m agent_coord` if `mill` missing), prints `not-mine` for anything else, and exits non-zero when its verb fails. Agents may replace the body; keep the three exits.
 
