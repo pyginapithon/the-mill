@@ -688,13 +688,25 @@ def log_startup() -> None:
         from agent_coord.server.records.driver import cached, warn_once
 
         info = warn_once(cached())
+        from agent_coord.server.records.db import book_sql_state
+
+        sql = book_sql_state()
         perf_log(
             "startup",
             0.0,
             version=package_version(),
             db_driver=info.get("path"),
             connector=info.get("version") or None,
+            sql="ok" if sql.get("ok") else "stale",
         )
+        if not sql.get("ok"):
+            # #614: say it where the operator looks; /health is 503 until it is fixed.
+            _log.error(
+                "book SQL is not this pack's (book %s, pack %s); run: %s",
+                sql.get("book") or "none",
+                sql.get("pack") or "unknown",
+                sql.get("fix"),
+            )
     except Exception:
         pass
 

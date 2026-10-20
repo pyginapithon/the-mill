@@ -203,6 +203,7 @@ def _bind(handler, fake: _Fake) -> None:
 
 def test_health_skips_the_door(monkeypatch) -> None:
     monkeypatch.setattr(db, "book_ping", lambda: True)
+    monkeypatch.setattr(db, "book_sql_state", lambda: {"ok": True})
 
     def door_must_not_run():
         raise AssertionError("health called the door")

@@ -551,6 +551,11 @@ def wall_import_check_cmd() -> list[str]:
     return [sys.executable or "python", "-c", code]
 
 
+def sql_install_cmd() -> list[str]:
+    """Run ensure with the pack just installed, then check the book's SQL stamp (#614)."""
+    return [sys.executable or "python", "-m", "agent_coord", "install", "sql", "--apply"]
+
+
 def update_plan(*, cwd: Path | None = None, dest: Path | None = None) -> dict[str, Any]:
     """Dry-run mill update. Refuse mill source tree; reuse dest; no wipe/smash."""
     here = Path(cwd or Path.cwd()).resolve()
@@ -564,6 +569,7 @@ def update_plan(*, cwd: Path | None = None, dest: Path | None = None) -> dict[st
         "smash": False,
         "schema": "not-run",
         "cmd": update_pip_cmd(),
+        "sql": sql_install_cmd(),
         "recycle": wall_recycle_cmds(),
     }
     if mill_source_tree(here):
@@ -596,8 +602,8 @@ def run_update(
     """pip -U the-mill from a non-mill cwd.
 
     Refuse when a mill connect holds the console script. Then stop, pip,
-    import the new package, then start. Never wipes. A failed pip or import
-    does not start the wall.
+    import the new package, ensure its SQL, then start. Never wipes. A failed
+    pip, import or SQL ensure does not start the wall.
     """
     plan = update_plan(cwd=cwd, dest=dest)
     urls = [with_session_hash(u) for u in share_wall_urls(private_ips=private_ips)]
@@ -720,6 +726,18 @@ def run_update(
         plan["wall_restart"] = "skipped"
         plan["error"] = check_err or "import check failed; mill-wall not started"
         return plan
+    # #614: the new pack's SQL goes in before the wall serves it (ensure, then the stamp check).
+    sql_ok, sql_err = _run_steps([sql_install_cmd()], label="sql ensure")
+    plan["schema"] = "applied" if sql_ok else "failed"
+    if not sql_ok:
+        plan["ok"] = False
+        plan["restart_ok"] = False
+        plan["wall_restart"] = "skipped"
+        plan["error"] = (
+            (sql_err or "sql ensure failed")
+            + "; mill-wall not started. Fix, then run: mill install sql --apply, and start mill-wall"
+        )
+        return plan
     start_ok, start_err = _run_steps(wall_start_cmds(), label="wall start")
     plan["restart_ok"] = start_ok
     plan["wall_restart"] = "ok" if start_ok else "failed"
@@ -733,7 +751,7 @@ def run_update(
         f"Share URL (HTTPS): {plan['url']}",
         "mill install check (probe/reuse dest; no smash)",
         "Does not smash dest or mill-wall SCM",
-        "Schema migrations are not run. The book is left as-is.",
+        "The book's SQL was brought to this pack (ensure); /health says 503 if it ever is not.",
         "Copy mill desk skill: the pack skill.md (path in the mill join note) over mill-desk/SKILL.md (mill briefing howto-ai). Restart the TUI.",
     ]
     if plan.get("pip_applied") and not plan.get("restart_ok"):

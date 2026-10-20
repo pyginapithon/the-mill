@@ -10,7 +10,8 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 |---|---|---|
 | `join` | `mill join <link>` | The seat welcome link, positional (no `--url`, no `--office` needed): the office alias is the link's host and becomes the default office. `--office <alias>` picks another local name. HTTP only. The link is `https://<wall>/welcome?desk=&seat=&project=&pem=`. Stores the seat token and CA, then prints the next line to run: `bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'`. The invite-key `/?invite=KEY` is the human Wall door, not a join argument. |
 | `local` | `mill local` | List the offices on this machine and their aliases. |
-| `update` | `mill update [--dry-run]` | Upgrade the mill package (pip). After it: recopy skill.md, reload, connect. |
+| `update` | `mill update [--dry-run]` | Upgrade the mill package (pip), apply its SQL (`mill install sql --apply`), restart the wall. After it: recopy skill.md, reload, connect. |
+| `install sql` | `mill install sql [--apply]` | Host: does the book hold this pack's SQL (stamp vs pack). `--apply` runs ensure, then checks. Exit 1 when it does not match (F66). |
 
 ## This machine
 
