@@ -195,7 +195,7 @@ def test_note_over_stored_size_refuses(monkeypatch) -> None:
     monkeypatch.setattr("agent_coord.server.records.todo.update", fake_update)
     monkeypatch.setattr(rpc, "_poke", lambda *a, **k: None)
     book = MagicMock()
-    with pytest.raises(CoordError, match="nothing trimmed"):
+    with pytest.raises(CoordError, match="refused, nothing written"):
         rpc._h_note(
             book,
             {"need": "note-cap", "note": _fit_detail("note-cap", "", 1)},
@@ -249,7 +249,7 @@ def test_note_after_overhead_4097_refuses(monkeypatch) -> None:
     stored = {"body": json.dumps({"slug": "note-cap", "doing": "", "detail": ""}), "n": 0}
     book = _note_book(monkeypatch, stored)
     before = stored["body"]
-    with pytest.raises(CoordError, match="nothing trimmed"):
+    with pytest.raises(CoordError, match="refused, nothing written"):
         rpc._h_note(
             book,
             {"need": "note-cap", "note": text, "replace": True},

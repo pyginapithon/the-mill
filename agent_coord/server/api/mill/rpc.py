@@ -1871,11 +1871,10 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
             c, hit, project, owner, str(payload.get("detail") or ""), supersedes, note_s, replace
         )
     elif note_s:
-        from agent_coord.helpers.bounds import append_note_detail
-
-        payload["detail"] = append_note_detail(
-            str(payload.get("detail") or ""), note_s, replace=replace
-        )
+        # The card's whole stored body is the bound, checked once below (#360).
+        prev = str(payload.get("detail") or "")
+        base = "" if replace or not prev.strip() else prev
+        payload["detail"] = note_s if not base else base + "\n" + note_s
     progress = rec_todo.format_progress(prog_text)
     if progress:
         payload["progress"] = progress
@@ -1890,6 +1889,9 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         from datetime import datetime
 
         payload["started_at"] = datetime.now().isoformat(sep=" ", timespec="seconds")
+    refusal = rec_todo.over_budget(before, payload)
+    if refusal:
+        raise CoordError(refusal)
     changed = payload != before
     tid = int(hit["id"])
     if changed:
@@ -1906,6 +1908,8 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     }
     if kept.get("progress"):
         rec["progress"] = kept["progress"]
+    # #360: the room left on this card, so the cap shows before a note hits it.
+    rec["detail_left"] = rec_todo.budget_left(payload if changed else before)
     if supersedes:
         rec["superseded"] = supersedes
     for k in ("eta_at", "started_at"):

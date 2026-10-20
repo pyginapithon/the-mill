@@ -59,6 +59,29 @@ def _bounded_body(body: str | None) -> str | None:
     raise CoordError(f"todo body must be 0..{BODY_MAX} chars")
 
 
+def budget_left(payload: dict[str, Any]) -> int:
+    """Characters a card has left before its stored body reaches BODY_MAX (#360)."""
+    return BODY_MAX - len(json.dumps(dict(payload)))
+
+
+def over_budget(before: dict[str, Any], after: dict[str, Any]) -> str:
+    """The refusal when a note would take the card past BODY_MAX, else "" (#360).
+
+    Every note on a card shares one budget, so the refusal says how much this
+    note needs, how much is left, and where long text goes instead.
+    """
+    if len(json.dumps(dict(after))) <= BODY_MAX:
+        return ""
+    left = max(0, budget_left(before))
+    need = len(json.dumps(dict(after))) - len(json.dumps(dict(before)))
+    return (
+        "note: refused, nothing written: this note needs %d characters and the card has %d left "
+        "of its %d (every note on a card shares one budget). Put the long text in a room letter "
+        "(mill reply <mail_id> --body-file PATH) and note just its mail id here."
+        % (need, left, BODY_MAX)
+    )
+
+
 def stored_body(payload: dict[str, Any]) -> str:
     """JSON body for a note. Over 4096 is a refusal, not a trim (#173)."""
     raw = json.dumps(dict(payload))
