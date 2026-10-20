@@ -100,7 +100,9 @@ python -m pip install -U the-mill
 
 Linux system Python that refuses a user install needs `python3 -m pip install --user --break-system-packages -U the-mill`. The wall unit must import that same tree (`User=` and `PYTHONPATH` on systemd, or the Windows service account). Then recycle the wall: `sudo systemctl restart mill-wall`, or `Restart-Service mill-wall` on Windows. `mill -V` and the response header `X-Mill-Version` must match.
 
-`mill update` is that pip install plus the recycle. It does not wipe the book, the CA, or desk tokens. It does not change stored procedures.
+`mill update` is the one update step: stop the wall, pip install, import check, `mill install sql --apply` with the new pack, then start the wall. A failed pip, import or SQL step leaves the wall stopped and says why. It does not wipe the book, the CA, or desk tokens. Back up the book first; the release was A/B tested on a throwaway book before publish (BUILD.md).
+
+By hand, the same order: pip install, `mill install sql --apply`, recycle. `mill install sql` without `--apply` only reports. The book carries a stamp of the pack SQL it holds (function `MILL_SQL_STAMP`, written last by ensure). When it is not this pack's, `/health` answers 503 with `fix: mill install sql --apply` and the wall logs the same at start, so a wall never serves on another pack's SQL silently (F66).
 
 A Windows mill-wall that runs the git checkout (not the pip package) reloads that checkout when the service restarts. `pip install` does not change it.
 
@@ -108,7 +110,7 @@ A Windows mill-wall that runs the git checkout (not the pip package) reloads tha
 
 Before applying SQL to a live office book, A/B on a throwaway local DB: (1) apply via migrate.split_script / apply_records, (2) apply the same files via mysql whole-file. Prove the new mill_* routines exist and a read path does not mint junk names. Only then apply to the live office book.
 
-Restarting the wall does not install new `CALL mill_*` routines. The tables stay. Do **not** run `wipe.sql`. Do **not** apply `tables.sql` on a live book.
+Restarting the wall does not install new `CALL mill_*` routines; `mill install sql --apply` (or `mill update`) does, through ensure. The tables stay. Do **not** run `wipe.sql`. Do **not** apply `tables.sql` on a live book.
 
 `name_type.sql` migrates an existing book to the `tables.sql` column shape. It is not in `apply_order.txt`. Run that file once, then apply the routines with wipe off. It leaves the 0.6 shape; `mill install` on 0.7.0 then runs `migrate_070_roster.sql` (one `roster` type, `roster_id` columns). A second run leaves the book as it is. There is no name watcher type. A fresh book is `wipe.sql` then the apply order.
 
@@ -218,11 +220,11 @@ MySQL must stay off the public net. mill-wall is the only process that opens the
 
 | Change | How it lands | Operator action |
 |---|---|---|
-| Python pack (ASGI, gzip, cache headers, pool, Wall JS/HTML in the wheel) | `pip install -U the-mill` or `mill update` | **Recycle mill-wall** so the SERVICE/unit imports the new pack (or reloads the git checkout). `mill -V` and `X-Mill-Version` must match |
+| Python pack (ASGI, gzip, cache headers, pool, Wall JS/HTML in the wheel) | `mill update` (or `pip install -U the-mill`, then `mill install sql --apply`) | **Recycle mill-wall** so the SERVICE/unit imports the new pack (or reloads the git checkout). `mill -V` and `X-Mill-Version` must match, and `/health` is 200 |
 | Git-checkout wall (Windows dogfood that puts the tree on `sys.path`) | commit on the checkout the SERVICE uses | **Recycle** -- `pip install` alone does not change that process |
 | Office config (`config.toml`, door, wall-allow, SSL certs) | edit under `~/.mill/` | Recycle only if the running process caches the value; TLS file swaps usually need recycle |
-| Stored procedures / functions (`CALL mill_*`) | **Not** applied by pip or recycle | Apply `agent_coord/server/sql/` per [Stored procedures](#stored-procedures) on the host. Pack update does **not** refresh live SPs |
+| Stored procedures / functions (`CALL mill_*`) | `mill update`, or `mill install sql --apply` after a pip install. **Not** applied by pip or recycle alone | `/health` is 503 with `fix: mill install sql --apply` until the book holds this pack's SQL |
 | Schema wipe / tables recreate | never on a live book | Do **not** run `wipe.sql` / live `tables.sql` |
 
-Summary: **pack change then recycle wall. Live SQL/SP change then explicit apply on the host. Neither replaces the other.**
+Summary: **`mill update` does pack, SQL and recycle in order. By hand: pip, `mill install sql --apply`, recycle. `/health` says when the SQL is behind.**
 

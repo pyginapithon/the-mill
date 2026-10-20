@@ -224,6 +224,25 @@ def connect(database: str | None = None):
     return cn
 
 
+def book_sql_state() -> dict[str, Any]:
+    """Whether the book holds this pack's SQL (#614). Read only; a failed read is not ok."""
+    from agent_coord.install.migrate import SQL_FIX, sql_state
+
+    try:
+        cn = connect()
+    except Exception:
+        return {"ok": False, "pack": "", "book": "", "fix": SQL_FIX, "error": "book unavailable"}
+    try:
+        return sql_state(cn)
+    except Exception as e:
+        return {"ok": False, "pack": "", "book": "", "fix": SQL_FIX, "error": type(e).__name__}
+    finally:
+        try:
+            cn.close()
+        except Exception:
+            pass
+
+
 def book_ping() -> bool:
     """True when the book answers a ping. No rows and no secrets (#144)."""
     try:

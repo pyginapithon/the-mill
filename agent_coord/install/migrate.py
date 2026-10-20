@@ -6,6 +6,8 @@ sql/ is not a migrate ladder.
 
 from __future__ import annotations
 
+import functools
+import hashlib
 import re
 from pathlib import Path
 from typing import Any
@@ -857,7 +859,73 @@ def apply_roster_070(cn) -> list[str]:
     return [ROSTER_070] + reload_routines(cn)
 
 
+SQL_FIX = "mill install sql --apply"
+_STAMP_FN = "MILL_SQL_STAMP"
+
+
+@functools.lru_cache(maxsize=1)
+def sql_digest() -> str:
+    """sha256 of this pack's SQL: every apply_order file but wipe.sql, then this
+    module (its ensure steps). Line endings do not count (#614)."""
+    h = hashlib.sha256()
+    parts = [p for p in sql_apply_order() if p.name != "wipe.sql"] + [Path(__file__)]
+    for path in parts:
+        h.update(path.name.encode("utf-8") + b"\0")
+        h.update(path.read_bytes().replace(b"\r\n", b"\n") + b"\0")
+    return h.hexdigest()
+
+
+def _stamp_sql(cn, digest: str) -> None:
+    """Record in the book which pack's SQL it holds: a function, no table (#614)."""
+    if not re.fullmatch(r"[0-9a-f]{64}", digest or ""):
+        raise ValueError("sql stamp is 64 hex")
+    cur = cn.cursor()
+    try:
+        cur.execute(f"DROP FUNCTION IF EXISTS {_STAMP_FN}")
+        cur.execute(
+            f"CREATE FUNCTION {_STAMP_FN}() RETURNS CHAR(64) CHARSET ascii"
+            f" DETERMINISTIC NO SQL RETURN '{digest}'"
+        )
+        cn.commit()
+    finally:
+        cur.close()
+
+
+def sql_state(cn) -> dict[str, Any]:
+    """Does the book hold this pack's SQL? Read only. ok, pack and book (12 hex each), fix."""
+    pack = sql_digest()
+    cur = cn.cursor()
+    try:
+        cur.execute(f"SELECT {_STAMP_FN}()")
+        row = cur.fetchone()
+        book = str((row or [""])[0] or "")
+    except Exception as e:
+        if getattr(e, "errno", None) != 1305:  # FUNCTION does not exist: a book from before the stamp
+            raise
+        book = ""
+    finally:
+        cur.close()
+    return {"ok": book == pack, "pack": pack[:12], "book": book[:12], "fix": SQL_FIX}
+
+
+def install_sql(cn, *, apply: bool) -> dict[str, Any]:
+    """mill install sql: without apply, report; with apply, ensure then verify (#614)."""
+    before = sql_state(cn)
+    if not apply:
+        return {**before, "applied": False}
+    res = ensure(cn)
+    after = sql_state(cn)
+    return {**after, "applied": True, "was": before["book"], "steps": len(res.get("applied") or [])}
+
+
 def ensure(cn) -> dict[str, Any]:
+    """Run the ensure steps, then stamp the book with this pack's SQL digest (#614)."""
+    res = _ensure_steps(cn)
+    _stamp_sql(cn, sql_digest())
+    return res
+
+
+def _ensure_steps(cn) -> dict[str, Any]:
     """0.4 book. Skip if activity exists (do not re-apply SPs). Else apply sql/."""
     import os
 

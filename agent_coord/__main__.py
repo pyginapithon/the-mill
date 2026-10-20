@@ -803,8 +803,9 @@ def _build_parser() -> MillArgumentParser:
     )
     ins.add_argument(
         "role",
-        choices=["server", "client", "book", "records", "wall", "desk", "check", "cloud", "glance-tap"],
-        help="server=records+wall (admin); client=mill CLI; records (alias book)/wall/desk; check; cloud runbook",
+        choices=["server", "client", "book", "records", "wall", "desk", "check", "cloud", "glance-tap", "sql"],
+        help="server=records+wall (admin); client=mill CLI; records (alias book)/wall/desk; check; cloud runbook; "
+        "sql: does the book hold this pack's SQL (--apply runs ensure, then checks)",
     )
     ins.add_argument("--apply", action="store_true", help="register/enable the OS unit when possible")
     ins.add_argument(
@@ -1510,6 +1511,18 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
             from .install import run_update
 
             result = run_update(apply=not bool(getattr(args, "dry_run", False)))
+            _print(result)
+            return 0 if result.get("ok") else 1
+        if args.cmd == "install" and args.role == "sql":
+            # #614: the book's SQL against this pack. --apply runs ensure on the configured book.
+            from agent_coord.install.migrate import install_sql
+            from agent_coord.server.records.db import connect
+
+            cn = connect()
+            try:
+                result = install_sql(cn, apply=bool(args.apply))
+            finally:
+                cn.close()
             _print(result)
             return 0 if result.get("ok") else 1
         if args.cmd == "install" and args.role == "glance-tap":

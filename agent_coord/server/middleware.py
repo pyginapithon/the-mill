@@ -906,6 +906,21 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
             from agent_coord.server.records.driver import cached
 
             if book_ping():
+                from agent_coord.server.records.db import book_sql_state
+
+                # #614: a book left on another pack's SQL is not healthy; name the fix.
+                st = book_sql_state()
+                if not st.get("ok"):
+                    msg = "book SQL is not this pack's (book %s, pack %s)" % (
+                        st.get("book") or "none",
+                        st.get("pack") or "unknown",
+                    )
+                    self._send(
+                        503,
+                        json.dumps({"ok": False, "error": msg, "fix": st.get("fix")}).encode("ascii"),
+                        "application/json",
+                    )
+                    return
                 path = "c" if cached().get("path") == "c" else "pure"
                 self._send(200, b'{"ok":true,"db_driver":"' + path.encode() + b'"}', "application/json")
                 return
