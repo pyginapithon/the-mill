@@ -69,9 +69,11 @@ def test_history_jobs_clone_full_history() -> None:
 
 
 def test_publish_jobs_use_oidc_not_tokens() -> None:
+    """No stored publish token. The only secret is the #339 private-name list."""
     text = _code(WF / "release.yml")
     assert "id-token: write" in text
-    assert "secrets." not in text
+    assert set(re.findall(r"secrets\.(\w+)", text)) == {"MILL_PRIVATE_NAMES"}
+    assert "secrets." not in _job(text, "publish_pypi")
     assert "password:" not in text
 
 
