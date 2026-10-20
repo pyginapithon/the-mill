@@ -6,7 +6,7 @@ Desk `hint-cold`, already joined on this computer: `mill connect hint-cold` uses
 
 Folder: the one that contains this file (repo checkout or installed pack). Program: `~/.mill/handlers/DESK_hint-cold/on_mail.py`. Copy `examples/stub_handler.py` there. Set `_ROOT` to the `docs/protocol/hint-handler` directory that contains this file (`Path(__file__).parents[1]` is that directory only in `examples/`). Ignore other doc links in the stub. Do not delete that program on tear-down.
 
-Desk commands run only in the parent shell that started connect. The desk is that connect. A second call is refused with `no sitting mill connect`. The trap stops connect when the shell exits. Everything after the route key is the program. `mill member` first: it waits for connect to sit, and `mill route` does not wait. Pass the absolute path of `on_mail.py`. A `~` in the route file is not expanded at start.
+Desk commands run only in the parent shell that started connect. The desk is that connect. A second call is refused with `no sitting mill connect`. The trap stops connect when the shell exits. Everything after the route key is the program. `mill route` waits for that connect to sit. Pass the absolute path of `on_mail.py`. A `~` in the route file is not expanded at start.
 
 This is the same parent shell `mill join` prints (`bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB'`). Replace `PATH_OF_ON_MAIL_PY` with the absolute path of `on_mail.py` before you run it. If one command exits non-zero, stop and hand back stderr.
 
@@ -15,7 +15,6 @@ bash <<'EOF'
 set -e
 mill connect hint-cold --vendor grok-build >/dev/null 2>&1 &
 trap "kill $!" EXIT
-mill member >/dev/null
 mill route add mail:MAIL -- python PATH_OF_ON_MAIL_PY
 printf '%s\n' 'hint-cold mail' > body.txt
 mill send desk hint-cold --body-file body.txt > send.json

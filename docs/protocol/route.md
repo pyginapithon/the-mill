@@ -111,7 +111,7 @@ A redirector gets the same doorbell. `*` can case on the route key. A per-key ex
 
 ## mill route CLI
 
-Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). `mill route` does not wait for connect to sit; run `mill member >/dev/null` first. Everything after the key is the program. A flag after the key becomes part of the program argv.
+Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). `mill route` waits for a connect started just before in that shell, like the other desk commands. Everything after the key is the program. A flag after the key becomes part of the program argv.
 
 ```
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route list'
