@@ -156,3 +156,13 @@ def test_cli_refuses_a_blank_old_line(monkeypatch, blank):
     )
     with pytest.raises(CoordError, match="--supersedes needs the old line"):
         outbound.body_from_args(a)
+
+
+def test_cli_plain_note_sends_no_supersedes(monkeypatch):
+    from agent_coord.__main__ import _build_parser
+    from agent_coord.client import outbound
+
+    monkeypatch.setattr("agent_coord.client.tokens.resolve_desk_owner", lambda _x="": "asker-desk")
+    for argv in (["note", "cold-test", "c333", "3/9"], ["note", "cold-test", "c333", "--note", "x"]):
+        body = outbound.body_from_args(_build_parser().parse_args(argv))
+        assert "supersedes" not in body

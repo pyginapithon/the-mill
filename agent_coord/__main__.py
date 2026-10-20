@@ -954,7 +954,7 @@ def _build_parser() -> MillArgumentParser:
     pg.add_argument("--note", default="")
     pg.add_argument(
         "--supersedes",
-        default="",
+        default=None,
         metavar="OLD_LINE",
         help="asker or Admin: mark this exact detail line superseded and put --note under it",
     )
