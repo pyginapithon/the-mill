@@ -14,7 +14,7 @@ from typing import Any
 from agent_coord.helpers.errors import CoordError
 
 TODO_PAGE = 50
-SHORT_KEYS = ("id", "need_id", "status", "volunteer", "project_id")
+SHORT_KEYS = ("id", "need_id", "status", "volunteer", "project_id", "focus")
 FULL_HINT = "short rows; --full prints every field of every card"
 
 
@@ -94,20 +94,23 @@ def sitting_desk(body: dict) -> str:
     return desk
 
 
-def keep_mine(row: Any, desk: str) -> Any:
-    """Keep only the cards whose volunteer is desk (exact name), in the wall's order.
+def keep_mine(row: Any, desk: str, rank: list | None = None) -> Any:
+    """The desk's cards: focus cards (label named desk) in rank order, then the
+    cards whose volunteer is desk (exact name), each once (#373, #374).
 
-    Runs before --find and paging, so page counts are the filtered set. The wall
-    still applies --status and --done; done cards stay hidden unless --done.
+    Runs before --find and paging, so page counts are this set. The wall still
+    applies --status and --done; done cards stay hidden unless --done.
     """
     if not isinstance(row, dict) or not isinstance(row.get("result"), list):
         return row
-    keep = [r for r in row["result"] if isinstance(r, dict) and str(r.get("volunteer") or "") == desk]
+    from agent_coord.client.focus import order_mine, set_focus_hint
+
+    keep, n_focus, n_claimed = order_mine(row["result"], desk, list(rank or []))
     out = dict(row)
     out["result"] = keep
-    said = f"--mine: {len(keep)} card(s) with volunteer {desk}"
+    said = f"--mine: {n_focus} focus (label {desk}, rank order), then {n_claimed} claimed by {desk}"
     if not keep:
-        said += "; add --done for finished cards, --all for every roster"
+        said += "; add --done for finished cards, --all for every roster; " + set_focus_hint(desk)
     prior = str(row.get("note") or "")
     out["note"] = f"{prior}; {said}" if prior else said
     return out

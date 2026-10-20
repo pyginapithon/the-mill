@@ -735,7 +735,14 @@ def mill_http_from_args(args: Any) -> int:
     row = _todo_call(args, body)
     if mine and isinstance(row, dict) and row.get("ok") is True:
         # #373: only the sitting desk's cards, before --find and paging cut the list.
-        row = todo_rows.keep_mine(row, todo_rows.sitting_desk(body))
+        from agent_coord.client import focus as _focus
+
+        desk = todo_rows.sitting_desk(body)
+        rank: list = []
+        if _focus.wears(row.get("result") or [], desk):
+            # #374: one label read for the rank, only when a listed card wears the desk's label.
+            rank = _focus.label_rank(lambda b: mill_http_call(dict(b, owner=desk)), desk)
+        row = todo_rows.keep_mine(row, desk, rank)
     if find:
         row = _todo_find(row, find)
     if short_rows and isinstance(row, dict) and row.get("ok") is True and isinstance(row.get("result"), list):
@@ -800,6 +807,8 @@ def mill_http_from_args(args: Any) -> int:
         and not (cmd_now == "todo" and str(getattr(args, "need", "") or ""))
         # --find keeps its ranked flat list unless a --group-by was asked (ux12).
         and not (find and not str(getattr(args, "group_by", "") or ""))
+        # --mine keeps focus rank order unless a --group-by was asked (#374).
+        and not (mine and not str(getattr(args, "group_by", "") or ""))
     ):
         from agent_coord.client.grouping import apply as _group
 
@@ -849,6 +858,30 @@ def mill_http_from_args(args: Any) -> int:
         return 0
     print(json.dumps(row, default=str), flush=True)
     return 0
+
+
+def seat_then_focus(who: str, project: str, stop: Any, outcome: dict) -> None:
+    """Project check, then, still seated, the desk's focus line (#374).
+
+    The focus line is one JSON row after the ready and sync lines, only when
+    the desk has a not-done card under the label named after it. Any failure
+    prints nothing: focus never fails or delays a connect.
+    """
+    check_project_on_socket(who, project, stop, outcome)
+    if stop.is_set() or outcome.get("exit"):
+        return
+    from agent_coord.client import ws as _ws
+    from agent_coord.client.focus import connect_block
+
+    def call(body: dict) -> Any:
+        return _ws.own_bridge_call(who, body, timeout_s=10.0)
+
+    try:
+        block = connect_block(call, who)
+    except Exception:
+        return
+    if block and not stop.is_set():
+        print(json.dumps(block, default=str), flush=True)
 
 
 def check_project_on_socket(who: str, project: str, stop: Any, outcome: dict) -> None:
@@ -1013,7 +1046,7 @@ def mill_here_over_http(args: Any) -> int:
     hold_sync_lines()
     start_ws_thread(who, tok, stop, outcome, refuse=refuse)
     threading.Thread(
-        target=check_project_on_socket,
+        target=seat_then_focus,
         args=(who, project, stop, outcome),
         name="mill-connect-project-%s" % who,
         daemon=True,

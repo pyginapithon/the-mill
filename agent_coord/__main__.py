@@ -1006,7 +1006,7 @@ def _build_parser() -> MillArgumentParser:
         help="list cards in short rows, 50 a page (optional NEED peek)",
         description="List cards: short rows (id, need, status, volunteer), 50 a page; "
         "--page N reads page N, --full prints every field of every card; "
-        "--mine keeps only the cards this desk volunteered for.",
+        "--mine lists this desk's focus cards in rank order, then the ones it volunteered for.",
     )
     nd.add_argument("project", nargs="?", default="")
     nd.add_argument(
@@ -1026,8 +1026,9 @@ def _build_parser() -> MillArgumentParser:
     nd.add_argument(
         "--mine",
         action="store_true",
-        help="only cards whose volunteer is this desk (the sitting mill connect); "
-        "works with --status, --done, --all, --find, --full and --page, and pages count only these cards",
+        help="this desk's cards (the sitting mill connect): first its focus cards (label named after the desk) in rank order, "
+        "then the cards it volunteered for; works with --status, --done, --all, --find, --full and --page, "
+        "and pages count only these cards",
     )
     nd.add_argument("--all", action="store_true", help="every roster in the office (default: your rosters)")
     nd.add_argument(
