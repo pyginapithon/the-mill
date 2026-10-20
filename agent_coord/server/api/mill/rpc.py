@@ -87,6 +87,22 @@ def _seat_roster(cn, desk: str) -> str:
     return names.pop() if len(names) == 1 else CONST_OFFICE
 
 
+def _connect_roster(cn, desk: str, name: str) -> str:
+    """Sender roster named at mill connect ROSTER DESK (#337); the desk must be on it."""
+    from agent_coord.server.records import member as rec_member
+
+    want = _stored(name)
+    if want == CONST_OFFICE:
+        return CONST_OFFICE
+    names = {_stored(r.get("slot")) for r in (rec_member.select(cn, "", desk, CONST_ROSTER) or [])}
+    if want not in names:
+        raise CoordError(
+            f"mail: {desk} is not on roster {want[:64]}, the roster this connect named; "
+            "pass --roster NAME, or connect on a roster this desk is on"
+        )
+    return want
+
+
 def _live_dest_kind(cn, name: str) -> str:
     """desk or roster already in the name table. Desk wins when the bare string is shared."""
     from agent_coord.server.records import name as rec_name
@@ -831,7 +847,9 @@ def _h_send(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     sender_roster = _stored(body.get("roster"))
     _check_roster(c._cn, "send", sender_roster)
     if not str(body.get("project") or "").strip():
-        project = _seat_roster(c._cn, src)
+        # #337: the roster named at connect is the default; an explicit --roster wins.
+        cr = _stored(body.get("connect_roster"))
+        project = _connect_roster(c._cn, src, cr) if cr and not sender_roster else _seat_roster(c._cn, src)
 
     # resolved: (dst_kind, stored dest name). dst_kind is desk, project, or role.
     resolved: list[tuple[str, str]] = []
@@ -1217,6 +1235,7 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         "parent_type": "mail",
         "parent_id": mail_id,
         "project": project if str(body.get("project") or "").strip() else "",
+        "connect_roster": body.get("connect_roster") or "",
     }
     # Optional override of letter sender roster (--roster)
     if body.get("roster") is not None and str(body.get("roster") or "").strip():
