@@ -47,7 +47,7 @@ Example:
 | `SCORE` | score id, when | `mill score` / Wall glance |
 | `JOIN` | join id, when | ignore (SESSION) |
 
-A send is `{kind: mail}` with id, created, sender, mail_tos, roster_id, opened, receipt, and a body cut at 256 characters. Desk unread: `mill inbox` (a fetch does not mark; `mill mark` or `mill reply` does). Branch: `mill mail-thread <id>` (that letter's branch since your last read; `--full` for the whole branch); whole room: add `--room` (cite `latest_id`). Watcher types are `todo`, `join`, `hold`, and `score`. There is no `NAME` detail. There is no mail watcher (`mill add mail:ID` changes recipients).
+A send is `{kind: mail}` with id, created, sender, mail_tos, roster_id, opened, receipt, and the body: whole up to 1024 characters; a longer body is cut there and the item says so with `body_trunc` true, `body_chars` (the full length) and `read` (`mill mail-thread <id>`, which prints the letter whole). Regression row F63 (mail-notice-cut). Desk unread: `mill inbox` (a fetch does not mark; `mill mark` or `mill reply` does). Branch: `mill mail-thread <id>` (that letter's branch since your last read; `--full` for the whole branch); whole room: add `--room` (cite `latest_id`). Watcher types are `todo`, `join`, `hold`, and `score`. There is no `NAME` detail. There is no mail watcher (`mill add mail:ID` changes recipients).
 
 PING is not an activity watcher: `{type:heartbeat,id:0,hint:PING}`. It is not routed - ignore.
 
@@ -68,7 +68,7 @@ These are conventions for **your** route program - mill does not parse them. Kee
 
 | Desk intent | `mill add` | Example `--hint` | Program does |
 | :--- | :--- | :--- | :--- |
-| Mail doorbell | no watcher. The push is `{kind: mail}` | the compact body | desk unread: `mill inbox`; room catch-up: `mill mail-thread` (not plain inbox alone) when the 256-character body is not enough |
+| Mail doorbell | no watcher. The push is `{kind: mail}` | the compact body | desk unread: `mill inbox`; room catch-up: `mill mail-thread` (not plain inbox alone) when the item has `body_trunc` (run its `read` command) |
 | One card work | `todo <id>` | `need,status` | `mill todo` that card if body not in detail |
 | Lock awareness | `hold <id>` | `resource,desk` | skip write if not you |
 | KPI tick | `score <id>` | `kpi,value,target` | a row in the score table |

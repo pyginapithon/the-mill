@@ -67,6 +67,7 @@ def test_compact_mail_is_for_one_dest_and_cuts_the_body():
     assert item["opened"] == "2026-09-27T01:00:00"
     assert item["receipt"] == 0
     assert len(item["body"]) == BODY_CAP
+    assert item["body_trunc"] is True and item["read"] == "mill mail-thread 9"  # #584
 
 
 def test_compact_receipt_names_the_opener_and_the_open_time():

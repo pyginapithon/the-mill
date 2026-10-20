@@ -90,6 +90,7 @@ When a verb gives you friction (refused, wrong or confusing output, a needless r
 
 - Watcher HINTs: `todo`, `hold`, `score`, and `join` (ignore `join`).
 - Mail arrives as `{kind: mail}` or `{kind: receipt}`; it is not a HINT. Hub `PING` is keep-alive; ignore it.
+- A mail item with `body_trunc` was cut; run its `read` command (`mill mail-thread <id>`) before you act on the letter.
 - One arrival, one job, then stop. A human in chat wins over a HINT.
 
 Office-function files (office-*), when present, add domain examples only.

@@ -9,11 +9,23 @@ def _nm(value: object) -> str:
     """Stored desk name."""
     return str(value or "").strip()
 
-BODY_CAP = 256
+# A typical letter arrives whole; a letter is at most 4096 characters, so a
+# connect sync of many missed letters stays bounded (#584).
+BODY_CAP = 1024
 
 
-def _body(raw: object) -> str:
-    return str(raw or "")[:BODY_CAP]
+def _body(raw: object, mail_id: int) -> dict:
+    """The body, whole when it fits. A cut says so, like inbox rows (body_trunc),
+    with the full length and the command that reads the letter whole (#584)."""
+    text = str(raw or "")
+    if len(text) <= BODY_CAP:
+        return {"body": text}
+    return {
+        "body": text[:BODY_CAP],
+        "body_trunc": True,
+        "body_chars": len(text),
+        "read": f"mill mail-thread {int(mail_id)}",
+    }
 
 
 def compact_mail(letter: dict, dest_rows: list[dict], for_desk: str) -> dict:
@@ -27,26 +39,28 @@ def compact_mail(letter: dict, dest_rows: list[dict], for_desk: str) -> dict:
             tos.append(desk)
         if desk == want:
             mine = row
+    mid = int(letter.get("id") or 0)
     return {
         "kind": "mail",
-        "id": int(letter.get("id") or 0),
+        "id": mid,
         "created": letter.get("created"),
         "sender": _nm(letter.get("desk") or letter.get("sender")),
         "mail_tos": tos,
         "roster_id": letter.get("sender_roster"),
         "opened": mine.get("opened"),
         "receipt": int(mine.get("receipt") or 0),
-        "body": _body(letter.get("body")),
+        **_body(letter.get("body"), mid),
     }
 
 
 def compact_receipt(row: dict) -> dict:
     """Open of a receipt-flagged mail, for the sender."""
+    mid = int(row.get("id") or row.get("mail_id") or 0)
     return {
         "kind": "receipt",
-        "id": int(row.get("id") or row.get("mail_id") or 0),
+        "id": mid,
         "created": row.get("created"),
-        "body": _body(row.get("body")),
+        **_body(row.get("body"), mid),
         "mail_to": _nm(row.get("desk") or row.get("opener")),
         "opened": row.get("opened") or row.get("updated"),
     }
