@@ -265,6 +265,17 @@ def main(argv: list[str] | None = None) -> int:
     return _run_parsed(p, argv)
 
 
+def _page_number(raw: str) -> int:
+    """todo --page N: a whole number from 1 (#295)."""
+    try:
+        n = int(raw)
+    except ValueError:
+        n = 0
+    if n < 1:
+        raise argparse.ArgumentTypeError("N is a whole number from 1")
+    return n
+
+
 def _build_parser() -> MillArgumentParser:
     p = MillArgumentParser(
         prog="mill",
@@ -904,7 +915,9 @@ def _build_parser() -> MillArgumentParser:
 
     nd = sub.add_parser(
         "todo",
-        help="list cards (optional NEED peek)",
+        help="list cards in short rows, 50 a page (optional NEED peek)",
+        description="List cards: short rows (id, need, status, volunteer), 50 a page; "
+        "--page N reads page N, --full prints every field of every card.",
     )
     nd.add_argument("project", nargs="?", default="")
     nd.add_argument(
@@ -932,6 +945,19 @@ def _build_parser() -> MillArgumentParser:
         "--status",
         default="",
         help="filter cards: parked|open|claimed|shipped|done (protocol todo)",
+    )
+    view = nd.add_mutually_exclusive_group()
+    view.add_argument(
+        "--full",
+        action="store_true",
+        help="every field of every card, no paging (default: short rows, 50 a page)",
+    )
+    view.add_argument(
+        "--page",
+        type=_page_number,
+        default=0,
+        metavar="N",
+        help="short rows, page N (1 = first); the reply's page block names the next",
     )
     nd.add_argument(
         "--fixtures",

@@ -48,7 +48,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status.
   - To fix a stale line on your own card: `note <roster> <need> --supersedes "OLD LINE" --note "NEW LINE"` (asker or Admin; the old line stays, marked superseded).
   - `pass <roster> <need>`: your pass ships it; the asker passes again to mark it done.
-  - The board list `todo <roster>` hides done cards; add `--done` to see them. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
+  - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.
