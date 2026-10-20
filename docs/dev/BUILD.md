@@ -4,6 +4,8 @@ This is for people who **change mill** (the git tree). App users do not build - 
 
 Do not pin mill versions in docs.
 
+**Builds between releases.** The version number changes only at the bump, so a build from a later `main` sha still reports the last release (for example `0.7.8`) in replies and on the Wall. `mill --version` adds `+g<sha7>` when it can tell the commit: run from a git checkout (its HEAD), or installed with `pip install "git+https://github.com/pyginapithon/the-mill@<sha>"` (pip records the commit). A wheel, sdist or plain-folder install of a main sha prints the bare number, so record the sha you installed from. Regression row F61 (dev-version).
+
 ## Release order
 
 Assume **regression tests already pass**. Then:

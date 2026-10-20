@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Plan #27: mill --version from importlib.metadata, one line, not git SHA."""
+"""Plan #27: mill --version from importlib.metadata, one line; the pack version is not a git SHA.
+
+A build that is not a release adds +g<sha7> to the printed line (#538, F61).
+"""
 from __future__ import annotations
 
 import io
@@ -8,6 +11,7 @@ from contextlib import redirect_stdout
 import pytest
 
 from agent_coord.__main__ import main, package_version
+from agent_coord.install.packver import version_line
 
 
 def test_package_version_not_git_sha():
@@ -26,7 +30,7 @@ def test_mill_version_flag_one_line():
     out = buf.getvalue().strip()
     assert out
     assert "\n" not in out
-    assert out == package_version()
+    assert out == version_line() and out.startswith(package_version())
 
 
 def test_mill_short_version_flag():
@@ -34,4 +38,4 @@ def test_mill_short_version_flag():
     with redirect_stdout(buf):
         code = main(["-V"])
     assert code == 0
-    assert buf.getvalue().strip() == package_version()
+    assert buf.getvalue().strip() == version_line()
