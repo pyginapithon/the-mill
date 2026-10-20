@@ -1,7 +1,7 @@
 """Desk focus: the label whose name is the desk id ranks that desk's cards (#374).
 
 Anyone ranks a card for a desk with `mill label todo <id> <desk> --ord N`
-(0 pinned, 65535 unplaced). Two readers, both on existing read paths:
+(0 pinned, 65535 unplaced). Two readers, both on existing read paths.
 
 Focus skips cards that are done, parked, or held by another desk. Rank is
 ord ascending (0 pinned first), ties by card id. Client only: the wall
@@ -11,15 +11,16 @@ serves the same reads it did in 0.7.8, so an older client sees nothing new.
   order (one `trail --label <desk>` read, only when a board card wears it),
   then the desk's claimed cards.
 - `mill connect`, once seated, prints one `{"kind": "focus"}` line with the
-  top FOCUS_TOP not-done focus cards, so the desk knows what to work on next
-  without asking; nothing when there are none.
+  top FOCUS_TOP focus cards from the same board `todo --mine` reads (the
+  desk's rosters), so the desk knows what to work on next without asking;
+  nothing when there are none, and one stderr line naming the cause when a
+  read fails (#536).
 """
 from __future__ import annotations
 
 from typing import Any, Callable
 
 FOCUS_TOP = 5
-FOCUS_PEEKS = 10  # card reads connect spends looking for FOCUS_TOP not-done ones
 UNPLACED = 65535
 # What a desk needs to act on a card: which one, where (claim takes roster and need),
 # its state, who has it, and its rank on the label.
@@ -37,15 +38,24 @@ def _result(reply: Any) -> Any:
     return reply.get("result")
 
 
-def label_rank(call: Callable[[dict], Any], desk: str) -> list[tuple[int, int]]:
-    """(todo id, ord) wearing label desk, ord ascending (0 pinned first), ties by card id.
+class FocusError(Exception):
+    """A focus read failed; the text names the read and its cause."""
 
-    [] on any failure.
-    """
+
+def _read(call: Callable[[dict], Any], body: dict) -> Any:
+    """One read for the connect focus line; FocusError names the verb and cause."""
+    verb = str(body.get("verb") or "")
     try:
-        res = _result(call({"verb": "trail", "label": desk}))
-    except Exception:
-        return []
+        reply = call(body)
+    except Exception as e:
+        raise FocusError(f"{verb} read failed: {e or type(e).__name__}") from e
+    if not isinstance(reply, dict) or reply.get("ok") is not True:
+        err = reply.get("error") if isinstance(reply, dict) else None
+        raise FocusError(f"{verb} read refused: {err or 'no answer'}")
+    return reply.get("result")
+
+
+def _rank_rows(res: Any) -> list[tuple[int, int]]:
     rows = res.get("rows") if isinstance(res, dict) else None
     out: list[tuple[int, int]] = []
     for r in rows if isinstance(rows, list) else []:
@@ -56,6 +66,17 @@ def label_rank(call: Callable[[dict], Any], desk: str) -> list[tuple[int, int]]:
                 continue
     out.sort(key=lambda t: (t[1], t[0]))
     return out
+
+
+def label_rank(call: Callable[[dict], Any], desk: str) -> list[tuple[int, int]]:
+    """(todo id, ord) wearing label desk, ord ascending (0 pinned first), ties by card id.
+
+    [] on any failure: todo --mine then lists focus cards by card id.
+    """
+    try:
+        return _rank_rows(_read(call, {"verb": "trail", "label": desk}))
+    except FocusError:
+        return []
 
 
 def actionable(card: dict, desk: str, status_asked: str = "") -> bool:
@@ -101,24 +122,39 @@ def wears(cards: list, desk: str) -> bool:
     return any(isinstance(r, dict) and desk in (r.get("labels") or []) for r in cards)
 
 
+TODO_ROSTERS_PER_READ = 200  # the wall's TODO_ROSTERS_MAX
+
+
 def connect_block(call: Callable[[dict], Any], desk: str) -> dict | None:
     """The focus line connect prints once seated, or None when there is nothing to show.
 
-    The top FOCUS_TOP actionable focus cards (see actionable) in rank order.
+    The same reads as `todo --mine` (#536): the desk's rosters (member), their
+    board in one read per 200 rosters (done hidden), then the label rank only
+    when a card wears the label. The top FOCUS_TOP focus cards in rank order.
+    A card is read on its own roster, never by a bare id: the wall defaults an
+    empty project to the-mill. A failed read raises FocusError naming it.
     """
-    rank = label_rank(call, desk)
-    cards: list[dict] = []
-    for cid, ord_ in rank[:FOCUS_PEEKS]:
-        if len(cards) >= FOCUS_TOP:
-            break
-        try:
-            res = _result(call({"verb": "todo", "project": "", "need": str(cid)}))
-        except Exception:
-            continue
-        card = res[0] if isinstance(res, list) and res and isinstance(res[0], dict) else None
-        if card is None or not actionable(card, desk):
-            continue
-        cards.append(dict({k: card.get(k, "") for k in CARD_KEYS}, rank=ord_))
-    if not cards:
+    res = _read(call, {"verb": "member"})
+    rosters: list[str] = []
+    for r in res if isinstance(res, list) else []:
+        slot = str(r.get("slot") or "") if isinstance(r, dict) else ""
+        if slot and slot not in rosters:
+            rosters.append(slot)
+    cards: list = []
+    for at in range(0, len(rosters), TODO_ROSTERS_PER_READ):
+        part = rosters[at : at + TODO_ROSTERS_PER_READ]
+        got = _read(call, {"verb": "todo", "project": part[0], "rosters": part})
+        if not isinstance(got, dict) or not isinstance(got.get("cards"), list):
+            raise FocusError("todo read: the wall did not answer {cards}")
+        cards.extend(got["cards"])
+    if not wears(cards, desk):
         return None
-    return {"kind": "focus", "label": desk, "cards": cards, "rest": REST}
+    rank = _rank_rows(_read(call, {"verb": "trail", "label": desk}))
+    listed, n_focus, _ = order_mine(cards, desk, rank)
+    top = [
+        dict({k: c.get(k, "") for k in CARD_KEYS}, rank=c.get("focus", UNPLACED))
+        for c in listed[: min(n_focus, FOCUS_TOP)]
+    ]
+    if not top:
+        return None
+    return {"kind": "focus", "label": desk, "cards": top, "rest": REST}

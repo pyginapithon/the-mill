@@ -864,8 +864,8 @@ def seat_then_focus(who: str, project: str, stop: Any, outcome: dict) -> None:
     """Project check, then, still seated, the desk's focus line (#374).
 
     The focus line is one JSON row after the ready and sync lines, only when
-    the desk has a not-done card under the label named after it. Any failure
-    prints nothing: focus never fails or delays a connect.
+    the desk has a focus card it can work on. A failed focus read prints one
+    stderr line naming the cause (#536); focus never fails or stops a connect.
     """
     check_project_on_socket(who, project, stop, outcome)
     if stop.is_set() or outcome.get("exit"):
@@ -874,11 +874,15 @@ def seat_then_focus(who: str, project: str, stop: Any, outcome: dict) -> None:
     from agent_coord.client.focus import connect_block
 
     def call(body: dict) -> Any:
-        return _ws.own_bridge_call(who, body, timeout_s=10.0)
+        return _ws.own_bridge_call(who, body, timeout_s=20.0)
 
     try:
         block = connect_block(call, who)
-    except Exception:
+    except Exception as e:
+        # #536: never fail or stop the connect, but say why the focus line is missing.
+        if not stop.is_set():
+            why = " ".join(str(e).split()) or type(e).__name__
+            print("connect: focus not shown: " + why[:300], file=sys.stderr, flush=True)
         return
     if block and not stop.is_set():
         print(json.dumps(block, default=str), flush=True)
