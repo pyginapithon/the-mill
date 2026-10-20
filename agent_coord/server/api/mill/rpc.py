@@ -1834,6 +1834,9 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
             note_s = (note_s + "\n" + text_s) if note_s else text_s
 
     supersedes = str(body.get("supersedes") or "").strip()
+    if "supersedes" in body and not supersedes:
+        # A blank OLD_LINE must not fall through to a plain note or a --replace overwrite.
+        raise CoordError("note: --supersedes needs the old line; copy it from mill todo")
     if supersedes and not note_s:
         raise CoordError("note: --supersedes needs the new text (--note TEXT)")
     eta_raw = str(body.get("eta") or "").strip()
@@ -1918,12 +1921,14 @@ def _supersede_line(
         raise CoordError("note: that line is already superseded; quote the line that replaced it")
     lines = detail.split("\n")
     hits = [i for i, ln in enumerate(lines) if ln.strip() == old]
+    # The errors never echo OLD_LINE: it is not a redacted key and could hold a secret.
     if not hits:
-        raise CoordError("note: no detail line is exactly %r; copy the whole line from mill todo" % old[:120])
+        raise CoordError("note: no detail line matches --supersedes exactly; copy the whole line from mill todo")
     if len(hits) > 1:
-        raise CoordError("note: %d detail lines match %r; nothing changed" % (len(hits), old[:120]))
+        raise CoordError("note: %d detail lines match --supersedes; nothing changed" % len(hits))
     i = hits[0]
-    lines[i : i + 1] = [SUPERSEDED + lines[i].strip(), new]
+    # Ends are ignored only to match; the kept line is the original, unchanged.
+    lines[i : i + 1] = [SUPERSEDED + lines[i], new]
     joined = "\n".join(lines)
     if len(joined) > NOTE_MAX:
         raise CoordError(f"note: detail would be {len(joined)} chars (max {NOTE_MAX}); shorten")

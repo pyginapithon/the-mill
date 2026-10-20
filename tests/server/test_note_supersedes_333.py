@@ -69,7 +69,7 @@ def test_non_asker_is_refused_and_nothing_written(card):
 
 
 def test_no_match_is_refused(card):
-    with pytest.raises(CoordError, match="no detail line is exactly"):
+    with pytest.raises(CoordError, match="no detail line matches --supersedes exactly"):
         _note({"supersedes": "1. connect desk", "note": "x"})
     assert card["writes"] == 0
 
@@ -118,3 +118,41 @@ def test_cli_sends_supersedes(monkeypatch):
     )
     body = outbound.body_from_args(a)
     assert body["supersedes"] == "1. old" and body["note"] == "1. new"
+
+
+@pytest.mark.parametrize("blank", ["", "   "])
+@pytest.mark.parametrize("replace", [False, True])
+def test_blank_old_line_is_refused_not_a_plain_note(card, blank, replace):
+    with pytest.raises(CoordError, match="--supersedes needs the old line"):
+        _note({"supersedes": blank, "note": "x", "replace": replace})
+    assert card["writes"] == 0
+
+
+def test_refusals_never_echo_the_old_line(card):
+    secret = "ghp_" + "A" * 36
+    with pytest.raises(CoordError) as ei:
+        _note({"supersedes": secret, "note": "x"})
+    assert secret not in str(ei.value)
+    card["body"] = json.dumps({"slug": "c333", "doing": "", "detail": secret + "\n" + secret})
+    with pytest.raises(CoordError) as ei:
+        _note({"supersedes": secret, "note": "x"})
+    assert secret not in str(ei.value)
+
+
+def test_kept_line_keeps_its_spaces(card):
+    card["body"] = json.dumps({"slug": "c333", "doing": "", "detail": "Steps:\n  - step one  \nend"})
+    _note({"supersedes": "- step one", "note": "  - step one, fixed"})
+    assert _detail(card) == "Steps:\n[superseded]   - step one  \n- step one, fixed\nend"
+
+
+@pytest.mark.parametrize("blank", ["", "  "])
+def test_cli_refuses_a_blank_old_line(monkeypatch, blank):
+    from agent_coord.__main__ import _build_parser
+    from agent_coord.client import outbound
+
+    monkeypatch.setattr("agent_coord.client.tokens.resolve_desk_owner", lambda _x="": "asker-desk")
+    a = _build_parser().parse_args(
+        ["note", "cold-test", "c333", "--supersedes", blank, "--note", "x"]
+    )
+    with pytest.raises(CoordError, match="--supersedes needs the old line"):
+        outbound.body_from_args(a)
