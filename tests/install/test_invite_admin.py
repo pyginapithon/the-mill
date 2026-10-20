@@ -65,8 +65,21 @@ def test_invite_cli_posts_the_verb(monkeypatch, capsys) -> None:
     assert seen["mint"] is True
     assert seen["label"] == "bot"
     assert seen["owner"] == "DESK_admin"
-    assert "https://203.0.113.10/?invite=sekret" in out
+    # #359: the link goes to an owner-only file; stdout names the file.
+    assert "sekret" not in out
     assert '"token"' not in out
+    assert "mill invite --enable abc123" in out
+    assert _link_text(out) == "https://203.0.113.10/?invite=sekret"
+
+
+def _link_text(out: str) -> str:
+    import json
+    import os
+    from pathlib import Path
+
+    body = out[: out.rindex("}") + 1]
+    where = json.loads(body)["link_file"].replace("~", str(Path.home()), 1)
+    return Path(os.path.expanduser(where)).read_text(encoding="utf-8").strip()
 
 
 def test_invite_verb_refuses_non_admin(monkeypatch) -> None:

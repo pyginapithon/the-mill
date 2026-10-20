@@ -352,6 +352,8 @@ invite ttl_for
 invite seat
 invite seat_roster
 invite label
+invite link_file
+invite print_link
 invite join
 invite party
 invite party_id
