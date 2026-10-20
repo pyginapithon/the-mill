@@ -24,6 +24,15 @@ def test_help_names_unassigned_and_the_handoff():
     assert "Chief" not in text
 
 
+def test_assign_dash_help_shows_the_handoff(capsys):
+    import pytest
+
+    with pytest.raises(SystemExit):
+        _build_parser().parse_args(["assign", "--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "unassigned card" in text and "unclaim it first" in text and "limited Admin" in text
+
+
 def test_skill_names_the_handoff():
     skill = (ROOT / "docs" / "protocol" / "skill.md").read_text()
     assert "To hand a card to a named desk: `unclaim` it, then `assign <roster> <need> <desk>`" in skill
