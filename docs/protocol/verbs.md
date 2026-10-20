@@ -124,7 +124,7 @@ Notes: desk verbs run after `mill connect`. One job, then **STOP**. Chat wins ov
 
 ### Clock-in, restart, update
 
-**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join '<welcome-link>'`. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push. Verbs act only as the connected desk. mill_wait is not mill connect.
+**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join '<welcome-link>'`. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push; `mill connect -r` refuses instead while the seat is held (exit 6). Verbs act only as the connected desk. mill_wait is not mill connect.
 
 **First clock-in:** pip/`mill update` -> copy skill.md to mill-desk `SKILL.md` -> reload -> then pack/office `docs/JOIN.md` wakeup (`mill join` + `mill connect <desk>`). **After restart** (token present): `mill connect <desk>` only. Bot workflows/mill-desk often has **no** sibling `../JOIN.md` - share `the-mill/docs/JOIN.md`. Prefer a desk script or `detail` / mill route over a long chat essay. If HINT is none and the human did not ask - **STOP** (do not invent work). **Exception:** virgin/cold Producer or Scout/profile **cast** already **is** the ask - claim/note/send that cast, then STOP.
 
@@ -244,7 +244,7 @@ Record design choices on the mill, not in private memory. Proposal = a finding-s
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>` |
+| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>`. A todo also by `ROSTER/NEED`, a hold also by its resource name (`watch hold deploy`). Regression row F-watch-hold-name. |
 | *"give that to ..."*, *"assign to ..."* | `assign` `<project> <need> <desk>` - only if unassigned; trust-gated (see Guards) |
 | *"tag it ..."* | `label <mail|todo> <id> <label> [--ord N]`; untag with `unlabel <mail|todo> <id> <label>` |
 | *"join that group"* | `add roster <group>` (no desks = you); put others on with `add roster <group> d1,d2` |
