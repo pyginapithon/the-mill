@@ -423,6 +423,17 @@ READY_NOTE = (
 )
 
 
+def with_connect_roster(verb: str, args: dict[str, Any]) -> dict[str, Any]:
+    """send/reply without --roster carry the roster this connect named (#337).
+
+    The server checks the desk is on it; an explicit --roster is left alone.
+    """
+    named = str(READY_ROSTER.get("roster") or "").strip()
+    if verb not in ("send", "reply") or not named or str(args.get("roster") or "").strip():
+        return args
+    return dict(args, connect_roster=named)
+
+
 def note_bridge_ready(desk: str) -> None:
     """One JSON line when this process first publishes the bridge (#210)."""
     who = slug_desk(desk)
@@ -1072,7 +1083,7 @@ async def _sit_session(
                             if stashed is not None:
                                 reply = stashed
                             else:
-                                wire = {"id": req_id, "verb": verb, "args": args}
+                                wire = {"id": req_id, "verb": verb, "args": with_connect_roster(verb, args)}
                                 wait_q: asyncio.Queue = asyncio.Queue(maxsize=1)
 
                                 async def _submit(
