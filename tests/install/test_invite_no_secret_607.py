@@ -4,7 +4,7 @@
 (mill join <welcome link>) still printed the seat secret. The printed reply
 now withholds the secret wherever it sits; the link goes to the owner-only
 file, or to stdout once with --print-link. mill init and mill install server
-mint an invite key and a host seat; their printed result follows the same rule.
+mint an invite key and a host seat; their links go only to the owner-only file.
 """
 from __future__ import annotations
 
@@ -104,10 +104,11 @@ def test_init_prints_no_secret_and_writes_the_links(monkeypatch, capsys):
     assert URL in text and f"{WALL}/?invite={KEY}" in text
 
 
-def test_init_print_link(monkeypatch, capsys):
-    rc, cap = _run_init(monkeypatch, capsys, ["--print-link"])
-    assert rc == 0
-    assert cap.out.count(SECRET) == 1 and cap.out.count(KEY) == 1
+def test_init_has_no_print_link(monkeypatch, capsys):
+    # The host links stay in the owner-only file; there is no stdout form.
+    with pytest.raises(SystemExit):
+        _run_init(monkeypatch, capsys, ["--print-link"])
+    assert SECRET not in capsys.readouterr().out
 
 
 def test_install_server_prints_no_secret(monkeypatch, capsys):
@@ -121,9 +122,8 @@ def test_install_server_prints_no_secret(monkeypatch, capsys):
 
 def test_init_and_install_take_the_link_flags():
     p = _build_parser()
-    for argv in (["init", "--print-link"], ["install", "server", "--link-file", "x.link"]):
-        a = p.parse_args(argv)
-        assert hasattr(a, "print_link") and hasattr(a, "link_file")
+    for argv in (["init", "--link-file", "x.link"], ["install", "server", "--link-file", "x.link"]):
+        assert p.parse_args(argv).link_file == "x.link"
 
 
 @pytest.mark.parametrize("reply", [

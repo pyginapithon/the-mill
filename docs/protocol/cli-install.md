@@ -24,9 +24,9 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 
 | verb | form | what |
 |---|---|---|
-| `install` | `mill install {server,client,book,records,wall,desk,check,cloud,glance-tap} [--apply] [--dry-run] [--http H] [--book B] [--provider P] [--bind B] [--port N] [--dest D] [--lan-only] [--public] [--agent] [--tap T] [--generate [N]]` | server = records + wall (admin); client = mill CLI; check = preflight; cloud = runbook. `--dry-run` mutates nothing. Desks do not run install. See [HOST.md](../install/HOST.md). |
+| `install` | `mill install {server,client,book,records,wall,desk,check,cloud,glance-tap} [--apply] [--dry-run] [--http H] [--book B] [--provider P] [--bind B] [--port N] [--dest D] [--lan-only] [--public] [--agent] [--tap T] [--generate [N]] [--link-file PATH]` | server = records + wall (admin); client = mill CLI; check = preflight; cloud = runbook. `--dry-run` mutates nothing. Desks do not run install. See [HOST.md](../install/HOST.md). |
 | `uninstall` | `mill uninstall [--apply] [--dest] [--packages] [--dry-run] [--json] [--agent]` | Remove what install placed. |
-| `init` | `mill init [--yes] [--host] [--port] [--user] [--password] [--database] [--node] [--bind] [--dashboard-port] [--lan] [--config]` | Write the records config. Pass secrets by prompt, not in shared scripts. |
+| `init` | `mill init [--yes] [--host] [--port] [--user] [--password] [--database] [--node] [--bind] [--dashboard-port] [--lan] [--config] [--link-file PATH]` | Write the records config. Pass secrets by prompt, not in shared scripts. The Wall invite link and host seat welcome link it mints go to an owner-only file (`--link-file PATH`, default under `~/.mill/invites`), named as `link_file`; never printed (F64). |
 | `wall` | `mill wall [--bind] [--port] [--roots] [--api-only]` | Run the Wall (HTML + `/api` + `/ws`). |
 | `wall-check` | `mill wall-check [--base] [--filter PROJECT] [--expect-empty]` | Check a running Wall. |
 | `wall-src` | `mill wall-src [src] [--apply] [--git-root] [--dest]` | Point the Wall at pip or git source. |

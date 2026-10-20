@@ -208,11 +208,6 @@ def _print_install(args, result) -> None:
         _print(result)
         return
     out = _withhold(result, secrets)
-    if bool(getattr(args, "print_link", False)):
-        _print(out)
-        for link in links:
-            print(link, flush=True)
-        return
     try:
         where = _invite_link_file(args, "install", "\n".join(links))
     except OSError as e:
@@ -225,7 +220,7 @@ def _print_install(args, result) -> None:
         )
         return
     out["link_file"] = str(where)
-    out["link"] = "written to link_file (owner-only); hand it over privately; --print-link prints it instead"
+    out["link"] = "minted links written to link_file (owner-only); hand them over privately"
     _print(out)
 
 
@@ -426,19 +421,16 @@ def _page_number(raw: str) -> int:
 
 
 def _link_flags(sp) -> None:
-    """--link-file / --print-link for commands that mint an invite key or a seat (#607)."""
+    """--link-file for commands that mint an invite key or a host seat (#607).
+
+    No --print-link here: the links are read from the owner-only file.
+    """
     sp.add_argument(
         "--link-file",
         default="",
         dest="link_file",
         metavar="PATH",
-        help="write a minted link here (owner-only; default under ~/.mill/invites)",
-    )
-    sp.add_argument(
-        "--print-link",
-        action="store_true",
-        dest="print_link",
-        help="print a minted secret link on stdout instead of writing a file",
+        help="write the minted links here (owner-only; default under ~/.mill/invites)",
     )
 
 

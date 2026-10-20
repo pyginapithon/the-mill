@@ -22,7 +22,6 @@ init dashboard_port
 init lan
 init config_path
 init link_file
-init print_link
 init office
 hold (verb)
 hold resource
@@ -137,7 +136,6 @@ install dashboard_bind
 install port
 install dest
 install link_file
-install print_link
 install lan_only
 install lan_only_off
 install mill_agent

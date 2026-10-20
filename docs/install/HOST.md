@@ -29,7 +29,7 @@ mill init --yes
 mill connect <desk> --vendor <vendor>
 ```
 
-`mill install server` and `mill init` mint a Wall invite key and a host seat welcome link; both links go to an owner-only file under `~/.mill/invites` and the printed result names it as `link_file` (`--print-link` prints them instead). Regression row F64 (secret-out).
+`mill install server` and `mill init` mint a Wall invite key and a host seat welcome link; both links go to an owner-only file under `~/.mill/invites` and the printed result names it as `link_file` (`--link-file PATH` picks the file). Regression row F64 (secret-out).
 
 Join recipe: [JOIN.md](../JOIN.md). Host vs join copy-paste: [usecases.md](../protocol/usecases.md). File hold: `mill hold` / `mill drop`. Cards: `mill create todo` / `claim` / `pass`.
 
