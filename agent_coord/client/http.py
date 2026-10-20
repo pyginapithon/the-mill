@@ -731,7 +731,11 @@ def mill_http_from_args(args: Any) -> int:
     mail_block: dict | None = None
     # Lock: never let argv --owner rewrite session active / Bearer.
     body = body_from_args(args)
+    mine = todo_rows.mine_applies(args)
     row = _todo_call(args, body)
+    if mine and isinstance(row, dict) and row.get("ok") is True:
+        # #373: only the sitting desk's cards, before --find and paging cut the list.
+        row = todo_rows.keep_mine(row, todo_rows.sitting_desk(body))
     if find:
         row = _todo_find(row, find)
     if short_rows and isinstance(row, dict) and row.get("ok") is True and isinstance(row.get("result"), list):

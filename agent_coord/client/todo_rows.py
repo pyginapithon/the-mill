@@ -67,3 +67,47 @@ def short(result: Any, roster: str = "") -> Any:
         out["groups"] = [dict(g, items=[one(r) for r in g.get("items") or []]) for g in result["groups"]]
         return out
     return result
+
+
+def mine_applies(args: Any) -> bool:
+    """True for `todo --mine` on the board list (#373); a NEED peek is refused."""
+    if str(getattr(args, "cmd", "") or "") != "todo" or not bool(getattr(args, "mine", False)):
+        return False
+    if str(getattr(args, "need", "") or ""):
+        raise CoordError("todo --mine: a NEED peek is one card; drop --mine")
+    return True
+
+
+def sitting_desk(body: dict) -> str:
+    """The desk --mine matches: the sitting connect this command ran as."""
+    desk = str((body or {}).get("owner") or "").strip()
+    if not desk:
+        from agent_coord.client.tokens import resolve_desk_owner
+
+        desk = (resolve_desk_owner("") or "").strip()
+    if not desk:
+        from agent_coord.client.session_errors import ONE_LINER
+
+        raise CoordError(
+            "todo --mine: no sitting mill connect, so there is no desk to match; run it as " + ONE_LINER
+        )
+    return desk
+
+
+def keep_mine(row: Any, desk: str) -> Any:
+    """Keep only the cards whose volunteer is desk (exact name), in the wall's order.
+
+    Runs before --find and paging, so page counts are the filtered set. The wall
+    still applies --status and --done; done cards stay hidden unless --done.
+    """
+    if not isinstance(row, dict) or not isinstance(row.get("result"), list):
+        return row
+    keep = [r for r in row["result"] if isinstance(r, dict) and str(r.get("volunteer") or "") == desk]
+    out = dict(row)
+    out["result"] = keep
+    said = f"--mine: {len(keep)} card(s) with volunteer {desk}"
+    if not keep:
+        said += "; add --done for finished cards, --all for every roster"
+    prior = str(row.get("note") or "")
+    out["note"] = f"{prior}; {said}" if prior else said
+    return out
