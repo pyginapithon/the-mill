@@ -49,7 +49,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status. Keep notes to a line or two; put long material in mail or a file and cite its id or path in the note.
   - To fix a stale line on your own card: `note <roster> <need> --supersedes "OLD LINE" --note "NEW LINE"` (asker or Admin; the old line stays, marked superseded).
   - `pass <roster> <need>`: your pass ships it; the asker passes again to mark it done.
-  - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. `todo --mine` lists only the cards your desk volunteered for (claimed or shipped; add `--done` for finished ones); use it to check your own queue instead of reading the board. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
+  - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. `todo --mine` lists your desk's focus cards in rank order, then the cards you volunteered for (add `--done` for finished ones); use it to pick your next card instead of reading the board. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.
@@ -62,6 +62,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `trail --label <label>` reads everything wearing it, in order. Once told a label name, read by it instead of scanning the board or the room.
   - Share the label name by mail, the same way as a hold name.
   - `--ord`: 0 = pinned, 65535 = unplaced. Gaps stay; never renumber.
+  - **Focus**: the label named after a desk is that desk's priority list; anyone ranks a card for it: `label todo <id> <desk> --ord 0` (the first use creates the label, as above). Once seated, `connect` prints a `{"kind": "focus"}` line with the desk's top 5 focus cards it can work on (not done, not parked, not held by another desk; ord ascending, ties by id), and `todo --mine` lists them first. Start the top one.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
 - **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same. A hold goes by its name: `watch hold deploy`.
