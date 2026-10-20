@@ -736,9 +736,33 @@ def is_dependabot_commit(author: str, body: str) -> bool:
     return author.strip() == DEPENDABOT_AUTHOR and DEPENDABOT_TRAILER in body.splitlines()
 
 
+# The Copilot coding agent on GitHub (S-12, #343). Exact identity only: its
+# commits are authored by this address, it adds this co-author line, and a
+# squash merge keeps the line. Assembled like the Dependabot address.
+COPILOT_AGENT_AUTHOR = "198982749+" + "Cop" + "ilot" + "@" + "users.noreply.github.com"
+COPILOT_COAUTHOR_TRAILER = "Co-authored-by: copilot-swe-agent[bot] <" + COPILOT_AGENT_AUTHOR + ">"
+# The subject of the empty commit the agent writes before any change.
+COPILOT_PLAN_SUBJECT = "Initial plan"
+_BOT_TRAILERS = frozenset({DEPENDABOT_TRAILER, COPILOT_COAUTHOR_TRAILER})
+
+
 def strip_bot_trailers(body: str) -> str:
-    """Drop the exact Dependabot sign-off line; any other address still counts."""
-    return "\n".join(ln for ln in body.splitlines() if ln.strip() != DEPENDABOT_TRAILER)
+    """Drop the exact Dependabot sign-off and Copilot co-author lines; any other address still counts."""
+    return "\n".join(ln for ln in body.splitlines() if ln.strip() not in _BOT_TRAILERS)
+
+
+def name_scan_text(author: str, body: str) -> str:
+    """The message text the name-token rule reads.
+
+    Only for a commit by the exact Copilot agent address, a first line that is
+    exactly its plan subject is left out. The rest of the message is read.
+    """
+    if author.strip() != COPILOT_AGENT_AUTHOR:
+        return body
+    first, sep, rest = body.partition("\n")
+    if first.rstrip() == COPILOT_PLAN_SUBJECT:
+        return rest
+    return body
 
 
 # GitHub's own committer on web merges and bot commits. Assembled like the
@@ -838,7 +862,7 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
             rev in name_revs
             and rev not in NAME_TOKEN_REVIEWED
             and not bot
-            and text_has_personal_name_token(body, vocab)
+            and text_has_personal_name_token(name_scan_text(author, body), vocab)
         ):
             fails.append(f"personal name token in git commit {rev[:12]}")
     return fails

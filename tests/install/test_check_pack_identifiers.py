@@ -370,3 +370,73 @@ def test_project_local_part_needs_a_noreply_domain() -> None:
     assert mod.email_is_placeholder(_j("pyginapithon", "@", "users.noreply.github.com"))
     assert not mod._email_allowed(_j("pyginapithon", "@", "mailhost.co"))
     assert mod._email_allowed(_j("pyginapithon", "@", "users.noreply.github.com"))
+
+
+# The Copilot coding agent on GitHub (S-12, #343): its generated first commit
+# and the co-author trailer it adds, which a squash keeps. Exact identity only.
+
+_COPILOT_AUTHOR = _j("198982749+", "Cop", "ilot", "@", "users.noreply.github.com")
+_COPILOT_TRAILER = _j("Co-authored-by: copilot-swe-agent[bot] <", _COPILOT_AUTHOR, ">")
+_DESK_NOREPLY = _j("344578673+desk", "@", "users.noreply.github.com")
+_DESK_TRAILER = _j("Co-authored-by: desk <", _DESK_NOREPLY, ">")
+
+
+def _plan_body() -> str:
+    return _j("Initial plan\n\n", _DESK_TRAILER, "\n")
+
+
+def test_copilot_initial_plan_commit_passes(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    _commit_as(repo, _COPILOT_AUTHOR, _plan_body())
+    mod, fails = _scan_in(monkeypatch, repo)
+    assert fails == [], fails
+    assert mod.COPILOT_AGENT_AUTHOR == _COPILOT_AUTHOR
+
+
+def test_copilot_coauthor_trailer_passes_on_a_desk_squash(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    msg = _j("#343 skip the copilot trailer (#30)\n\n", _COPILOT_TRAILER, "\n", _DESK_TRAILER, "\n")
+    _commit_as(repo, _DESK_NOREPLY, msg)
+    mod, fails = _scan_in(monkeypatch, repo)
+    assert fails == [], fails
+    assert mod.COPILOT_COAUTHOR_TRAILER == _COPILOT_TRAILER
+
+
+def test_initial_plan_by_another_author_keeps_the_name_rule(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    who = _j("W", "ibble")
+    rev = _commit_as(repo, _DESK_NOREPLY, _j("Initial plan\n\nfor ", who, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert fails == [f"personal name token in git commit {rev[:12]}"], fails
+
+
+def test_copilot_commit_body_keeps_the_name_rule(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    who = _j("W", "ibble")
+    rev = _commit_as(repo, _COPILOT_AUTHOR, _j("Initial plan\n\nasked by ", who, "\n\n", _DESK_TRAILER, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert fails == [f"personal name token in git commit {rev[:12]}"], fails
+
+
+def test_copilot_later_commit_subject_keeps_the_name_rule(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    who = _j("W", "ibble")
+    rev = _commit_as(repo, _COPILOT_AUTHOR, _j("fix the scan for ", who, "\n\n", _COPILOT_TRAILER, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert fails == [f"personal name token in git commit {rev[:12]}"], fails
+
+
+def test_a_near_copilot_trailer_is_not_stripped(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    near = _j("Co-authored-by: Cop", "ilot <", _COPILOT_AUTHOR, ">")
+    rev = _commit_as(repo, _DESK_NOREPLY, _j("#343 plain change\n\n", near, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert fails == [f"personal name token in git commit {rev[:12]}"], fails
+
+
+def test_copilot_trailer_does_not_hide_an_address(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "initial public import")
+    addr = _j("someone", "@", "github.com")
+    rev = _commit_as(repo, _COPILOT_AUTHOR, _j("Initial plan\n\nask ", addr, "\n\n", _COPILOT_TRAILER, "\n"))
+    _mod_, fails = _scan_in(monkeypatch, repo)
+    assert f"email outside placeholder domains in git commit {rev[:12]}" in fails, fails
