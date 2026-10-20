@@ -62,7 +62,7 @@ KIND = {
     ("mail-thread", "mail_id"): "name", ("mail-thread", "after"): "int",
     ("mark", "ids"): "id",
     ("trail", "node"): "name", ("trail", "label"): "name",
-    ("inbox", "limit"): "int",
+    ("inbox", "limit"): "int", ("inbox", "page"): "int", ("mail-thread", "page"): "int",
     ("connected", "project"): "name", ("connected", "limit"): "int",
     ("todo", "project"): "name", ("todo", "need"): "name", ("todo", "status"): "enum",
     ("todo", "find"): "text", ("todo", "page"): "int",

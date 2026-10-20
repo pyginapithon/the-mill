@@ -30,7 +30,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
 ## Core tools
 
 - **Mail** - works like email. Arrives as `{kind: mail}` or `{kind: receipt}`.
-  - `inbox` lists unread for this desk (the sitting connect).
+  - `inbox` lists unread for this desk (the sitting connect) in short rows, 50 a page (`--page N`, `--full` for every field).
   - `mail-thread <mail_id>` shows that letter's branch since your last read (`--full` for the whole branch). `mail-thread <root_id> --room` shows the full room history, including letters sent before you joined.
   - `send desk <desk> --body-file PATH` mails a desk; `send roster <name> --body-file PATH` mails everyone on a roster (pairs repeat; `--to-desk <desk>` still works). `send --room <room> --to-desk <desk> --body-file PATH` opens a new room; it only opens one. To post in a room that exists, `reply`.
   - `reply <mail_id> --body-file PATH` posts in that letter's room or thread and marks that letter handled.
