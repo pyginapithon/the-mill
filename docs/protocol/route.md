@@ -61,7 +61,7 @@ The agent picks. Both are "agent specifies where programs live." mill stores arg
 **One program (case inside)**
 
 ```
-mill route add * -- python C:\work\desk.py
+mill route add "*" -- python C:\work\desk.py
 ```
 
 Every non-PING frame goes to that exe. The program reads the frame JSON and switches on the route key. mill does not know the cases. Print `not-mine` as the last line for a frame it leaves to the vendor.
@@ -71,7 +71,7 @@ Every non-PING frame goes to that exe. The program reads the frame JSON and swit
 ```
 mill route add todo:TODO -- python C:\work\on_todo.py
 mill route add mail:MAIL -- python C:\work\on_mail.py
-mill route add * -- python C:\work\desk.py
+mill route add "*" -- python C:\work\desk.py
 ```
 
 A TODO frame walks `on_todo.py`, then `desk.py` if the first said `not-mine`. A letter walks `on_mail.py`, then `desk.py`. Order is the order of add. `*` is a normal entry and sits where it was added; it is not moved to the end. Adding a key that is already in the list replaces that entry and keeps its place.
@@ -111,12 +111,12 @@ A redirector gets the same doorbell. `*` can case on the route key. A per-key ex
 
 ## mill route CLI
 
-Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). Everything after the key is the program. A flag after the key becomes part of the program argv.
+Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). `mill route` does not wait for connect to sit; run `mill member >/dev/null` first. Everything after the key is the program. A flag after the key becomes part of the program argv.
 
 ```
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route list'
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python path/to/on_mail.py'
-bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add * -- python path/to/desk.py'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add "*" -- python path/to/desk.py'
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm mail:MAIL'
 ```
 
@@ -126,7 +126,7 @@ bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm 
 
 Durable chain: `~/.mill/session/<desk>.route` (`key = value` lines, file order is chain order). mill connect re-reads it on every frame. No mill connect restart. No mill_wait.
 
-mill connect has no catch-all flag. A catch-all is the route key `*`: `mill route add * -- <program>`. mill route is the chain agents mutate.
+mill connect has no catch-all flag. A catch-all is the route key `*`: `mill route add "*" -- <program>` (quote `*` so the shell does not expand it). mill route is the chain agents mutate.
 
 
 ## Template
@@ -135,7 +135,7 @@ Copy [route-template.py](route-template.py). Point a route at it from the connec
 
 ```
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python docs/protocol/route-template.py'
-bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add * -- python docs/protocol/route-template.py'
+bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add "*" -- python docs/protocol/route-template.py'
 ```
 
 stdin = the frame JSON. The template handles MAIL and TODO with `mill inbox` / `mill todo` (or `python -m agent_coord` if `mill` missing), prints `not-mine` for anything else, and exits non-zero when its verb fails. Agents may replace the body; keep the three exits.

@@ -6,7 +6,7 @@ The chain lives under `~/.mill/session/<name>.route` (see [route.md](route.md)).
 ## Day-one
 
 1. Leave `mill connect` running for the desk.
-2. Optional catch-all: `mill route add * -- python path/to/handler.py` from that same parent shell.
+2. Optional catch-all: `mill route add "*" -- python path/to/handler.py` from that same parent shell.
 3. Prefer per-HINT keys (`mill route add mail:MAIL -- ...`) over the catch-all.
 
 ## Vendor poke fallback

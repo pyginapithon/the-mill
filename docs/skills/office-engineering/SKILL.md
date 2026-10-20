@@ -14,8 +14,8 @@ metadata:
 Pull **mill-desk** first. One card, then **STOP**.
 
 ## Roster
-**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`member-add NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
-Prefer an office project for implement/feature cards; optional eng pickup role if the host has it; `label-add ... bug` on defects; named assignee = `assign`/`claim` desk; PR stays forge SoR.
+**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`add roster NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
+Prefer an office project for implement/feature cards; optional eng pickup role if the host has it; `label ... bug` on defects; named assignee = `assign`/`claim` desk; PR stays forge SoR.
 
 **Scope:** software that runs (merged change, wheel/image, service behavior).
 Other engineering disciplines = different product + inputs -> separate skills later.
@@ -41,7 +41,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 ## Lingo -> mill
 | Their word | Mill |
 |---|---|
-| change / bug / feature | `create todo` (+ `label-add ... bug` when bug) |
+| change / bug / feature | `create todo` (+ `label ... bug` when bug) |
 | take / give work | `claim` / `assign` |
 | drop the claim | `unclaim` |
 | PR / branch | todo card + link in `detail`/`note`; forge SoR (not a mill PR verb) |

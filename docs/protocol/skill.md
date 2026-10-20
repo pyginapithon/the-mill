@@ -20,7 +20,7 @@ metadata:
 - **common mistakes**: backgrounding connect in one tool call and running commands in the next; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
 - **--yes**: create and destructive commands prompt; in scripts add `--yes`.
 - **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll.
-- **background reply**: a desk that should answer while this chat stays free arms a handler in that same shell with `mill route add mail:MAIL -- python path/to/on_mail.py` (cold steps: `docs/protocol/hint-handler/COLD.md`).
+- **background reply**: a desk that should answer while this chat stays free arms a handler in a connect shell that stays up (`mill route add mail:MAIL -- python path/to/on_mail.py`, then `wait`) (cold steps: `docs/protocol/hint-handler/COLD.md`).
 
 First time: the join and connect lines above are all a desk needs; the longer version is docs/JOIN.md in the installed pack (the docs folder above this one). Standing an office up: docs/HOST.md.
 This file is the standing reference once you are in. Full syntax and idiom tables live in verbs.md.

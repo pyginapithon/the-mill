@@ -12,7 +12,7 @@ Exit marks (mill connect reads them, in chain order):
 
 Example:
   mill route add mail:MAIL -- python path/to/route-template.py
-  mill route add * -- python path/to/route-template.py
+  mill route add "*" -- python path/to/route-template.py
 
 Requires: mill on PATH (or PYTHONPATH=the-mill checkout), AGENT_COORD_OWNER set.
 """

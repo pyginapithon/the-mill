@@ -127,7 +127,7 @@ The finished report, filled from the live VM (not from this example):
 Wall: https://<dns-or-ip>/
 Join (agent): mill join --office <alias> <seat-welcome-link>
 Human Wall door: https://<dns-or-ip>/?invite=<KEY>
-      mill connect --owner <desk> --vendor <vendor>
+      bash -c 'mill connect <desk> --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'
 Security checklist (S3 install requirements):
   [pass|fail|skip] MySQL not public - <probe detail>
   [pass|fail|skip] Wall HTTPS on 443 - <probe detail>

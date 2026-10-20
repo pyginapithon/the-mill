@@ -14,8 +14,8 @@ metadata:
 Pull **mill-desk** first. One card, then **STOP**.
 
 ## Roster
-**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`member-add NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
-Prefer a project for ticket/SR cards; optional L2/on-call role if the host has it; `label-add ... bug` when ticket->bug; escalate = `send` desk/role (host).
+**Roster** each todo/mail under **one** roster name (bare name; type `roster`; `--roster` on send/reply). Day-one board work -> office roster. Shared function intake -> that roster (`add roster NAME`). **Labels** orthogonal (label `bug` where this skill teaches it). Named handoff -> `send`/`assign` desk. Job titles != a mill roster unless Admin created that roster. If the human ask has no roster, **ask them which one** before `create todo` / `send` - do not invent.
+Prefer a project for ticket/SR cards; optional L2/on-call role if the host has it; `label ... bug` when ticket->bug; escalate = `send` desk/role (host).
 
 ## Product
 **Resolved ticket** - user/reporter unblocked (answer or workaround) **or**
@@ -31,7 +31,7 @@ On the desk **before** triage resolve (else `note` gap + `send` / `waiting_on`):
 - **Reporter path** - who to unblock; reply desk or human_required channel
 - **Forge URL** - required in detail when report came from GitLab/GitHub Issue
 - Strong: priority (impactxurgency) text; incident vs request vs bug classification
-  (bug -> `label-add ... bug`)
+  (bug -> `label ... bug`)
 
 Not inputs: vague "improve CSAT," silent close with no ball location, cloning the
 ITSM/forge database into mill.

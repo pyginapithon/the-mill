@@ -34,37 +34,32 @@ Copy `examples/stub_handler.py` to `~/.mill/handlers/DESK_<desk>/on_mail.py`. Im
 
 `ev.detail` is this desk's `watcher.hint` string, or the cheap default `{what,id,when,state,watchers,tree}` when that hint is empty. A letter has no `detail`. The wire `hint` on a watcher frame stays `TYPE`. The route key stays `mail:MAIL`, `todo:TODO`, and so on. A recipe does not change the key.
 
-`log()` writes stderr. mill connect reads the route child's stdout: a last line of `not-mine` tries the next redirector, and any other exit 0 is handled. stderr is discarded. A print is not evidence. The stub appends one line to `hint-evidence.jsonl` beside the program (`detail_kind` is `recipe` or `default`). Replace that write with the mill verb the task needs. `hint drain ok=1` means the program **started**, not that it exited 0.
+`log()` writes stderr. mill connect reads the route child's stdout: a last line of `not-mine` tries the next redirector, and any other exit 0 is handled. stderr is discarded. A print is not evidence. The stub appends one line to `hint-evidence.jsonl` beside the program (`detail_kind` is `recipe` or `default`). Replace that write with the mill verb the task needs.
 
 Keep the program. Reuse it. It is not package code.
 
 ### 2. Arm
 
-The desk is the sitting connect. Desk commands run in the same parent shell that started connect, the shape `mill join` prints. Everything after the key is the program. A flag after the key becomes part of the program argv.
+The desk is the sitting connect. One shell arms, attaches, and stays up to deliver frames. Run it in a call allowed to keep running:
 
 ```text
-bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python ~/.mill/handlers/DESK_<desk>/on_mail.py'
-bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add todo:TODO -- python path/to/on_todo.py'
-bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add * -- python path/to/desk_handler.py'
+bash -c 'mill connect <desk> --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT
+mill member >/dev/null
+mill route add mail:MAIL -- python ~/.mill/handlers/DESK_<desk>/on_mail.py
+mill route add todo:TODO -- python path/to/on_todo.py
+mill add todo:<id> --hint "need,status"
+wait'
 ```
 
-The list is a chain in add order; `*` sits where it was added. The route file stays after that shell exits. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart.
+`mill member` first: it waits for connect to sit; `mill route` does not wait. Everything after the key is the program. The catch-all key is `"*"`, quoted so the shell does not expand it. The list is a chain in add order. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart. The route file stays after the shell exits.
 
-Keep a connect up in its own shell so frames are delivered. One dest, one mill connect:
-
-```text
-bash -c 'mill connect <desk> --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT; wait'
-```
+Every other `mill connect` for this desk takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk verbs before `wait`, or stop this shell first.
 
 `--session` on connect is the Grok session id for a grok-build poke. Omit it unless that poke needs it.
 
 ### 3. Customize the HINT, then trigger
 
-After connect is up, in that same shell, attach this desk to **that activity**:
-
-```text
-mill add todo:<id> --hint "need,status"
-```
+The `mill add` line in the arm shell attaches this desk to **that activity**.
 
 Empty hint restores the cheap default. The recipe is a short field list for **your** program. mill does not parse it.
 
@@ -83,17 +78,17 @@ stdin is one JSON object. A watcher frame is `{type,id,hint,detail?}`. A letter 
 
 ### 5. Drop
 
-```text
-bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm mail:MAIL'
-```
+Stop the arm shell, then:
 
-Stop the connect that is still up when the collab ends. Switching foreground and background: stop the old connect, then start the new mode.
+```text
+bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill member >/dev/null; mill route rm mail:MAIL'
+```
 
 ## Worked paths (short)
 
 | Path | Arm | Customize | On HINT |
 | :--- | :--- | :--- | :--- |
-| MAIL | `bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add mail:MAIL -- python .../on_mail.py'` | no watcher. The send push is the trigger | parse -> detail -> inbox leftovers only if needed -> STOP -> exit 0 |
-| TODO | `bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add todo:TODO -- python .../on_todo.py'` | `mill add todo:<id> --hint "need,status"` | parse -> detail -> that card only -> STOP -> exit 0 |
+| MAIL | `mill route add mail:MAIL -- python .../on_mail.py` (arm shell) | no watcher. The send push is the trigger | parse -> detail -> inbox leftovers only if needed -> STOP -> exit 0 |
+| TODO | `mill route add todo:TODO -- python .../on_todo.py` (arm shell) | `mill add todo:<id> --hint "need,status"` | parse -> detail -> that card only -> STOP -> exit 0 |
 
 See `HINT-HANDLER.TEMPLATE.md`, `examples/stub_handler.py`, `tools/hint_handler/`. Cold steps that ship in the pack: `COLD.md`.
