@@ -63,6 +63,7 @@ def _client_route_key(obj: Mapping[str, Any]) -> str:
 
 
 def parse_hint(obj: Mapping[str, Any]) -> HintEvent:
+    """Route key matches route_key in client/route_chain.py."""
     key = _client_route_key(obj)
     if ":" in key:
         typ, hint = key.split(":", 1)
