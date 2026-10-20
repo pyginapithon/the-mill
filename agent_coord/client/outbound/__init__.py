@@ -284,7 +284,7 @@ def body_from_args(args: Any) -> dict[str, Any]:
     need = str(getattr(args, "need", "") or getattr(args, "need_id", "") or "")
     if need:
         body["need"] = need
-    # #333: a blank OLD_LINE would fall through to a plain note (with --replace, an overwrite).
+    # #333: a blank OLD_LINE would fall through to a plain note .
     sup = getattr(args, "supersedes", None)
     if sup is not None and not str(sup).strip():
         from agent_coord.helpers.errors import CoordError
@@ -411,8 +411,6 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["done"] = True
     if verb == "todo" and bool(getattr(args, "fixtures", False)):
         body["fixtures"] = True
-    if bool(getattr(args, "replace", False)):
-        body["replace"] = True
     if bool(getattr(args, "dead", False)):
         body["dead"] = True
     if verb == "score" and bool(getattr(args, "retire_score", False)):

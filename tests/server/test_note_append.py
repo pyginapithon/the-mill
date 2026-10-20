@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
+from agent_coord.helpers.errors import CoordError
 from agent_coord.server.api.mill import rpc
 
 
@@ -51,7 +54,7 @@ def test_note_appends_detail(monkeypatch):
     assert "seed-text" in r2["detail"] and "first" in r2["detail"] and "second" in r2["detail"]
 
 
-def test_note_replace_overwrites(monkeypatch):
+def test_note_replace_is_refused(monkeypatch):
     stored = {"payload_detail": "seed-text", "body": "detail=seed-text"}
 
     def fake_find(cn, project, need):
@@ -78,10 +81,12 @@ def test_note_replace_overwrites(monkeypatch):
     monkeypatch.setattr(rpc, "_poke", lambda *a, **k: None)
 
     book = MagicMock()
-    r = rpc._h_note(
-        book,
-        {"need": "loop2-note", "note": "only-this", "replace": True},
-        "PROJ_the-mill",
-        "DESK_builder",
-    )
-    assert r["detail"] == "only-this"
+    # #539: notes append; a replace request is refused and the detail stays.
+    with pytest.raises(CoordError, match="there is no replace"):
+        rpc._h_note(
+            book,
+            {"need": "loop2-note", "note": "only-this", "replace": True},
+            "PROJ_the-mill",
+            "DESK_builder",
+        )
+    assert stored["payload_detail"] == "seed-text"

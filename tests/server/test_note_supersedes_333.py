@@ -90,7 +90,7 @@ def test_needs_new_text(card):
 
 
 def test_not_with_replace(card):
-    with pytest.raises(CoordError, match="not with --replace"):
+    with pytest.raises(CoordError, match="there is no replace"):
         _note({"supersedes": "Steps:", "note": "x", "replace": True})
 
 

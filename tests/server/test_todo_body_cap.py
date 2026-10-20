@@ -232,7 +232,7 @@ def test_note_after_overhead_4095_and_4096_kept(monkeypatch) -> None:
         book = _note_book(monkeypatch, stored)
         rec = rpc._h_note(
             book,
-            {"need": "note-cap", "note": text, "replace": True},
+            {"need": "note-cap", "note": text},
             "the-mill",
             "builder",
         )
@@ -252,7 +252,7 @@ def test_note_after_overhead_4097_refuses(monkeypatch) -> None:
     with pytest.raises(CoordError, match="refused, nothing written"):
         rpc._h_note(
             book,
-            {"need": "note-cap", "note": text, "replace": True},
+            {"need": "note-cap", "note": text},
             "the-mill",
             "builder",
         )
@@ -279,7 +279,7 @@ def test_note_at_stored_boundary_keeps_text(monkeypatch) -> None:
     text = _fit_detail("note-cap", "", 0)
     rec = rpc._h_note(
         book,
-        {"need": "note-cap", "note": text, "replace": True},
+        {"need": "note-cap", "note": text},
         "the-mill",
         "builder",
     )
