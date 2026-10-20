@@ -704,6 +704,11 @@ def _build_parser() -> MillArgumentParser:
     dr.add_argument("--drain-id", default="", help="optional drain id")
     dr.add_argument("--dst", default="*", help="MAIL dst (default *)")
 
+    # #332: -r refuses a held seat; plain connect takes it. Exit 6 = seat in use.
+    _REFUSE_HELP = (
+        "refuse when another connect holds this desk's seat (exit 6); "
+        "without -r the newest connect takes the seat"
+    )
     cnct = sub.add_parser(
         "connect",
         help="establish desk id + sit on /ws (token from mill join). Does not write the join row.",
@@ -725,6 +730,7 @@ def _build_parser() -> MillArgumentParser:
         default="",
         help="AGENT_COORD_VENDOR for HINT poke (grok-bot, grok-build, claude, ...)",
     )
+    cnct.add_argument("-r", "--refuse", action="store_true", help=_REFUSE_HELP)
 
     rt = sub.add_parser(
         "route",
@@ -759,6 +765,7 @@ def _build_parser() -> MillArgumentParser:
     cw.add_argument("desk", nargs="?", default="", help="desk id this connect sits (required)")
     cw.add_argument("--vendor", default="", help="AGENT_COORD_VENDOR for HINT poke")
     cw.add_argument("--session", default="", help="Grok session UUID for grok-build poke")
+    cw.add_argument("-r", "--refuse", action="store_true", help=_REFUSE_HELP)
 
     rst = sub.add_parser(
         "reset",
@@ -945,6 +952,12 @@ def _build_parser() -> MillArgumentParser:
         help="9/12, 75%%, done or git <sha> = progress; other text = diary line; @file reads a file",
     )
     pg.add_argument("--note", default="")
+    pg.add_argument(
+        "--supersedes",
+        default=None,
+        metavar="OLD_LINE",
+        help="asker or Admin: mark this exact detail line superseded and put --note under it",
+    )
     pg.add_argument("--eta", default="", help="20m / 2h / datetime so the other desk can see when you expect to finish")
     pg.add_argument("--started", action="store_true", help="set started_at to now")
 

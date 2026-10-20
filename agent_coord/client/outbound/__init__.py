@@ -84,6 +84,7 @@ _STR = (
     "type_a",
     "type_b",
     "note",
+    "supersedes",
     "eta",
     "msg",
     "resource",
@@ -283,6 +284,12 @@ def body_from_args(args: Any) -> dict[str, Any]:
     need = str(getattr(args, "need", "") or getattr(args, "need_id", "") or "")
     if need:
         body["need"] = need
+    # #333: a blank OLD_LINE would fall through to a plain note (with --replace, an overwrite).
+    sup = getattr(args, "supersedes", None)
+    if sup is not None and not str(sup).strip():
+        from agent_coord.helpers.errors import CoordError
+
+        raise CoordError("note: --supersedes needs the old line; copy it from mill todo")
     for key in _STR:
         if key == "need":
             continue

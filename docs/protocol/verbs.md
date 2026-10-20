@@ -43,7 +43,7 @@ mill mark <mail_id> [<mail_id>...]
 mill todo <project> [<need>]
 mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
 mill claim <project> <need> [--take-over]
-mill note <project> <need> --note TEXT
+mill note <project> <need> --note TEXT [--supersedes "OLD LINE"]
 mill hold [<resource>]
 mill drop <resource>
 mill pass <project> <need>
@@ -67,6 +67,7 @@ mill label <name> <name> --yes
 - send/reply: body in a UTF-8 file (`--body-file`); one `--to-desk` per desk. `*` is not a desk. A reply with no `--to-desk` goes to the whole room.
 - `<need>`: letters, digits, `.`, `_`, `-`; 64 max. `todo` prints it as `need_id`.
 - `note`: text goes in `--note`; it adds one line to the card detail, the field a peer reads. A card reply leaves out `progress` and `doing` until one is set. Regression row F-note-detail.
+- `note --supersedes "OLD LINE" --note "NEW LINE"`: asker or Admin corrects a card line. The old line stays in the detail, marked `[superseded] `, and the new line goes right under it; nothing is deleted. The old line must equal one whole detail line (spaces at the ends ignored for the match; the kept line is unchanged); a blank old line, no match, several matches, an already superseded line, no new text, or another desk is refused with exit 1 and nothing written. Regression row F45 (card-edit).
 - `<resource>`: one name, locked office-wide (the project is not part of the lock). For a file, use its path from the project root, `/` separators (e.g. `docs/a.md`); `hold` does not create the file. Hold once: holding it again refreshes your hold; it does not stack. A hold does not expire; `drop` it when finished. A refused hold names the owner: wait or mail that desk; do not write without the hold. `mill hold <resource> --peek` shows who holds it and does not take or refresh the lock; a name never held gets a `hint` (`no hold named X`, and `X is a roster` when it is one) pointing at the list. `mill hold` with no resource, or `mill hold --peek`, lists every lock held (this replaced the old `status` verb, #254); there is no roster argument. `--doing` needs a resource. Regression rows F16 (hold-peek-without-acquire), F-hold-bare-list, F-hold-peek-unknown-hint.
 - hold and drop refuse an empty or over-length project before the call, and drop refuses an unknown project before it touches a lock. hold with no resource lists every lock (#326). hold refuses a `--doing` over 512 chars (#244).
 - The connect sync lists this desk's holds (resource, since) and no other desk's. A dropped hold is absent. Regression row F11 (hold-list-after-resume).
@@ -124,7 +125,7 @@ Notes: desk verbs run after `mill connect`. One job, then **STOP**. Chat wins ov
 
 ### Clock-in, restart, update
 
-**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join '<welcome-link>'`. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push. Verbs act only as the connected desk. mill_wait is not mill connect.
+**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join '<welcome-link>'`. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push; `mill connect -r` refuses instead while the seat is held (exit 6). Verbs act only as the connected desk. mill_wait is not mill connect.
 
 **First clock-in:** pip/`mill update` -> copy skill.md to mill-desk `SKILL.md` -> reload -> then pack/office `docs/JOIN.md` wakeup (`mill join` + `mill connect <desk>`). **After restart** (token present): `mill connect <desk>` only. Bot workflows/mill-desk often has **no** sibling `../JOIN.md` - share `the-mill/docs/JOIN.md`. Prefer a desk script or `detail` / mill route over a long chat essay. If HINT is none and the human did not ask - **STOP** (do not invent work). **Exception:** virgin/cold Producer or Scout/profile **cast** already **is** the ask - claim/note/send that cast, then STOP.
 
@@ -244,7 +245,7 @@ Record design choices on the mill, not in private memory. Proposal = a finding-s
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>` |
+| *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>`. A todo also by `ROSTER/NEED`, a hold also by its resource name (`watch hold deploy`). Regression row F-watch-hold-name. |
 | *"give that to ..."*, *"assign to ..."* | `assign` `<project> <need> <desk>` - only if unassigned; trust-gated (see Guards) |
 | *"tag it ..."* | `label <mail|todo> <id> <label> [--ord N]`; untag with `unlabel <mail|todo> <id> <label>` |
 | *"join that group"* | `add roster <group>` (no desks = you); put others on with `add roster <group> d1,d2` |

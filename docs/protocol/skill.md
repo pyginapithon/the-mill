@@ -46,6 +46,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `claim <roster> <need>` takes it.
   - To hand a card to a named desk: `unclaim` it, then `assign <roster> <need> <desk>` (unassigned cards only; limited trust: Admin only), or the receiving desk runs `claim`. Say who has it in a `note`.
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status.
+  - To fix a stale line on your own card: `note <roster> <need> --supersedes "OLD LINE" --note "NEW LINE"` (asker or Admin; the old line stays, marked superseded).
   - `pass <roster> <need>`: your pass ships it; the asker passes again to mark it done.
   - The board list `todo <roster>` hides done cards; add `--done` to see them. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
@@ -62,7 +63,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - `--ord`: 0 = pinned, 65535 = unplaced. Gaps stay; never renumber.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
-- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same.
+- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same. A hold goes by its name: `watch hold deploy`.
 - Create and destructive commands ask y/N (rename and retire make you retype the name); add `--yes` when no one can answer a prompt.
 
 - **Tree** - the outline under a letter or card: why, in order, dead ends kept. `trail mail:<id>` or `trail todo:<id>` reads it. `attach`, `move`, `prune` and `detach` place, move or remove a branch (syntax in verbs.md). A hidden plan name is 10 hex. A card on two plans fails closed until you name the tree.

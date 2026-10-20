@@ -30,7 +30,13 @@ def _body(argv):
 
 @pytest.mark.parametrize(
     "raw,typ,want",
-    [("12", "todo", 12), ("cold-test/fix-login", "todo", "cold-test/fix-login"), (" 7 ", "hold", 7)],
+    [
+        ("12", "todo", 12),
+        ("cold-test/fix-login", "todo", "cold-test/fix-login"),
+        (" 7 ", "hold", 7),
+        # #327: any non-number is a hold name, slashes included; the server resolves it.
+        ("cold-test/fix-login", "hold", "cold-test/fix-login"),
+    ],
 )
 def test_card_ref_ok(raw, typ, want):
     assert card_ref(raw, typ, "watch") == want
@@ -46,7 +52,8 @@ def test_card_ref_ok(raw, typ, want):
         ("/fix-login", "todo", "watch todo: give the todo id"),
         ("cold test/fix", "todo", "watch todo: give the todo id"),
         ("a" * 65 + "/x", "todo", "watch todo: give the todo id"),
-        ("cold-test/fix-login", "hold", "watch hold: give the hold id (a number above 0)"),
+        ("0", "hold", "watch hold: give the hold id (a number above 0)"),
+        ("x" * 1000, "hold", "resource must be 1.."),
         ("", "score", "watch score: give the score id"),
     ],
 )
