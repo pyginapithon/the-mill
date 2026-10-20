@@ -353,7 +353,7 @@ def _build_parser() -> MillArgumentParser:
         "-V",
         "--version",
         action="store_true",
-        help="print the-mill package version (not git SHA)",
+        help="print the-mill version; a build that is not a release adds +g<commit> when known",
     )
     p.add_argument(
         "-v",
@@ -1331,7 +1331,9 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
 
     raw = consume_mill_agent(argv)
     if raw and raw[0] in ("-V", "--version"):
-        print(package_version(), flush=True)
+        from agent_coord.install.packver import version_line
+
+        print(version_line(), flush=True)
         return 0
     from agent_coord.client.offices import bind_cli_office, pull_office_flag
 
@@ -1343,7 +1345,9 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
 
         _dbg_os.environ["AGENT_COORD_DEBUG"] = "1"
     if bool(getattr(args, "version", False)) and not args.cmd:
-        print(package_version(), flush=True)
+        from agent_coord.install.packver import version_line
+
+        print(version_line(), flush=True)
         return 0
     if not args.cmd:
         p.error("the following arguments are required: cmd")
