@@ -923,6 +923,7 @@ def mill_here_over_http(args: Any) -> int:
     from agent_coord.lib.proc import parent_gone
 
     parent = _shell_ppid()
+    refuse = bool(getattr(args, "refuse", False))
     if bool(getattr(args, "foreground", False)):
         # Foreground: this process waits for ONE work HINT, prints it, exits.
         # No HintBuf drain / mill route spawn. Break-out = KeyboardInterrupt.
@@ -932,7 +933,8 @@ def mill_here_over_http(args: Any) -> int:
             # An empty queue keeps the socket until the next hint, as the docs
             # say; a non-empty queue prints and exits (card #278).
             got = wait_one_hint(
-                who, tok, skip_ping=True, timeout_s=None, parent_pid=parent, hold_empty_sync=True
+                who, tok, skip_ping=True, timeout_s=None, parent_pid=parent, hold_empty_sync=True,
+                refuse=refuse,
             )
         except KeyboardInterrupt:
             print(
@@ -944,7 +946,7 @@ def mill_here_over_http(args: Any) -> int:
             )
             return 130
         print(json.dumps(got, default=str), flush=True)
-        return 0 if got.get("ok") else 1
+        return 0 if got.get("ok") else int(got.get("exit") or 1)
     stop = threading.Event()
     outcome: dict = {}
     from agent_coord.client.ws import clear_connect_starting, write_connect_starting
@@ -956,7 +958,7 @@ def mill_here_over_http(args: Any) -> int:
 
     project = str(getattr(args, "project", "") or "").strip()
     hold_sync_lines()
-    start_ws_thread(who, tok, stop, outcome)
+    start_ws_thread(who, tok, stop, outcome, refuse=refuse)
     threading.Thread(
         target=check_project_on_socket,
         args=(who, project, stop, outcome),

@@ -16,6 +16,7 @@ from agent_coord.const import (
     ACTIVITY_TYPES,
     CONST_ADMIN,
     CONST_DESK,
+    CONST_HOLD,
     CONST_LABEL,
     CONST_MAIL,
     CONST_OFFICE,
@@ -2246,8 +2247,13 @@ def _card_ref_id(cn, body: dict[str, Any], verb: str) -> int:
         return 0
     verb = {"label-add": "label", "label-remove": "unlabel"}.get(verb, verb)
     typ = str(body.get("type") or body.get("kind") or "").strip().lower()
+    if typ == CONST_HOLD:
+        return _hold_ref_id(cn, ref, verb)
     if typ != "todo":
-        raise CoordError(f"{verb}: ROSTER/NEED names a todo only; give the {typ or 'activity'} id")
+        raise CoordError(
+            f"{verb}: only a todo (ROSTER/NEED) or a hold (its name) goes by name; "
+            f"give the {typ or 'activity'} id"
+        )
     roster, _, need = ref.partition("/")
     roster, need = _stored(roster.strip()), need.strip()
     if not roster or not need or len(roster) > 64 or len(need) > 64:
@@ -2263,6 +2269,16 @@ def _card_ref_id(cn, body: dict[str, Any], verb: str) -> int:
     if not row:
         raise CoordError(f"{verb}: no card {need} in {roster} (mill todo {roster} --done lists its cards)")
     return int(row.get("id") or 0)
+
+
+def _hold_ref_id(cn, name: str, verb: str) -> int:
+    """A hold named by its resource -> the hold id (#327). A released hold keeps its row."""
+    from agent_coord.server.records import hold as rec_hold
+
+    got = rec_hold.peek(cn, "", name)
+    if not got.get("id"):
+        raise CoordError(f"{verb}: no hold named {name[:120]} (mill hold lists every lock)")
+    return int(got["id"])
 
 
 def _add_target(body: dict[str, Any], verb: str, cn=None) -> tuple[str, int]:

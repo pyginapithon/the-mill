@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import threading
+import time
 from typing import Any
 
 from agent_coord.const import CONST_ADMIN, CONST_OFFICE, CONST_ROSTER
@@ -99,6 +100,9 @@ WS_REPLACED = 4000
 # Frame pushed to the older socket before close (not a HINT activity).
 WS_REPLACED_REASON = "superseded: new connect same tokenHash"
 
+# Close code for mill connect -r/--refuse when another live /ws holds the seat (#332).
+WS_IN_USE = 4409
+
 
 class Hub:
     def __init__(self) -> None:
@@ -108,8 +112,13 @@ class Hub:
     def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
 
-    async def add(self, desk: str, ws: Any) -> None:
-        """Sit desk on /ws. The room key is the desk name."""
+    async def add(self, desk: str, ws: Any, *, refuse: bool = False) -> dict[str, str] | None:
+        """Sit desk on /ws. The room key is the desk name.
+
+        refuse (mill connect -r): when another live socket holds the seat, do not
+        sit and do not kick; return {desk, since} for the refusal. The check and
+        the sit run with no await between them, so two connects cannot both pass.
+        """
         from agent_coord.helpers.ident import desk as room_stem
         from agent_coord.helpers.ident import desk_name
 
@@ -117,11 +126,24 @@ class Hub:
             room_key = room_stem(desk)
             stored = desk_name(desk)
             if not room_key:
-                return
+                return None
             room = self.rooms.setdefault(room_key, set())
+            if refuse:
+                # A socket already closed but not yet discarded does not hold the seat.
+                for prev in [p for p in room if p is not ws and _ws_gone(p)]:
+                    room.discard(prev)
+                live = [p for p in room if p is not ws]
+                if live:
+                    since = min(float(getattr(p, "_mill_sat_at", 0) or 0) for p in live)
+                    _bc_log(f"ws refuse desk={stored} reason=in-use")
+                    return {"desk": stored, "since": _utc_iso(since)}
             old = [prev for prev in list(room) if prev is not ws]
             first = not room
             room.add(ws)
+            try:
+                ws._mill_sat_at = time.time()
+            except Exception:
+                pass
             for prev in old:
                 await _kick_replaced(room_key, prev)
                 room.discard(prev)
@@ -130,6 +152,7 @@ class Hub:
             _bc_log(f"ws sit desk={stored} n={len(self.rooms.get(room_key) or ())}")
         except Exception as e:
             _bc_log(f"ws sit fail desk={desk} err={e}")
+        return None
 
     def discard(self, desk: str, ws: Any) -> None:
         from agent_coord.helpers.ident import desk as room_stem
@@ -187,6 +210,21 @@ class Hub:
         except Exception as e:
             _bc_log(f"ws notify fail desk={desk} err={e}")
 
+
+
+def _ws_gone(ws: Any) -> bool:
+    """True when the socket state already says disconnected (no I/O)."""
+    for attr in ("client_state", "application_state"):
+        state = getattr(ws, attr, None)
+        if getattr(state, "name", "") == "DISCONNECTED":
+            return True
+    return False
+
+
+def _utc_iso(ts: float) -> str:
+    if not ts:
+        return ""
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ts))
 
 
 async def _kick_replaced(desk: str, ws: Any) -> None:
