@@ -36,7 +36,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 | `note` | `mill note <roster> <need> [text] [--note N] [--supersedes OLD_LINE] [--eta E] [--started]` | Card diary: text and `--note` append a line to the card's `detail`, the field a peer reads. A progress token as text (`9/12`, `75%`, `git <sha>`) sets `progress` instead. A card shows `progress` and `doing` (title) only once they are set. To correct a line, the asker (or Admin) runs `--supersedes "OLD LINE" --note "NEW LINE"`: the old line stays, marked `[superseded]`, with the new line under it. The old line must match one whole detail line exactly. |
 | `unclaim` | `mill unclaim <roster> <need>` | Drop your claim; card goes back to open. |
 | `unpark` | `mill unpark <roster> <need> [--parent-type mail|todo --parent-id N]` | Parked to open; needs a tree parent. |
-| `assign` | `mill assign <roster> <need> <desk>` | Put a desk on an unassigned card. Trust-gated: high any desk, limited Admin. |
+| `assign` | `mill assign <roster> <need> <desk>` | Put a named desk on an unassigned card; a claimed card is refused (no overwrite). Trust-gated: high any desk, limited Admin. To hand off your own card: `unclaim`, then `assign` (or the receiver runs `claim`). Regression row F47 (assign-handoff). |
 | `pass` | `mill pass <roster> <need>` | Claimed to shipped; the asker's second pass moves shipped to done. |
 
 ## Hold
