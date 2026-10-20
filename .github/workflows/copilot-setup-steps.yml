@@ -1,0 +1,82 @@
+# Copilot setup steps (#316): the environment the Copilot coding agent starts
+# in when a mill card is assigned to it as a GitHub issue. GitHub runs only the
+# job named copilot-setup-steps, and only from the default branch. On a pull
+# request that touches this file it runs as a normal check; there the seat
+# secret is absent and the join step is skipped.
+# Rules as in ci.yml: actions pinned to a full commit SHA, least permissions,
+# no self-hosted runners.
+name: copilot-setup-steps
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+permissions:
+  contents: read
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      # Same desk runtime as ci.yml pytest_no_sql (the wall validator tests).
+      NODE_VERSION: v24.21.0
+      NODE_SHA256: fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Node (official tarball, sha256 checked)
+        run: |
+          set -eu
+          test "$(uname -m)" = "x86_64"
+          tarball="$RUNNER_TEMP/node.tar.xz"
+          curl -fsSL --retry 5 --retry-all-errors -o "$tarball" \
+            "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz"
+          echo "${NODE_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/node"
+          tar -xJf "$tarball" -C "$RUNNER_TEMP/node" --strip-components=1
+          echo "$RUNNER_TEMP/node/bin" >> "$GITHUB_PATH"
+      - run: npm ci --prefix tools/wall-validators
+      # The desk client is the released mill, pinned, so a change under test in
+      # this checkout never alters the desk the agent talks through. Tests run
+      # with python -m pytest from the repo root and import the checkout.
+      - name: Install the mill 0.7.7 and the test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "the-mill==0.7.7" "pytest>=8" "httpx>=0.27" build
+          mill --version
+      # The repo hooks stay off here: the agent's own first commit is generated
+      # text the name-token rule refuses. The agent runs the scans by hand
+      # (copilot-instructions.md) and CI check_pack is the gate.
+      # MILL_PILOT_SEAT is an Agents secret holding the github-pilot welcome
+      # link. Agents secrets reach this job as environment variables. Join
+      # output is kept in a private file and never printed: it names the seat.
+      - name: Join the office as desk github-pilot
+        run: |
+          set -eu
+          if [ -z "${MILL_PILOT_SEAT:-}" ]; then
+            echo "MILL_PILOT_SEAT not set; skipping join (expected outside a Copilot session)"
+            exit 0
+          fi
+          umask 077
+          log="$RUNNER_TEMP/mill-join.log"
+          if mill join "$MILL_PILOT_SEAT" >"$log" 2>&1; then
+            echo "mill join: ok"
+          else
+            rc=$?
+            echo "mill join: failed with exit $rc (details kept private)"
+            exit "$rc"
+          fi

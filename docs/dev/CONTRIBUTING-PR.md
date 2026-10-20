@@ -73,8 +73,16 @@ deletion, linear history, and every change lands through a pull request
 5. Tell Builder the PR number in the card's thread. Builder reviews and
    merges with squash or rebase (merge commits are off, so history stays
    linear). The head branch is deleted on merge. Do not merge your own PR.
-   Copilot code review runs on each PR and push; its comments are advisory.
-   The author addresses or answers each one, and Builder still merges.
+   Automatic Copilot code review is off (the `copilot-review` ruleset is
+   disabled to save AI credits). Builder may request one on a PR by hand;
+   its comments are advisory, the author addresses or answers each one, and
+   Builder still merges.
+
+   A card can also go to the Copilot coding agent (desk `github-pilot`):
+   Builder files it as an issue and assigns Copilot, which opens the PR.
+   Its rules are in `.github/copilot-instructions.md` and its environment
+   in `.github/workflows/copilot-setup-steps.yml`. The same checks and the
+   same review apply; tags, versions and PyPI stay with Builder.
 
    Merges must keep noreply identities. A web merge (squash or rebase)
    stamps the merging account's commit email on the result, so every
