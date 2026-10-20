@@ -44,14 +44,13 @@ The desk is the sitting connect. One shell arms, attaches, and stays up to deliv
 
 ```text
 bash -c 'mill connect <desk> --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT
-mill member >/dev/null
 mill route add mail:MAIL -- python ~/.mill/handlers/DESK_<desk>/on_mail.py
 mill route add todo:TODO -- python path/to/on_todo.py
 mill add todo:<id> --hint "need,status"
 wait'
 ```
 
-`mill member` first: it waits for connect to sit; `mill route` does not wait. Everything after the key is the program. The catch-all key is `"*"`, quoted so the shell does not expand it. The list is a chain in add order. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart. The route file stays after the shell exits.
+`mill route` waits for that connect to sit. Everything after the key is the program. The catch-all key is `"*"`, quoted so the shell does not expand it. The list is a chain in add order. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart. The route file stays after the shell exits.
 
 Every other `mill connect` for this desk takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk verbs before `wait`, or stop this shell first.
 
@@ -81,7 +80,7 @@ stdin is one JSON object. A watcher frame is `{type,id,hint,detail?}`. A letter 
 Stop the arm shell, then:
 
 ```text
-bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill member >/dev/null; mill route rm mail:MAIL'
+bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm mail:MAIL'
 ```
 
 ## Worked paths (short)

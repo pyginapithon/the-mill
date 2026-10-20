@@ -1409,7 +1409,10 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
             from agent_coord.client.route_chain import add_route, list_lines, rm_route, route_path
 
             from agent_coord.client.tokens import resolve_desk_owner
-            owner = resolve_desk_owner("")
+            from agent_coord.client.ws import wait_for_sitting_desk
+
+            # Like the RPC verbs: wait for a connect started just before in this shell (#358).
+            owner = resolve_desk_owner("") or wait_for_sitting_desk()
             if not owner:
                 print("mill route: mill connect DESK first", file=sys.stderr, flush=True)
                 return 1
