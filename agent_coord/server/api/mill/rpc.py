@@ -395,7 +395,7 @@ TODO_ROSTERS_MAX = 200
 
 
 def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
-    return {
+    card = {
         "project_id": project_label,
         "need_id": fields["need_id"],
         "id": r.get("id"),
@@ -409,6 +409,12 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
         "tree": _stored(r.get("tree") or "") or None,
         "labels": _json_names(r.get("labels")),
     }
+    # #330: notes land in detail. A title (doing) or progress token that was
+    # never set is left out, so no field in the reply is always empty.
+    for k in ("doing", "progress"):
+        if not card[k]:
+            del card[k]
+    return card
 
 
 def _todo_many(c: Book, body: dict[str, Any], want_st: str, with_done: bool, show_fix: bool) -> dict:
@@ -1867,9 +1873,10 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         "need_id": fields["need_id"],
         "id": tid,
         "detail": kept.get("detail") or "",
-        "progress": kept.get("progress") or "",
         "changed": changed,
     }
+    if kept.get("progress"):
+        rec["progress"] = kept["progress"]
     for k in ("eta_at", "started_at"):
         if payload.get(k):
             rec[k] = payload[k]

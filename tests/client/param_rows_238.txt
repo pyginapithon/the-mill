@@ -159,6 +159,7 @@ connect (verb)
 connect project
 connect desk
 connect vendor
+connect refuse
 connect session
 connect office
 connect yes
@@ -181,6 +182,7 @@ connect-wait project
 connect-wait desk
 connect-wait vendor
 connect-wait session
+connect-wait refuse
 connect-wait office
 connect-wait yes
 reset (verb)
