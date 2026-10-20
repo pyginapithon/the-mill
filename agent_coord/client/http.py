@@ -1020,13 +1020,9 @@ def mill_here_over_http(args: Any) -> int:
                 # Start-Process leaves this process up after the script exits (#192).
                 if parent_gone(parent):
                     stop.set()
-                    print(
-                        json.dumps(
-                            {"ok": True, "mode": "ws", "reason": "parent exited", "desk": who},
-                            default=str,
-                        ),
-                        flush=True,
-                    )
+                    from agent_coord.client.session_errors import parent_exited_notice
+
+                    print(json.dumps(parent_exited_notice(who), default=str), flush=True)
                     return 0
                 stop.wait(1.0)
         except KeyboardInterrupt:
