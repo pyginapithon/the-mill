@@ -1805,30 +1805,55 @@ def _h_yield(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
 
 
 def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
+    """One named step (#615): ship (claimed -> shipped, the volunteer), done
+    (shipped -> done, the asker accepts) or back (done -> shipped -> claimed).
+    A step that does not fit the card's status is refused and changes nothing."""
     from agent_coord.server.records import todo as rec_todo
 
     need = slug(str(body.get("need") or ""))
+    step = str(body.get("step") or "ship").strip().lower()
+    if step not in ("ship", "done", "back"):
+        raise CoordError("pass: step is ship, done or back")
     hit = rec_todo.find(c._cn, project, need)
     if hit is None:
         raise CoordError(f"no such need: {project}/{need}")
     st = hit.get("status") or ""
-    nxt = "done" if st == "shipped" else "shipped"
     who = _stored(owner or "")
     vol = _desk_slug(c._cn, hit, "volunteer", "assigned")
     ask = _desk_slug(c._cn, hit, "asker", "creator")
-    # An open card with no volunteer is not shipped by anyone (#211).
-    if st == "open" and not vol:
-        raise CoordError("claim first: mill claim <project> <need>")
-    if nxt == "shipped" and vol and who and vol != who:
-        raise CoordError("who-may: pass claimed->shipped is the volunteer")
-    # No volunteer yet: only the asker may ship it (the old lookup made the
-    # asker stand in as volunteer; keep that gate explicit).
-    if nxt == "shipped" and not vol and ask and who and ask != who:
-        raise CoordError("who-may: pass claimed->shipped is the volunteer")
-    if nxt == "done" and ask and who and ask != who and vol != who:
-        raise CoordError("who-may: pass shipped->done is the asker")
+    form = f"mill pass {project} {need}"
+    if step == "ship":
+        if st == "shipped":
+            raise CoordError(f"pass: {need} is already shipped; the asker accepts it with {form} --done")
+        if st == "done":
+            raise CoordError(f"pass: {need} is already done; {form} --back steps it back to shipped")
+        if st not in ("open", "claimed"):
+            raise CoordError(f"pass: {need} is {st}; only a claimed card ships")
+        # An open card with no volunteer is not shipped by anyone (#211).
+        if st == "open" and not vol:
+            raise CoordError("claim first: mill claim <project> <need>")
+        if vol and who and vol != who:
+            raise CoordError("who-may: pass claimed->shipped is the volunteer")
+        # No volunteer yet: only the asker may ship it.
+        if not vol and ask and who and ask != who:
+            raise CoordError("who-may: pass claimed->shipped is the volunteer")
+        nxt = "shipped"
+    elif step == "done":
+        if st != "shipped":
+            raise CoordError(f"pass --done: {need} is {st}, not shipped; nothing changed")
+        if ask and who and ask != who and vol != who:
+            raise CoordError("who-may: pass shipped->done is the asker")
+        nxt = "done"
+    else:
+        if st not in ("shipped", "done"):
+            raise CoordError(
+                f"pass --back: {need} is {st}; only shipped or done steps back (unclaim releases a claim)"
+            )
+        if ask and who and ask != who and vol != who:
+            raise CoordError("who-may: pass --back is the asker or the volunteer")
+        nxt = "shipped" if st == "done" else ("claimed" if vol else "open")
     rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=nxt)
-    rec = {"ok": True, "need": need, "status": nxt, "id": int(hit["id"])}
+    rec = {"ok": True, "need": need, "status": nxt, "was": st, "id": int(hit["id"])}
     _poke(c, "todo", rec["id"], "pass", owner=owner)
     return rec
 

@@ -48,7 +48,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
   - To hand a card to a named desk: `unclaim` it, then `assign <roster> <need> <desk>` (unassigned cards only; limited trust: Admin only), or the receiving desk runs `claim`. Say who has it in a `note`.
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status. Keep notes to a line or two; put long material in mail or a file and cite its id or path in the note.
   - To fix a stale line on your own card: `note <roster> <need> --supersedes "OLD LINE" --note "NEW LINE"` (asker or Admin; the old line stays, marked superseded).
-  - `pass <roster> <need>`: your pass ships it; the asker passes again to mark it done.
+  - `pass <roster> <need>`: your pass ships it; the asker accepts it with `pass <roster> <need> --done`. `--back` steps a card back one stage. A pass that does not fit the card is refused and changes nothing.
   - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. `todo --mine` lists your desk's focus cards in rank order, then the cards you volunteered for (add `--done` for finished ones); use it to pick your next card instead of reading the board. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 

@@ -37,7 +37,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 | `unclaim` | `mill unclaim <roster> <need>` | Drop your claim; card goes back to open. |
 | `unpark` | `mill unpark <roster> <need> [--parent-type mail|todo --parent-id N]` | Parked to open; needs a tree parent. |
 | `assign` | `mill assign <roster> <need> <desk>` | Put a named desk on an unassigned card; a claimed card is refused (no overwrite). Trust-gated: high any desk, limited Admin. To hand off your own card: `unclaim`, then `assign` (or the receiver runs `claim`). Regression row F47 (assign-handoff). |
-| `pass` | `mill pass <roster> <need>` | Claimed to shipped; the asker's second pass moves shipped to done. |
+| `pass` | `mill pass <roster> <need> [--done \| --back]` | Claimed to shipped. `--done`: the asker moves shipped to done. `--back`: one stage back (done to shipped, shipped to claimed). A pass that does not fit the card is refused (F67). |
 
 ## Hold
 

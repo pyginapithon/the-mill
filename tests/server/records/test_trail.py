@@ -99,7 +99,7 @@ def _branch(cn):
         rpc._h_claim(book, {"need": need}, "unit", "tester")
     rpc._h_note(book, {"need": a_need, "note": "dead-end: same error after rerun"}, "unit", "tester")
     rpc._h_pass(book, {"need": a_need}, "unit", "tester")  # claimed -> shipped (volunteer)
-    rpc._h_pass(book, {"need": a_need}, "unit", "asker")  # shipped -> done (asker, agent-ux 1213)
+    rpc._h_pass(book, {"need": a_need, "step": "done"}, "unit", "asker")  # shipped -> done (asker, agent-ux 1213)
     rpc._h_note(book, {"need": b_need, "note": "solved: same launcher both sides, exit 0"}, "unit", "tester")
     rpc._h_pass(book, {"need": b_need}, "unit", "tester")
     return {"book": book, "room": room, "rid": rid, "fid": fid, "a": a_id, "b": b_id, "deep": int(deep["id"])}

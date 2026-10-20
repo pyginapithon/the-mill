@@ -316,8 +316,9 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["all"] = bool(args.all)
     if hasattr(args, "star"):
         body["star"] = bool(args.star)
-    if verb == "pass" or bool(getattr(args, "pass_close", False)):
-        body["pass_close"] = True
+    if verb == "pass":
+        # #615: the step is named; a repeat never moves a card on by itself.
+        body["step"] = "done" if getattr(args, "done", False) else ("back" if getattr(args, "back", False) else "ship")
     if bool(getattr(args, "yes", False)):
         body["yes"] = True
     if verb == "claim" and bool(getattr(args, "take_over", False)):
