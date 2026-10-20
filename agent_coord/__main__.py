@@ -149,6 +149,84 @@ def _welcome_desk_bare(url: str) -> str:
     )
 
 _INVITE_SECRET_KEYS = ("token", "seat", "invite_url", "invite_path")
+WITHHELD = "<withheld: see link_file>"
+
+
+def _withhold(obj, secrets):
+    """Copy of obj with every minted secret replaced, wherever it sits (#607).
+
+    #359 dropped a fixed list of key names, so join_argv (mill join <welcome
+    link>) still printed the seat. Matching the secret value covers any field.
+    """
+    from urllib.parse import quote
+
+    vals = sorted({str(s) for s in secrets if s and len(str(s)) >= 8}, key=len, reverse=True)
+    if not vals:
+        return obj
+    forms = sorted({f for v in vals for f in (v, quote(v, safe=""))}, key=len, reverse=True)
+
+    def walk(x):
+        if isinstance(x, str):
+            for f in forms:
+                if f in x:
+                    x = x.replace(f, WITHHELD)
+            return x
+        if isinstance(x, dict):
+            return {k: walk(v) for k, v in x.items()}
+        if isinstance(x, (list, tuple)):
+            return [walk(v) for v in x]
+        return x
+
+    return walk(obj)
+
+
+def _install_secrets(result: dict) -> tuple[list[str], list[str]]:
+    """Secrets and links that mill init / mill install server minted (#607)."""
+    secrets: list[str] = []
+    links: list[str] = []
+    inv = result.get("invite") if isinstance(result.get("invite"), dict) else {}
+    seat = result.get("seat_welcome") if isinstance(result.get("seat_welcome"), dict) else {}
+    if inv.get("token"):
+        secrets.append(str(inv["token"]))
+        link = str(result.get("invite_link") or inv.get("invite_path") or "")
+        if link:
+            links.append(link)
+    if seat.get("seat"):
+        secrets.append(str(seat["seat"]))
+        if seat.get("invite_url"):
+            links.append(str(seat["invite_url"]))
+    return secrets, links
+
+
+def _print_install(args, result) -> None:
+    """Print an init or install result; minted links go to an owner-only file (#607)."""
+    if not isinstance(result, dict):
+        _print(result)
+        return
+    secrets, links = _install_secrets(result)
+    if not secrets:
+        _print(result)
+        return
+    out = _withhold(result, secrets)
+    if bool(getattr(args, "print_link", False)):
+        _print(out)
+        for link in links:
+            print(link, flush=True)
+        return
+    try:
+        where = _invite_link_file(args, "install", "\n".join(links))
+    except OSError as e:
+        _print(out)
+        print(
+            f"mill: could not write the link file ({e.strerror or e}); the minted links were not printed. "
+            "Rerun mill invite --seat DESK or mill invite --mint for new ones",
+            file=sys.stderr,
+            flush=True,
+        )
+        return
+    out["link_file"] = str(where)
+    out["link"] = "written to link_file (owner-only); hand it over privately; --print-link prints it instead"
+    _print(out)
 
 
 def _invite_link_file(args, name: str, link: str) -> "Path":
@@ -223,6 +301,9 @@ def _invite_cmd(args) -> int:
         from urllib.parse import urlencode
 
         link = _invite_url("/welcome?" + urlencode({"desk": inner["desk"], "seat": seat}))
+    # #607: withhold the secret in any field (join_argv, or one a later wall adds).
+    row = _withhold(row, [token, seat])
+    inner = row["result"] if isinstance(row.get("result"), dict) else row
     if link and bool(getattr(args, "print_link", False)):
         _print(row)
         print(link, flush=True)
@@ -344,6 +425,23 @@ def _page_number(raw: str) -> int:
     return n
 
 
+def _link_flags(sp) -> None:
+    """--link-file / --print-link for commands that mint an invite key or a seat (#607)."""
+    sp.add_argument(
+        "--link-file",
+        default="",
+        dest="link_file",
+        metavar="PATH",
+        help="write a minted link here (owner-only; default under ~/.mill/invites)",
+    )
+    sp.add_argument(
+        "--print-link",
+        action="store_true",
+        dest="print_link",
+        help="print a minted secret link on stdout instead of writing a file",
+    )
+
+
 def _build_parser() -> MillArgumentParser:
     p = MillArgumentParser(
         prog="mill",
@@ -397,6 +495,7 @@ def _build_parser() -> MillArgumentParser:
     ini.add_argument("--dashboard-port", type=int)
     ini.add_argument("--lan", action="store_true", help="dashboard on 0.0.0.0 for the office LAN")
     ini.add_argument("--config", dest="config_path", default="", help="config path")
+    _link_flags(ini)
 
     a = sub.add_parser(
         "hold",
@@ -731,6 +830,7 @@ def _build_parser() -> MillArgumentParser:
     ins.add_argument("--bind", dest="dashboard_bind", default=None)
     ins.add_argument("--port", type=int, default=None)
     ins.add_argument("--dest", default="", help="write configs here (default ~/.mill)")
+    _link_flags(ins)
     ins.add_argument("--lan-only", dest="lan_only", action="store_true", help="Listen on private/loopback only (not 0.0.0.0)")
     ins.add_argument("--public", dest="lan_only_off", action="store_true", help="Allow public/wildcard bind (cloud); still HTTPS-only")
     ins.add_argument(
@@ -1412,7 +1512,7 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 prompt=not args.yes,
             )
             result = init_office(data, path=Path(args.config_path) if args.config_path else None)
-            _print(result)
+            _print_install(args, result)
             return 0
         if args.cmd == "update":
             from .install import run_update
@@ -1463,7 +1563,7 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 lan_only=lan_only,
                 public=want_public,
             )
-            _print(result)
+            _print_install(args, result)
             return 0 if result.get("ok") else 1
         if args.cmd == "uninstall":
             from .install import uninstall
