@@ -18,20 +18,38 @@ def _stored(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _live_kind(cn, name: str) -> str:
-    """Type of one live name row. A bare string shared by two types returns one row."""
-    from agent_coord.server.records.db import scalar
+_NAME_TYPES = ("roster", "label", "desk")
 
-    rec = scalar(
-        cn,
-        "SELECT type FROM name WHERE name=%s AND deleted IS NULL",
-        (name.strip(),),
-    )
-    if rec is None:
-        raise CoordError(f"name {name.strip()!r} is not in the name table")
-    if isinstance(rec, (bytes, bytearray)):
-        rec = rec.decode("utf-8")
-    return str(rec)
+
+def _live_kind(cn, name: str, body: dict[str, Any] | None = None, *, verb: str = "retire") -> str:
+    """The name type to act on (#537).
+
+    The type the CLI names (body name_type) wins, with no lookup: a desk-focus
+    label shares its name with the desk. Without one (an older CLI), the live
+    rows are all read; one type is used, two or more are refused by name.
+    """
+    from agent_coord.server.records.db import rows_done
+
+    want = str((body or {}).get("name_type") or "").strip().lower()
+    if want:
+        if want not in _NAME_TYPES:
+            raise CoordError(f"{verb}: name type must be roster, label or desk, not {want!r}")
+        return want
+    bare = name.strip()
+    found: list[str] = []
+    for r in rows_done(cn, "SELECT DISTINCT type FROM name WHERE name=%s AND deleted IS NULL", (bare,)):
+        t = r.get("type")
+        t = t.decode("utf-8") if isinstance(t, (bytes, bytearray)) else str(t)
+        if t not in found:
+            found.append(t)
+    if not found:
+        raise CoordError(f"name {bare!r} is not in the name table")
+    if len(found) > 1:
+        kinds = sorted(found)
+        tail = " NEW" if verb == "rename" else ""
+        forms = " or ".join(f"mill {verb} {k} {bare}{tail}" for k in kinds)
+        raise CoordError(f"{verb}: {bare} is a {' and a '.join(kinds)}; name the type: {forms}")
+    return found[0]
 
 
 def _yes(body: dict[str, Any]) -> None:
@@ -69,7 +87,7 @@ def reclaim(cn, desk: str, body: dict[str, Any]) -> list[dict]:
     a = str(body.get("slug") or "").strip()
     b = str(body.get("confirm") or "").strip()
     _match(a, b, verb="reclaim")
-    return rec_name.reclaim(cn, a, _live_kind(cn, a))
+    return rec_name.reclaim(cn, a, _live_kind(cn, a, body, verb="reclaim"))
 
 
 def rename(cn, desk: str, body: dict[str, Any]) -> list[dict]:
@@ -79,7 +97,7 @@ def rename(cn, desk: str, body: dict[str, Any]) -> list[dict]:
     new = str(body.get("new") or "").strip()
     confirm = str(body.get("confirm") or "").strip()
     _match(new, confirm, verb="rename")
-    return rec_name.rename(cn, old, new, _live_kind(cn, old))
+    return rec_name.rename(cn, old, new, _live_kind(cn, old, body, verb="rename"))
 
 
 def retire(cn, desk: str, body: dict[str, Any]) -> list[dict]:
@@ -88,4 +106,4 @@ def retire(cn, desk: str, body: dict[str, Any]) -> list[dict]:
     a = str(body.get("slug") or "").strip()
     b = str(body.get("confirm") or "").strip()
     _match(a, b, verb="retire")
-    return rec_name.retire(cn, a, _live_kind(cn, a))
+    return rec_name.retire(cn, a, _live_kind(cn, a, body, verb="retire"))
