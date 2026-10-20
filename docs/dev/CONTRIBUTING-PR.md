@@ -23,7 +23,14 @@ deletion, linear history, and every change lands through a pull request
    Title-case name tokens in comments, docstrings and Markdown prose.
    `commit-msg` runs the same rules on the message. Each hit names
    `file:line` and the kind. Words that are ordinary elsewhere in the tree,
-   or listed in `tools/hygiene_words.txt`, are not names. The hooks need
+   or listed in `tools/hygiene_words.txt`, are not names. In a commit
+   message that holds for the first word of a line (sentence case, also
+   after a bullet, a list number or a card number); a capital mid-line
+   still has to be on the desk-word allow-list. `check_pack` applies the
+   same rule to commit history. Regression row F49 (hook-linestart).
+   The hooks find the repo from their own path, so running one by hand
+   from any directory gives the same verdict, and a scan that cannot run
+   exits 1 with `hygiene ERROR` (it fails closed). The hooks need
    `python3`, `python` or `py` on PATH (Git Bash on Windows is fine).
    `git commit --no-verify` skips them; CI `check_pack` still fails the PR.
    `python tools/precommit_hygiene.py tree` runs the comment scan over the

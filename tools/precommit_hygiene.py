@@ -5,6 +5,9 @@ Usage:
   python tools/precommit_hygiene.py msg FILE        # scan a commit message
   python tools/precommit_hygiene.py tree            # comment scan, whole tip
 
+Any cwd works: git runs in the repo this file lives in. A scan that cannot
+run (git missing, not a repo) exits 1 with "hygiene ERROR", never 0.
+
 Uses the tools/check_pack.py rules: non-documentation address, home path
 with a login segment, email outside placeholder domains, byte-order mark,
 typographic marks, and (in comments, docstrings, Markdown prose and the
@@ -36,9 +39,9 @@ _SENT_START_RE = re.compile(r"(?:^|[.!?:;]\s+|^\s*[-*>#\d.)]+\s*)([A-Z][a-z]{2,2
 _NOT_PROSE_RE = re.compile(r"\S*[/\\_=@$<>{}\[\]]\S*|\w+\.\w+\S*")
 
 
-_WORDS_FILE = Path(__file__).resolve().parent / "hygiene_words.txt"
-_LOWER_RE = re.compile(r"\b[a-z]{3,21}\b")
 _VOCAB: set[str] | None = None
+# The repo this file lives in. Hooks and by-hand runs work from any cwd (#338).
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def tree_vocab() -> set[str]:
@@ -50,28 +53,9 @@ def tree_vocab() -> set[str]:
     is prose, not a name. A name never appears lower-case, so it still fails.
     """
     global _VOCAB
-    if _VOCAB is not None:
-        return _VOCAB
-    words: set[str] = set()
-    try:
-        # A root commit has no HEAD yet: read the staged tree instead.
-        if _has_head():
-            args = ["-E", "[a-z]{3,21}", "HEAD"]
-        else:
-            args = ["--cached", "-E", "[a-z]{3,21}"]
-        raw = _git("grep", "-h", "-o", "-w", "-I", *args, "--", ".")
-        words.update(_LOWER_RE.findall(raw.decode("utf-8", "replace")))
-    except (OSError, subprocess.CalledProcessError):
-        pass
-    try:
-        for ln in _WORDS_FILE.read_text(encoding="utf-8").splitlines():
-            ln = ln.split("#", 1)[0].strip()
-            if ln:
-                words.add(ln.casefold())
-    except OSError:
-        pass
-    _VOCAB = words
-    return words
+    if _VOCAB is None:
+        _VOCAB = cp.ordinary_words(ROOT, staged=not _has_head())
+    return _VOCAB
 
 
 def name_hit(text: str, vocab: set[str] | None = None) -> bool:
@@ -164,7 +148,7 @@ def _has_head() -> bool:
 
 
 def _git(*args: str) -> bytes:
-    return subprocess.check_output(["git", *args], stderr=subprocess.DEVNULL)
+    return subprocess.check_output(["git", *args], cwd=ROOT, stderr=subprocess.DEVNULL)
 
 
 def scan_staged() -> list[str]:
@@ -212,7 +196,7 @@ def scan_message(path: str) -> list[str]:
             fails.append(f"commit message:{i}: home path with a login name")
         if cp.text_has_personal_email(ln):
             fails.append(f"commit message:{i}: email outside placeholder domains")
-        if cp.text_has_personal_name_token(ln):
+        if cp.text_has_personal_name_token(ln, tree_vocab()):
             fails.append(f"commit message:{i}: personal name token (#229 rule)")
     return fails
 
@@ -222,12 +206,18 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] not in ("staged", "msg", "tree") or (argv[0] == "msg" and len(argv) < 2):
         print(__doc__.strip())
         return 2
-    if argv[0] == "staged":
-        fails = scan_staged()
-    elif argv[0] == "msg":
-        fails = scan_message(argv[1])
-    else:
-        fails = scan_tree()
+    try:
+        if argv[0] == "staged":
+            fails = scan_staged()
+        elif argv[0] == "msg":
+            fails = scan_message(argv[1])
+        else:
+            fails = scan_tree()
+    except (OSError, subprocess.CalledProcessError) as exc:
+        # A scan that could not run is not a pass (#338).
+        what = exc.cmd[:2] if isinstance(exc, subprocess.CalledProcessError) else type(exc).__name__
+        print(f"hygiene ERROR: the {argv[0]} scan could not run ({what}); failing closed", file=sys.stderr)
+        return 1
     if fails:
         print(f"hygiene FAIL: {len(fails)} hit(s)", file=sys.stderr)
         for f in fails:
