@@ -210,6 +210,31 @@ def _allow_text(allow: list[tuple[str, str]]) -> str:
     return ", ".join(h + p for h, p in allow) or "none"
 
 
+def allow_step(host: str, allow: list[tuple[str, str]]) -> str:
+    """The exact host-Admin step that adds HOST/<prefix>/ to wake_hosts (#619).
+
+    Names where this wall reads the setting: the env var when it is set (it wins
+    over the file, and the service reads it at start), else the config file
+    (read on every join, no restart). Never a real path, never the URL path.
+    """
+    listed = ",".join(h + p for h, p in allow)
+    value = (listed + "," if listed else "") + f"{host}/<webhook path prefix>/"
+    if (os.environ.get("AGENT_COORD_WAKE_HOSTS") or "").strip():
+        return (
+            f"the host Admin sets AGENT_COORD_WAKE_HOSTS={value} in the mill-wall service "
+            "environment on the wall host and must restart mill-wall, then this mill join runs again"
+        )
+    where = (
+        "the file named by AGENT_COORD_CONFIG"
+        if (os.environ.get("AGENT_COORD_CONFIG") or "").strip()
+        else "~/.mill/config.toml of the account mill-wall runs as"
+    )
+    return (
+        f'the host Admin puts the line wake_hosts = "{value}" in {where} on the wall host '
+        "(read on the next join, no restart), then this mill join runs again"
+    )
+
+
 def _ip_literal(host: str) -> bool:
     import ipaddress
 
@@ -276,14 +301,17 @@ def check_url(raw: str, *, allow_only: bool = True) -> tuple[str, str]:
     allow = wake_hosts()
     path = parts.path or "/"
     if not any(host == h and path.startswith(p) for h, p in allow):
-        if any(host == h for h, _p in allow):
+        step = allow_step(host, allow)
+        mine = [p for h, p in allow if h == host]
+        if mine:
             raise WakeRefused(
-                f"join: that path on {host} is not a webhook path this wall allows ({_allow_text(allow)}); "
-                "copy the webhook URL from the routine again"
+                f"join: that path on {host} is not a webhook path this wall allows "
+                f"(allowed on {host}: {', '.join(mine)}); copy the webhook URL from the routine again. "
+                f"If it is a new webhook path, {step}"
             )
         raise WakeRefused(
-            f"join: host {host} is not on this wall's wake allowlist ({_allow_text(allow)}); "
-            "the host adds it to wake_hosts in the wall config"
+            f"join: host {host} is not on this wall's wake allowlist (allowed: {_allow_text(allow)}). "
+            f"To allow it, {step}"
         )
     return url, host
 
