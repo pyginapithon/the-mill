@@ -106,7 +106,7 @@ def test_explicit_project_is_not_overridden():
 def test_reply_hands_connect_roster_to_send(monkeypatch, roster):
     seen = {}
 
-    def fake_send(c, b, project, owner):
+    def fake_send(c, b, project, owner, **kw):
         seen.update(b)
         return {"ok": True}
 

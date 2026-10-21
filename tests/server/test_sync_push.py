@@ -146,7 +146,7 @@ def test_push_mail_emits_one_item_per_dest(monkeypatch):
     )
     monkeypatch.setattr(
         "agent_coord.server.push.emit",
-        lambda cn, desk, kind, payload: sent.append(desk) or "missed",
+        lambda cn, desk, kind, payload, **kw: sent.append(desk) or "missed",
     )
     push_mail(object(), 9)
     assert sent == ["DESK_one", "DESK_two"]

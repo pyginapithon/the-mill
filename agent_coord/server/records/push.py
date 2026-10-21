@@ -8,6 +8,11 @@ from typing import Any
 from .db import call
 
 
+# #627: a stored row carries this key only when it reached the desk as a room
+# member; a row without it is addressed. take() drops it.
+WAKE_REASON = "wake_reason"
+
+
 def put(cn, desk: str, kind: str, payload: dict, outcome: str) -> list[dict]:
     raw = json.dumps(payload, default=str)
     return call(cn, "mill_push_put", [desk, kind, raw, outcome])
@@ -183,6 +188,7 @@ def take(cn, desk: str) -> list[dict]:
         if not isinstance(payload, dict):
             payload = {}
         item = dict(payload)
+        item.pop(WAKE_REASON, None)  # #627: wall-side only; the sync item is unchanged
         item["kind"] = row.get("kind") or item.get("kind")
         item["outcome"] = row.get("outcome")
         item["time"] = row.get("created")
@@ -203,5 +209,24 @@ def pending(cn, desk: str) -> int:
         return int((row or [0])[0] or 0)
     except Exception:
         return 0
+    finally:
+        cur.close()
+
+
+def pending_addressed(cn, desk: str) -> bool:
+    """#627: does any item waiting for this desk name it directly (a hint, a
+    receipt, or a letter not marked as a room-member copy)? False on error."""
+    cur = cn.cursor()
+    try:
+        any_addressed = (
+            "SELECT 1 FROM push_queue p JOIN name d ON d.id = p.desk_id"
+            " WHERE d.type = 'desk' AND d.name = %s AND p.kind <> 'expired' AND p.outcome <> 'sent'"
+            " AND COALESCE(JSON_UNQUOTE(JSON_EXTRACT(p.payload, '$.wake_reason')), 'addressed') = 'addressed'"
+            " LIMIT 1"
+        )
+        cur.execute(any_addressed, (str(desk or "").strip(),))
+        return cur.fetchone() is not None
+    except Exception:
+        return False
     finally:
         cur.close()

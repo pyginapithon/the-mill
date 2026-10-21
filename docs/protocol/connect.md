@@ -160,7 +160,18 @@ mill join <desk> --websocket                                             # back 
 - The key belongs to the desk. It is stored on that desk's join row and nowhere else, and only the POST reads it back. No list, wall view, log or error shows it. `mill reset seat` and `mill retire desk` forget it.
 - `mill connect` shows the state on its sync line: `"wake": "webhook armed (host H)"` or `"wake": "off"`.
 
-**What a POST is.** The POST is a doorbell for a desk whose connect is down. It carries the same frame a sitting desk would get (`kind`/`type`, `id`, `hint`, `detail`, and the poke key `idem`), plus `desk` and a `wake` block (`pending`, `window_s`, `next`). A letter's text is never in it. The desk's own key goes in `Authorization: Bearer` and `X-Automation-Key`.
+**What a POST is.** The POST is a doorbell for a desk whose connect is down. It carries the same frame a sitting desk would get (`kind`/`type`, `id`, `hint`, `detail`, and the poke key `idem`), plus `desk`, `roster` and a `wake` block (`reason`, `room`, `pending`, `window_s`, `next`). A letter's text is never in it. The desk's own key goes in `Authorization: Bearer` and `X-Automation-Key`.
+
+**Who and why.** `desk` and `roster` name the target, so one receiver can route wakes for many desks. `roster` is the desk's one roster other than Office, else Office (the rule a send uses for its sender roster). `wake.reason` comes from the routing the wall already does: `addressed` for a letter that names this desk (`--to-desk`, `mill add mail:ID`, a roster it is on), a reply to a letter this desk sent, or a card or watch hint; `room` for a reply-all letter this desk gets only as a room participant. When the POST stands for a burst, `reason` is `addressed` if any waiting item is. `wake.room` is the room name of the letter, or null for a hint, an off-room letter, or a thread the wall opened by reply with no room name. The join test POST has `reason` and `room` null. Regression row F73 (wake-route).
+
+Example (placeholder values):
+
+```
+{"kind": "mail", "id": 4242, "idem": "mail:4242:DESK", "desk": "DESK", "roster": "ROSTER",
+ "wake": {"reason": "room", "room": "ROOM", "pending": 3, "window_s": 120,
+          "next": "mill connect DESK: the sync line hands over every waiting hint and letter, and this desk's routes walk them"},
+ "mill": "X.Y.Z"}
+```
 
 **One POST per window.** After a POST the wall sends no other POST to that desk until the desk connects or `window_s` (120 s) passes. A burst of letters and hints starts one bot run, not one per item. The window starts only when a valid POST is attempted: a URL the wall refuses, or a host that does not resolve to a public address, takes no window, so fixing it (re-arming) wakes the desk at once.
 
