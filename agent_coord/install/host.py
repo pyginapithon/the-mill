@@ -551,9 +551,39 @@ def wall_import_check_cmd() -> list[str]:
     return [sys.executable or "python", "-c", code]
 
 
-def sql_install_cmd() -> list[str]:
-    """Run ensure with the pack just installed, then check the book's SQL stamp (#614)."""
-    return [sys.executable or "python", "-m", "agent_coord", "install", "sql", "--apply"]
+def sql_install_cmd(*, apply: bool) -> list[str]:
+    """mill install sql with the pack just installed: check the book's SQL stamp;
+    apply adds --apply (migrate.ensure, the one migration entry). mill update
+    passes apply=False: it flags stale SQL and never applies it (#616)."""
+    cmd = [sys.executable or "python", "-m", "agent_coord", "install", "sql"]
+    return cmd + ["--apply"] if apply else cmd
+
+
+SQL_STALE_NEXT = (
+    "SQL is not applied by mill update. Back up the book and run the throwaway A/B"
+    " (BUILD.md), then run: mill install sql --apply. /health is 503 while the"
+    " book's SQL is not this pack's."
+)
+
+
+def _sql_check(rec) -> tuple[str, dict[str, str], str]:
+    """Read mill install sql (no apply): schema current|stale|unchecked, book/pack, error."""
+    code = int(getattr(rec, "returncode", 1) or 0)
+    if code == 0:
+        return "current", {}, ""
+    out = getattr(rec, "stdout", None) or ""
+    try:
+        row = json.loads(out)
+    except (TypeError, ValueError):
+        row = None
+    if isinstance(row, dict) and row.get("ok") is False and "book" in row:
+        st = {"book": str(row.get("book") or ""), "pack": str(row.get("pack") or "")}
+        return "stale", st, "book SQL is not this pack's (book %s, pack %s); run: mill install sql --apply" % (
+            st["book"] or "none",
+            st["pack"],
+        )
+    err = (getattr(rec, "stderr", None) or out or "")[:300].strip() or f"sql check exit {code}"
+    return "unchecked", {}, err + "; the SQL stamp was not read. Check the book, then run: mill install sql"
 
 
 def update_plan(*, cwd: Path | None = None, dest: Path | None = None) -> dict[str, Any]:
@@ -569,7 +599,7 @@ def update_plan(*, cwd: Path | None = None, dest: Path | None = None) -> dict[st
         "smash": False,
         "schema": "not-run",
         "cmd": update_pip_cmd(),
-        "sql": sql_install_cmd(),
+        "sql": sql_install_cmd(apply=False),
         "recycle": wall_recycle_cmds(),
     }
     if mill_source_tree(here):
@@ -602,8 +632,8 @@ def run_update(
     """pip -U the-mill from a non-mill cwd.
 
     Refuse when a mill connect holds the console script. Then stop, pip,
-    import the new package, ensure its SQL, then start. Never wipes. A failed
-    pip, import or SQL ensure does not start the wall.
+    import the new package, check its SQL (never apply it), then start. Never
+    wipes. A failed pip or import does not start the wall; stale SQL is flagged.
     """
     plan = update_plan(cwd=cwd, dest=dest)
     urls = [with_session_hash(u) for u in share_wall_urls(private_ips=private_ips)]
@@ -726,18 +756,18 @@ def run_update(
         plan["wall_restart"] = "skipped"
         plan["error"] = check_err or "import check failed; mill-wall not started"
         return plan
-    # #614: the new pack's SQL goes in before the wall serves it (ensure, then the stamp check).
-    sql_ok, sql_err = _run_steps([sql_install_cmd()], label="sql ensure")
-    plan["schema"] = "applied" if sql_ok else "failed"
-    if not sql_ok:
-        plan["ok"] = False
-        plan["restart_ok"] = False
-        plan["wall_restart"] = "skipped"
-        plan["error"] = (
-            (sql_err or "sql ensure failed")
-            + "; mill-wall not started. Fix, then run: mill install sql --apply, and start mill-wall"
-        )
-        return plan
+    # #616: check the book's SQL with the new pack; never apply it here. A stale
+    # book is flagged (exit 1, the apply command) and the wall still starts:
+    # its /health answers 503 naming the same command until the SQL is applied.
+    try:
+        sql_rec = runner(sql_install_cmd(apply=False), check=False, capture_output=True, text=True)
+    except OSError as e:
+        schema, sql_seen, sql_err = "unchecked", {}, f"{e}; the SQL stamp was not read. Check the book, then run: mill install sql"
+    else:
+        schema, sql_seen, sql_err = _sql_check(sql_rec)
+    plan["schema"] = schema
+    if sql_seen:
+        plan["sql"] = sql_seen
     start_ok, start_err = _run_steps(wall_start_cmds(), label="wall start")
     plan["restart_ok"] = start_ok
     plan["wall_restart"] = "ok" if start_ok else "failed"
@@ -747,13 +777,18 @@ def run_update(
             start_err
             or "wall start failed after pip; mill-wall is down - start it manually"
         )
+    if sql_err:
+        plan["ok"] = False
+        plan["error"] = "; ".join(x for x in (plan.get("error"), sql_err) if x)
     plan["next"] = [
         f"Share URL (HTTPS): {plan['url']}",
         "mill install check (probe/reuse dest; no smash)",
         "Does not smash dest or mill-wall SCM",
-        "The book's SQL was brought to this pack (ensure); /health says 503 if it ever is not.",
+        "SQL is a separate step: mill update checks the book's SQL and never applies it.",
         "Copy mill desk skill: the pack skill.md (path in the mill join note) over mill-desk/SKILL.md (mill briefing howto-ai). Restart the TUI.",
     ]
+    if schema != "current":
+        plan["next"].insert(0, SQL_STALE_NEXT)
     if plan.get("pip_applied") and not plan.get("restart_ok"):
         plan["next"].insert(
             0,
