@@ -461,6 +461,13 @@ def _gate_take(desk: str, now: float) -> bool:
         return True
 
 
+def _gate_open(desk: str, now: float) -> bool:
+    """True when no window is running for this desk. Takes nothing."""
+    with _GATE_LOCK:
+        last = _GATE.get(desk)
+        return last is None or now - last >= WAKE_WINDOW_S
+
+
 def gate_clear(desk: str) -> None:
     """The desk connected: its sync has the queue, so the next hint may wake it again."""
     with _GATE_LOCK:
@@ -481,7 +488,8 @@ def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = Non
     if not target:
         return "off"
     url, key = target
-    if not _gate_take(desk, time.monotonic()):
+    if not _gate_open(desk, time.monotonic()):
+        # A wake already went out in this window: skip the checks and the DNS lookup.
         return "coalesced"
     try:
         url, host = check_url(url)
@@ -491,6 +499,11 @@ def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = Non
     if not public_host(host):
         _log_hook_fail(desk, hint_id, exc_type="NotPublic")
         return "error"
+    # The window starts only for a POST that is actually attempted: a refused or
+    # unresolvable target takes no gate, so it never blocks the next valid wake.
+    # Taken here (not peeked) so two threads racing past the peek send one POST.
+    if not _gate_take(desk, time.monotonic()):
+        return "coalesced"
     from agent_coord.server.records import push as rec_push
 
     pending = rec_push.pending(cn, desk) + 1
