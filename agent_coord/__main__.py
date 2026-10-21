@@ -1373,6 +1373,9 @@ def _build_parser() -> MillArgumentParser:
     # Refused with a plain line; never echoed (argparse would print an unknown flag's value).
     jn.add_argument("--webhook-key", default=None, help=argparse.SUPPRESS)
     jn.add_argument("--websocket", action="store_true", help="switch the desk back to websocket only (forget the webhook)")
+    # #628: which items wake this desk. addressed: room-only letters wait for its next connect.
+    jn.add_argument("--wake-on", default="", choices=("addressed", "all"),
+                    help="with the webhook options: wake for every item (all, the default) or only items addressed to this desk")
 
     sub.add_parser(
         "local",

@@ -307,7 +307,8 @@ END //
 CREATE PROCEDURE mill_join_wake_arm(
   IN p_desk VARCHAR(64),
   IN p_url  VARCHAR(512),
-  IN p_key  VARCHAR(512)
+  IN p_key  VARCHAR(512),
+  IN p_wake_on VARCHAR(16)
 )
 BEGIN
   DECLARE v_desk BIGINT UNSIGNED;
@@ -318,10 +319,14 @@ BEGIN
   IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM `join` WHERE desk_id = v_desk) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake: desk has not joined';
   END IF;
+  IF IFNULL(p_wake_on, 'all') NOT IN ('all', 'addressed') THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake arm: wake_on is all or addressed';
+  END IF;
   UPDATE `join`
-     SET delivery_mode = 'webhook', endpoint_url = p_url, endpoint_key = p_key, updated = updated
+     SET delivery_mode = 'webhook', endpoint_url = p_url, endpoint_key = p_key,
+         wake_on = IFNULL(p_wake_on, 'all'), updated = updated
    WHERE desk_id = v_desk;
-  SELECT TRIM(p_desk) AS desk, 'webhook' AS delivery_mode;
+  SELECT TRIM(p_desk) AS desk, 'webhook' AS delivery_mode, IFNULL(p_wake_on, 'all') AS wake_on;
 END //
 
 CREATE PROCEDURE mill_join_wake_off(
@@ -335,7 +340,7 @@ BEGIN
   END IF;
   UPDATE `join`
      SET delivery_mode = IF(delivery_mode = 'webhook', 'websocket', delivery_mode),
-         endpoint_url = NULL, endpoint_key = NULL, updated = updated
+         endpoint_url = NULL, endpoint_key = NULL, wake_on = 'all', updated = updated
    WHERE desk_id = v_desk;
   SELECT TRIM(p_desk) AS desk, 'off' AS wake;
 END //
@@ -348,7 +353,8 @@ BEGIN
   SELECT TRIM(p_desk) AS desk,
          (j.delivery_mode = 'webhook' AND j.endpoint_url IS NOT NULL AND j.endpoint_key IS NOT NULL) AS armed,
          IF(j.endpoint_url IS NULL, NULL,
-            SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(j.endpoint_url, '://', -1), '/', 1), ':', 1)) AS host
+            SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(j.endpoint_url, '://', -1), '/', 1), ':', 1)) AS host,
+         j.wake_on
     FROM `join` j
     JOIN name d ON d.id = j.desk_id AND d.type = 'desk' AND d.deleted IS NULL
    WHERE d.name = TRIM(p_desk)

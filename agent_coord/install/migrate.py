@@ -608,6 +608,26 @@ def _ensure_join_endpoint_key(cn) -> list[str]:
     return applied
 
 
+def _ensure_join_wake_on(cn) -> list[str]:
+    """#628: join.wake_on, the desk's choice of which items POST (all or addressed)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "join") and not _column_exists(cur, "join", "wake_on"):
+            cur.execute(
+                "ALTER TABLE `join` ADD COLUMN wake_on "
+                "ENUM('all','addressed') NOT NULL DEFAULT 'all' AFTER endpoint_key"
+            )
+            applied.append("join.wake_on")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 _TREE_READ_SQL = (
     "CREATE TABLE IF NOT EXISTS tree_read ("
     " desk_id BIGINT UNSIGNED NOT NULL,"
@@ -963,6 +983,7 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(_ensure_label_ord(cn))
             # Column before the procedure refresh: mill_join_wake_* name it (#618).
             applied.extend(_ensure_join_endpoint_key(cn))
+            applied.extend(_ensure_join_wake_on(cn))
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))

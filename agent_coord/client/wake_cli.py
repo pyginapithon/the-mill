@@ -75,7 +75,7 @@ def read_url(args: Any) -> str:
 
 
 def delivery_body(args: Any, stdin=None) -> dict[str, Any] | None:
-    """None: plain join (delivery unchanged). {"mode": "websocket"} or {"mode": "webhook", url, key}.
+    """None: plain join (delivery unchanged). {"mode": "websocket"} or {"mode": "webhook", url, key[, wake_on]}.
 
     The URL and key shape are checked here, before anything is sent; the wall
     checks again and alone knows its host allowlist.
@@ -87,6 +87,9 @@ def delivery_body(args: Any, stdin=None) -> dict[str, Any] | None:
     has_url = bool(str(getattr(args, "webhook_url", "") or "").strip() or str(getattr(args, "webhook_url_file", "") or "").strip())
     has_key = any(_key_picks(args))
     ws = bool(getattr(args, "websocket", False))
+    wake_on = str(getattr(args, "wake_on", "") or "").strip().lower()
+    if wake_on and (ws or not (has_url or has_key)):
+        raise CoordError("join: --wake-on goes with --webhook-url-file and --webhook-key-file")
     if ws and (has_url or has_key):
         raise CoordError("join: --websocket takes no webhook options")
     if ws:
@@ -102,7 +105,10 @@ def delivery_body(args: Any, stdin=None) -> dict[str, Any] | None:
         key = normalize_key(raw_key)
     except WakeRefused as e:
         raise CoordError(str(e)) from None
-    return {"mode": "webhook", "url": url, "key": key}
+    out = {"mode": "webhook", "url": url, "key": key}
+    if wake_on:
+        out["wake_on"] = wake_on  # #628; the wall checks the word
+    return out
 
 
 def _wall_error(e: BaseException) -> str:

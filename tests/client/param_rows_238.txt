@@ -431,6 +431,7 @@ join webhook_key_env
 join webhook_key_stdin
 join webhook_key
 join websocket
+join wake_on
 join office
 join yes
 local (verb)
