@@ -251,6 +251,25 @@ def _ip_literal(host: str) -> bool:
     return all(re.fullmatch(r"(?i)0x[0-9a-f]+|[0-9]+", lab or "x") for lab in labels)
 
 
+def _climbs(path: str) -> bool:
+    """True when a URL path could leave its prefix: a . or .. segment, a backslash,
+    or an encoded slash or backslash, at any depth of percent-encoding."""
+    import re
+    from urllib.parse import unquote
+
+    p = path
+    for _ in range(5):
+        if re.search(r"(?i)%(?:2f|5c)", p) or "\\" in p:
+            return True
+        if any(seg in (".", "..") for seg in p.split("/")):
+            return True
+        q = unquote(p)
+        if q == p:
+            return False
+        p = q
+    return True  # still encoded after five layers: refuse rather than guess
+
+
 def looks_like_key(text: str) -> bool:
     t = str(text or "").strip()
     return bool(t) and "/" not in t and (
@@ -295,6 +314,12 @@ def check_url(raw: str, *, allow_only: bool = True) -> tuple[str, str]:
         raise WakeRefused("join: the URL must use the default https port")
     if parts.fragment:
         raise WakeRefused("join: drop the #fragment from the URL")
+    if _climbs(parts.path or "/"):
+        # Before the prefix check: /allowed/prefix/../../elsewhere must not pass as the prefix.
+        raise WakeRefused(
+            "join: the URL path has a dot segment (. or ..), or an encoded slash, backslash or dot "
+            "that hides one; copy the webhook URL from the routine again"
+        )
     if not allow_only:
         # The desk side checks the shape; only the wall knows its allowlist.
         return url, host
