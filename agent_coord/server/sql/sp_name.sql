@@ -41,6 +41,10 @@ BEGIN
     -- #608: a retired desk keeps no seat. Same stamp as mill_join_reset.
     UPDATE `join` SET token_hash = NULL, doing = '', time_disconnect = MILL_NOW()
      WHERE desk_id = v_id AND token_hash IS NOT NULL;
+    -- #618: and no webhook wake.
+    UPDATE `join` SET delivery_mode = IF(delivery_mode = 'webhook', 'websocket', delivery_mode),
+           endpoint_url = NULL, endpoint_key = NULL
+     WHERE desk_id = v_id AND endpoint_url IS NOT NULL;
   END IF;
   SELECT v_id AS id, TRIM(p_name) AS name, p_type AS name_type, 'deleted' AS op;
 END //

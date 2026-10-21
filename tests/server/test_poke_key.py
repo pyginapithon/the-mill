@@ -10,7 +10,10 @@ from agent_coord.server.records import push as rec_push
 from agent_coord.server.wake import fire_wake_hook
 
 
-def test_fanout_puts_hint_key_on_frame_and_post() -> None:
+def test_fanout_puts_hint_key_on_frame_and_post(monkeypatch) -> None:
+    from tests.server.webhook_fixtures import arm
+
+    arm(monkeypatch)
     notified: list[dict] = []
     posted: list[dict] = []
 
@@ -49,7 +52,7 @@ def test_fanout_puts_hint_key_on_frame_and_post() -> None:
     ), patch("agent_coord.server.records.push.put", lambda *a, **k: []), patch.object(
         hub.HUB, "rooms", {"sitter": {object()}}
     ), patch.object(hub.HUB, "notify", side_effect=capture), patch(
-        "urllib.request.urlopen", urlopen
+        "agent_coord.server.wake._open", urlopen
     ):
         hub.fanout(cn, "todo", 119, "TODO")
     assert notified[0]["idem"] == "hint:todo:119:sitter"
@@ -66,7 +69,7 @@ def test_failed_post_with_idem_retries_once() -> None:
         calls["n"] += 1
         raise urllib.error.URLError("timed out")
 
-    with patch("urllib.request.urlopen", urlopen):
+    with patch("agent_coord.server.wake._open", urlopen):
         assert fire_wake_hook(
             "http://127.0.0.1/hook",
             {"idem": "hint:todo:119:away"},
@@ -82,7 +85,7 @@ def test_failed_post_without_idem_does_not_retry() -> None:
         calls["n"] += 1
         raise urllib.error.URLError("timed out")
 
-    with patch("urllib.request.urlopen", urlopen):
+    with patch("agent_coord.server.wake._open", urlopen):
         assert fire_wake_hook(
             "http://127.0.0.1/hook",
             {"type": "todo", "id": 1},

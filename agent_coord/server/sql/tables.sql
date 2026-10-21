@@ -189,6 +189,8 @@ CREATE TABLE IF NOT EXISTS `join` (
   doing         VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
   delivery_mode ENUM('websocket','webhook','polling') NOT NULL DEFAULT 'polling',
   endpoint_url  VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
+  -- #618: the desk's own webhook key. Only mill_join_wake_target reads it (POST time).
+  endpoint_key  VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NULL,
   lan_ip          VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NULL,
   time_connect    DATETIME(6) NULL,
   time_disconnect DATETIME(6) NULL,

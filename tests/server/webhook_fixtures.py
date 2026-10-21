@@ -1,0 +1,35 @@
+"""Shared arrange for desk webhook tests (#618). A fake receiver; no network."""
+from __future__ import annotations
+
+from unittest.mock import patch
+
+HOOK_HOST = "hooks.example.test"
+HOOK_URL = f"https://{HOOK_HOST}/automations/webhook/fixture-routine"
+HOOK_KEY = "unit-key-0123456789"
+
+
+def arm(monkeypatch, *, armed: dict[str, tuple[str, str]] | None = None) -> None:
+    """Allow the fixture host, resolve it public, start with an empty wake gate.
+
+    armed maps desk -> (url, key) for rec_join.wake_target; default: every desk
+    is armed at HOOK_URL with HOOK_KEY.
+    """
+    from agent_coord.server import wake
+
+    monkeypatch.setenv("AGENT_COORD_WAKE_HOSTS", f"{HOOK_HOST}/automations/webhook/")
+    monkeypatch.setattr(wake, "public_host", lambda host: True)
+    monkeypatch.setattr(wake, "_GATE", {})
+    table = armed
+
+    def target(cn, desk):
+        if table is None:
+            return (HOOK_URL, HOOK_KEY)
+        return table.get(desk)
+
+    monkeypatch.setattr("agent_coord.server.records.join.wake_target", target)
+    monkeypatch.setattr("agent_coord.server.records.push.pending", lambda cn, desk: 0)
+
+
+def opener(fn):
+    """Patch the wake POST opener (redirects refused) with a fake receiver."""
+    return patch("agent_coord.server.wake._open", fn)

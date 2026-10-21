@@ -95,6 +95,7 @@ _FAMILIES = (
     r"sk-(?:proj-|ant-[a-z0-9]{2,8}-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}",
     r"[sr]k_(?:live|test)_[A-Za-z0-9]{16,}",
     r"xai-[A-Za-z0-9_-]{20,}",
+    r"crsr_[A-Za-z0-9]{32,}",
     r"gh[pousr]_[A-Za-z0-9]{20,}",
     r"github_pat_[A-Za-z0-9_]{20,}",
     r"xox[a-z]-[A-Za-z0-9-]{10,}",

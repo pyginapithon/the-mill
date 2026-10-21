@@ -188,3 +188,20 @@ def take(cn, desk: str) -> list[dict]:
         item["time"] = row.get("created")
         out.append(item)
     return out
+
+
+def pending(cn, desk: str) -> int:
+    """How many push rows wait for this desk's next sync (#618 wake body). 0 on error."""
+    cur = cn.cursor()
+    try:
+        count_rows = (
+            "SELECT COUNT(*) FROM push_queue p JOIN name d ON d.id = p.desk_id"
+            " WHERE d.type = 'desk' AND d.name = %s"
+        )
+        cur.execute(count_rows, (str(desk or "").strip(),))
+        row = cur.fetchone()
+        return int((row or [0])[0] or 0)
+    except Exception:
+        return 0
+    finally:
+        cur.close()

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Host webhook POST: 8s, auth headers only when a key is set.
+"""Desk webhook POST: 8s, the desk's own key in the auth headers (#618).
 
 A success is one try. A failed POST retries once when the body has idem.
+The hint row stays missed either way, so the next connect sync hands it over.
 """
 from __future__ import annotations
 
@@ -10,6 +11,7 @@ from unittest.mock import MagicMock, patch
 
 from agent_coord.server import push
 from agent_coord.server.wake import fire_wake_hook
+from tests.server.webhook_fixtures import HOOK_HOST, HOOK_KEY, arm
 
 
 class _Resp:
@@ -49,14 +51,14 @@ def _fanout(rows: list[dict], *, sitting: set[str], urlopen, outcomes: list[str]
     ), patch("agent_coord.server.records.push.put", _put), patch.object(
         push.HUB, "rooms", rooms
     ), patch.object(push.HUB, "notify", side_effect=capture), patch(
-        "urllib.request.urlopen", urlopen
+        "agent_coord.server.wake._open", urlopen
     ):
         push.fanout(cn, "todo", 14, "TODO")
     return notified
 
 
 def test_fanout_webhook_posts_once_with_key(monkeypatch, caplog) -> None:
-    monkeypatch.setenv("AGENT_COORD_WEBHOOK_KEY", "unit-key")
+    arm(monkeypatch)
     seen: list[tuple] = []
 
     def urlopen(req, timeout=0):
@@ -81,45 +83,37 @@ def test_fanout_webhook_posts_once_with_key(monkeypatch, caplog) -> None:
     raw = dict(req.header_items())
     headers = _names(req)
     assert headers["content-type"] == "application/json"
-    assert raw["Authorization"] == "Bearer unit-key"
-    assert raw["X-Automation-Key"] == "unit-key"
+    assert raw["Authorization"] == "Bearer " + HOOK_KEY
+    assert raw["X-Automation-Key"] == HOOK_KEY
     assert "X-automation-key" not in raw
     body = json.loads(req.data.decode("utf-8"))
     assert body["type"] == "todo"
     assert body["id"] == 14
     assert body["hint"] == "TODO"
     assert body["detail"] == "need"
-    assert "unit-key" not in caplog.text
+    assert body["idem"] == "hint:todo:14:DESK_away"
+    assert body["wake"]["pending"] == 1
+    assert HOOK_KEY not in caplog.text
 
 
-def test_fanout_webhook_omits_auth_when_key_unset(monkeypatch) -> None:
-    monkeypatch.delenv("AGENT_COORD_WEBHOOK_KEY", raising=False)
-    seen: list[tuple] = []
+def test_fanout_desk_not_armed_does_not_post(monkeypatch) -> None:
+    """A join row says webhook but carries no key: not armed, no POST, the hint stays missed."""
+    arm(monkeypatch, armed={})
+    seen: list = []
+    outcomes: list[str] = []
 
     def urlopen(req, timeout=0):
-        seen.append((req, timeout))
+        seen.append(req)
         return _Resp()
 
-    rows = [
-        {
-            "desk": "DESK_away",
-            "hint": None,
-            "delivery_mode": "webhook",
-            "endpoint_url": "http://127.0.0.1/hook",
-        }
-    ]
-    _fanout(rows, sitting=set(), urlopen=urlopen)
-    assert len(seen) == 1
-    req, timeout = seen[0]
-    assert timeout == 8
-    headers = _names(req)
-    assert "authorization" not in headers
-    assert "x-automation-key" not in headers
-    assert headers["content-type"] == "application/json"
+    rows = [{"desk": "DESK_away", "hint": None, "delivery_mode": "webhook", "endpoint_url": "x"}]
+    _fanout(rows, sitting=set(), urlopen=urlopen, outcomes=outcomes)
+    assert seen == []
+    assert outcomes == ["missed"]
 
 
 def test_sitting_desk_does_not_post(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_COORD_WEBHOOK_KEY", "unit-key")
+    arm(monkeypatch)
     seen: list = []
 
     def urlopen(req, timeout=0):
@@ -140,15 +134,14 @@ def test_sitting_desk_does_not_post(monkeypatch) -> None:
 
 
 def test_fire_wake_hook_without_key_stays_unsigned(monkeypatch) -> None:
-    """Client poke calls fire_wake_hook with no key. Env must not add headers."""
-    monkeypatch.setenv("AGENT_COORD_WEBHOOK_KEY", "unit-key")
+    """Client poke calls fire_wake_hook with no key. No host-wide key adds headers (#618)."""
     seen: list[tuple] = []
 
     def urlopen(req, timeout=0):
         seen.append((req, timeout))
         return _Resp()
 
-    with patch("urllib.request.urlopen", urlopen):
+    with patch("agent_coord.server.wake._open", urlopen):
         assert fire_wake_hook("http://127.0.0.1/hook", {"type": "todo", "id": 1}, timeout=0.3) is True
     req, timeout = seen[0]
     assert timeout == 0.3
@@ -162,7 +155,7 @@ def _away_row() -> dict:
         "desk": "DESK_away",
         "hint": "need",
         "delivery_mode": "webhook",
-        "endpoint_url": "http://127.0.0.1/hook?token=querysecret",
+        "endpoint_url": "set",
     }
 
 
@@ -172,10 +165,10 @@ def _fail_lines(caplog) -> str:
     )
 
 
-def test_fanout_webhook_http_error_is_not_sent(monkeypatch, caplog, tmp_path) -> None:
+def test_fanout_webhook_http_error_stays_missed(monkeypatch, caplog, tmp_path) -> None:
     import urllib.error
 
-    monkeypatch.delenv("AGENT_COORD_WEBHOOK_KEY", raising=False)
+    arm(monkeypatch, armed={"DESK_away": ("https://" + HOOK_HOST + "/automations/webhook/r?token=querysecret", HOOK_KEY)})
     monkeypatch.setenv("AGENT_COORD_MILL_HOME", str(tmp_path))
 
     def urlopen(req, timeout=0):
@@ -185,17 +178,18 @@ def test_fanout_webhook_http_error_is_not_sent(monkeypatch, caplog, tmp_path) ->
     with caplog.at_level("INFO", logger="mill.push"):
         notified = _fanout([_away_row()], sitting=set(), urlopen=urlopen, outcomes=outcomes)
     assert notified == []
-    assert outcomes == ["error"]
+    assert outcomes == ["missed"]
     line = _fail_lines(caplog)
     assert "status=503" in line
     assert "desk=DESK_away" in line
     assert "id=14" in line
-    assert "127.0.0.1" not in line
+    assert HOOK_HOST not in line
     assert "querysecret" not in line
+    assert HOOK_KEY not in line
 
 
-def test_fanout_webhook_timeout_is_not_sent(monkeypatch, caplog, tmp_path) -> None:
-    monkeypatch.delenv("AGENT_COORD_WEBHOOK_KEY", raising=False)
+def test_fanout_webhook_timeout_stays_missed(monkeypatch, caplog, tmp_path) -> None:
+    arm(monkeypatch, armed={"DESK_away": ("https://" + HOOK_HOST + "/automations/webhook/r?token=querysecret", HOOK_KEY)})
     monkeypatch.setenv("AGENT_COORD_MILL_HOME", str(tmp_path))
 
     def urlopen(req, timeout=0):
@@ -205,10 +199,11 @@ def test_fanout_webhook_timeout_is_not_sent(monkeypatch, caplog, tmp_path) -> No
     with caplog.at_level("INFO", logger="mill.push"):
         notified = _fanout([_away_row()], sitting=set(), urlopen=urlopen, outcomes=outcomes)
     assert notified == []
-    assert outcomes == ["error"]
+    assert outcomes == ["missed"]
     line = _fail_lines(caplog)
     assert "err=TimeoutError" in line
     assert "desk=DESK_away" in line
     assert "id=14" in line
-    assert "127.0.0.1" not in line
+    assert HOOK_HOST not in line
     assert "querysecret" not in line
+    assert HOOK_KEY not in line

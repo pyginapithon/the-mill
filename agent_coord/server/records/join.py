@@ -240,3 +240,38 @@ def prune_dead(cn) -> dict:
         "join_left": left,
         "note": "seats with no token_hash are kept as disconnect history (#96)",
     }
+
+
+def wake_arm(cn, desk: str, url: str, key: str) -> list[dict]:
+    """#618: store the desk's webhook URL and its own key; delivery becomes webhook."""
+    from agent_coord.server.records.name import bare
+
+    return call(cn, "mill_join_wake_arm", [bare(desk, CONST_DESK), url, key])
+
+
+def wake_off(cn, desk: str) -> list[dict]:
+    """#618: forget the URL and key; delivery goes back to websocket."""
+    from agent_coord.server.records.name import bare
+
+    return call(cn, "mill_join_wake_off", [bare(desk, CONST_DESK)])
+
+
+def wake_state(cn, desk: str) -> dict:
+    """{armed, host} for one desk. The read never carries the URL path or the key."""
+    from agent_coord.server.records.name import bare
+
+    rows = call(cn, "mill_join_wake_state", [bare(desk, CONST_DESK)]) or []
+    row = rows[0] if rows else {}
+    return {"armed": bool(int(row.get("armed") or 0)), "host": str(row.get("host") or "")}
+
+
+def wake_target(cn, desk: str) -> tuple[str, str] | None:
+    """(url, key) of an armed live desk, for the POST only. Never log or return it."""
+    from agent_coord.server.records.name import bare
+
+    rows = call(cn, "mill_join_wake_target", [bare(desk, CONST_DESK)]) or []
+    if not rows:
+        return None
+    url = str(rows[0].get("endpoint_url") or "")
+    key = str(rows[0].get("endpoint_key") or "")
+    return (url, key) if url and key else None

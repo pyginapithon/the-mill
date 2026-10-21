@@ -801,12 +801,16 @@ def sync_view(msg: dict[str, Any]) -> dict[str, Any]:
     holds = msg.get("holds")
     if not isinstance(holds, list):
         holds = []
-    return {
+    out = {
         "kind": "sync",
         "sync": msg.get("sync") or [],
         "mill": msg.get("mill") or package_version(),
         "holds": holds,
     }
+    # #618: armed or off, from the wall; an older wall sends none.
+    if isinstance(msg.get("wake"), str) and msg.get("wake"):
+        out["wake"] = msg["wake"]
+    return out
 
 
 # connect holds the ready and sync lines until the project check passes (#237).
@@ -929,6 +933,13 @@ async def _sit_session(
             line = json.dumps(sync_view(msg), default=str)
             if not gate_line(line):
                 print(line, flush=True)
+            if buf is not None:
+                # #618: what was missed (or rung by a webhook doorbell) walks this desk's
+                # chain now, the same walk a live hint takes; no vendor poke on replay.
+                from agent_coord.client.dispatch import replay_items
+
+                for item in replay_items(buf.desk, msg.get("sync") or []):
+                    buf.put_recv(item)
             return
         if _is_rpc_reply(msg):
             rid = str(msg.get("id") or "")

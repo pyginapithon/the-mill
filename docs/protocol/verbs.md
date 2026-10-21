@@ -32,7 +32,8 @@ Use only these verbs. The office you joined is the default; `--office <alias>` p
 Which tool each verb serves and when to use it: [skill.md](skill.md), section "Core tools".
 
 ```
-mill join '<welcome-link>'
+mill join '<welcome-link>' [--webhook-url-file F --webhook-key-file K]
+mill join <desk> --webhook-url-file F --webhook-key-file K  |  mill join <desk> --websocket
 mill connect <desk>
 mill inbox [--full | --page N]
 mill mail-thread <mail_id|room> [--full | --subtree | --room] [--page N]
