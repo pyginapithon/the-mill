@@ -72,8 +72,10 @@ def _post_status(
     key: str | None,
     desk: str,
     hint_id: int | None,
+    quiet: bool = False,
 ) -> tuple[int | None, str]:
-    """One HTTP POST. Never raises. (status, "") or (None, error type)."""
+    """One HTTP POST. Never raises. (status, "") or (None, error type).
+    quiet: the caller logs the outcome itself (a desk wake logs one line, #625)."""
     u = (url or "").strip()
     if not u:
         return None, "NoURL"
@@ -103,18 +105,20 @@ def _post_status(
             if status is None:
                 status = getattr(resp, "code", None)
             status = 200 if status is None else int(status)
-            if not 200 <= status <= 299:
+            if not 200 <= status <= 299 and not quiet:
                 _log_hook_fail(desk, hint_id, status=status)
             return status, ""
     except urllib.error.HTTPError as e:
-        _log_hook_fail(desk, hint_id, status=int(e.code))
+        if not quiet:
+            _log_hook_fail(desk, hint_id, status=int(e.code))
         return int(e.code), ""
     except Exception as e:
-        _log_hook_fail(desk, hint_id, exc_type=type(e).__name__)
+        if not quiet:
+            _log_hook_fail(desk, hint_id, exc_type=type(e).__name__)
         return None, type(e).__name__
 
 
-def _post_once(
+def _fire(
     url: str,
     payload: dict[str, Any],
     *,
@@ -122,10 +126,17 @@ def _post_once(
     key: str | None,
     desk: str,
     hint_id: int | None,
-) -> bool:
-    """One HTTP POST. Never raises. True only when the response is 2xx."""
-    status, _err = _post_status(url, payload, timeout=timeout, key=key, desk=desk, hint_id=hint_id)
-    return status is not None and 200 <= status <= 299
+    quiet: bool = False,
+) -> tuple[int | None, str]:
+    """POST once; a body that carries idem retries a failure once. The last (status, error)."""
+    from agent_coord.server.poke_key import FIELD
+
+    status, err = _post_status(url, payload, timeout=timeout, key=key, desk=desk, hint_id=hint_id, quiet=quiet)
+    if status is not None and 200 <= status <= 299:
+        return status, err
+    if not str((payload or {}).get(FIELD) or "").strip() or not (url or "").strip():
+        return status, err
+    return _post_status(url, payload, timeout=timeout, key=key, desk=desk, hint_id=hint_id, quiet=quiet)
 
 
 def fire_wake_hook(
@@ -144,30 +155,8 @@ def fire_wake_hook(
     A body that already carries idem retries that failure once. A body without it
     does not retry.
     """
-    from agent_coord.server.poke_key import FIELD
-
-    ok = _post_once(
-        url,
-        payload,
-        timeout=timeout,
-        key=key,
-        desk=desk,
-        hint_id=hint_id,
-    )
-    if ok:
-        return True
-    if not str((payload or {}).get(FIELD) or "").strip():
-        return False
-    if not (url or "").strip():
-        return False
-    return _post_once(
-        url,
-        payload,
-        timeout=timeout,
-        key=key,
-        desk=desk,
-        hint_id=hint_id,
-    )
+    status, _err = _fire(url, payload, timeout=timeout, key=key, desk=desk, hint_id=hint_id)
+    return status is not None and 200 <= status <= 299
 
 
 # --- desk webhook wake (#618) ------------------------------------------------
@@ -474,11 +463,27 @@ def gate_clear(desk: str) -> None:
         _GATE.pop(str(desk or "").strip(), None)
 
 
+def _wake_log(desk: str, frame: dict[str, Any], hint_id: int | None, outcome: str) -> None:
+    """One line per desk per wake attempt (#625). Never the URL, its host, or the key
+    (the same rule as the webhook fail line; mill connect shows the host)."""
+    kind = str(frame.get("kind") or "").strip()
+    item = f"kind={kind}" if kind and kind != "hint" else f"type={frame.get('type') or 'hint'}"
+    ident = hint_id if hint_id is not None else frame.get("id")
+    try:
+        from agent_coord.server.push import _bc_log
+
+        _bc_log(f"webhook desk={desk} {item} id={ident} wake={outcome}")
+    except Exception:
+        return
+
+
 def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = None) -> str:
     """Wake an armed desk that is not sitting. sent | coalesced | error | off.
 
     coalesced: a wake already went out in this window and the desk has not
     connected since; the item waits in the push queue like every other one.
+    Every outcome but off logs one line (#625): sent with the status, coalesced
+    or skipped with the reason, fail with the status or error type.
     """
     import time
 
@@ -490,23 +495,30 @@ def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = Non
     url, key = target
     if not _gate_open(desk, time.monotonic()):
         # A wake already went out in this window: skip the checks and the DNS lookup.
+        _wake_log(desk, frame, hint_id, "coalesced reason=window")
         return "coalesced"
     try:
         url, host = check_url(url)
     except WakeRefused:
-        _log_hook_fail(desk, hint_id, exc_type="NotAllowed")
+        _wake_log(desk, frame, hint_id, "skipped reason=not-allowed")
         return "error"
     if not public_host(host):
-        _log_hook_fail(desk, hint_id, exc_type="NotPublic")
+        _wake_log(desk, frame, hint_id, "skipped reason=not-public")
         return "error"
     # The window starts only for a POST that is actually attempted: a refused or
     # unresolvable target takes no gate, so it never blocks the next valid wake.
     # Taken here (not peeked) so two threads racing past the peek send one POST.
     if not _gate_take(desk, time.monotonic()):
+        _wake_log(desk, frame, hint_id, "coalesced reason=window")
         return "coalesced"
     from agent_coord.server.records import push as rec_push
 
     pending = rec_push.pending(cn, desk) + 1
-    ok = fire_wake_hook(url, wake_body(desk, frame, pending=pending),
-                        timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id)
-    return "sent" if ok else "error"
+    status, err = _fire(url, wake_body(desk, frame, pending=pending),
+                        timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id, quiet=True)
+    if status is not None and 200 <= status <= 299:
+        _wake_log(desk, frame, hint_id, f"sent status={status}")
+        return "sent"
+    why = f"status={status}" if status is not None else f"err={err or 'Exception'}"
+    _wake_log(desk, frame, hint_id, f"fail {why}")
+    return "error"

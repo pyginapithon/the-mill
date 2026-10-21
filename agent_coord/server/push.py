@@ -469,7 +469,7 @@ def fanout(
                         n_hook += 1
                     else:
                         n_miss += 1
-                    _bc_log(f"webhook desk={desk} type={type} id={id} wake={got}")
+                    # post_desk logged this desk's wake line (#625).
                 else:
                     n_miss += 1
                     _bc_log(f"fanout miss desk={desk} type={type} id={id} hint={hint} mode={mode}")

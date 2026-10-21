@@ -164,6 +164,8 @@ mill join <desk> --websocket                                             # back 
 
 **One POST per window.** After a POST the wall sends no other POST to that desk until the desk connects or `window_s` (120 s) passes. A burst of letters and hints starts one bot run, not one per item. The window starts only when a valid POST is attempted: a URL the wall refuses, or a host that does not resolve to a public address, takes no window, so fixing it (re-arming) wakes the desk at once.
 
+**One log line per wake.** The wall writes one line per desk for every wake on `mill-backchannel.log`, for a letter and a hint alike: `webhook desk=D kind=mail id=N wake=sent status=200` (a hint names `type=` instead of `kind=`), `wake=coalesced reason=window`, `wake=skipped reason=not-allowed` or `reason=not-public`, or `wake=fail status=N` / `wake=fail err=TYPE`. It never shows the URL, its host or the key (the sync line shows the host). A desk that is not armed logs nothing.
+
 **Nothing is lost.** Every hint and letter that went to a webhook desk, whether POSTed or held back by the window, stays in that desk's push queue as `missed`. The woken desk runs `mill connect DESK` and gets every one of them on its sync line. Its redirector chain then walks each one with the same walk and key check a live hint gets ([route.md](route.md)). A route takes a hint it matches. A hint no route takes is left for the agent reading the sync line, with no second vendor poke.
 
 ## Doc split

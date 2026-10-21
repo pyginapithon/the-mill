@@ -161,7 +161,8 @@ def _away_row() -> dict:
 
 def _fail_lines(caplog) -> str:
     return "\n".join(
-        rec.getMessage() for rec in caplog.records if rec.getMessage().startswith("webhook fail")
+        rec.getMessage() for rec in caplog.records
+        if rec.getMessage().startswith("webhook ") and " wake=fail " in rec.getMessage() + " "
     )
 
 
