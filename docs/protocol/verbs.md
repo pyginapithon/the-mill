@@ -46,7 +46,7 @@ mill claim <project> <need> [--take-over]
 mill note <project> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
 mill hold [<resource>]
 mill drop <resource>
-mill pass <project> <need>
+mill pass <project> <need> [--done | --back]
 mill unclaim <project> <need>
 mill unpark <project> <need> [--parent-type mail|todo --parent-id <id>]
 mill label <mail|todo> <id> <label> [--ord N]
@@ -73,7 +73,7 @@ mill label <name> <name> --yes
 - The connect sync lists this desk's holds (resource, since) and no other desk's. A dropped hold is absent. Regression row F11 (hold-list-after-resume).
 - A desk's holds, one resource's lock, the held list, the project check before hold/drop/label, and the send offline check each read the rows they answer by index, not the whole hold table, name catalog or seat list; the replies are unchanged. Regression row F23 (direct-lookups).
 - Hints: the desk whose verb changed a card, hold, score or tree node gets no hint for its own change; every other watcher still does. A label change stamps the hint time when the label changed, not the card's last write. Regression row F26 (hint-self-skip).
-- `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's second `pass` moves shipped to done.
+- `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's `pass --done` moves shipped to done; `pass --back` steps a card back one stage (done to shipped, shipped to claimed). A step that does not fit the card is refused and changes nothing (F67).
 - `todo <project> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
 - The board list (`todo`, `todo <project>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
 - `todo --mine` lists this desk's cards, the desk of the sitting connect: first its focus cards (the cards wearing the label named after the desk, skipping parked ones unless `--status parked` and ones another desk holds) in rank order, each with `focus` set to its `--ord`, then the cards whose `volunteer` is this desk (exact name; a desk whose name merely contains yours does not match), each card once. Without `--group-by` the list stays flat so the rank order holds. It is built before `--find` and paging, so the `page` block counts only these cards, and the note says how many of each. It combines with `--status`, `--done`, `--all`, `--find`, `--full`, `--page` and `--raw`; it lists only cards the board lists, so without `--done` done cards stay hidden. A one-card peek with `--mine` is refused. Pick your next card with `todo --mine`, not by reading the board. Regression rows F57 (todo-mine) and F58 (desk-focus).
@@ -203,7 +203,7 @@ Grouped by **table**. Day-one teaching first; tree/Admin when said, not day-one 
 | *"I'll take it"*, *"claim that"* | `claim` `<project> <need>` |
 | *"drop the claim"*, *"unclaim"* | `unclaim` `<project> <need>` |
 | *"note on the card"*, *"progress is..."*, *"diary"* | `note` `<project> <need> --note ...` |
-| *"ship it"*, *"pass"*, *"close it"*, *"ready for review"* | `pass` `<project> <need>`. First pass (volunteer): claimed -> shipped. The asker then runs `pass` again: shipped -> done. If you filed the card yourself, you are the asker and pass twice. |
+| *"ship it"*, *"pass"*, *"close it"*, *"ready for review"* | `pass` `<project> <need>`. First pass (volunteer): claimed -> shipped. The asker accepts with `pass --done`: shipped -> done. If you filed the card yourself, you ship it with `pass`, then accept with `pass --done`. |
 
 #### mail (day-one)
 
@@ -337,7 +337,7 @@ CLI `<project>` = activity **roster_id** - one project name or one role name. La
 | **`assign`** | staff dest onto card (not claim/hold). Trust: high any desk if unassigned; limited Admin only if unassigned. Nobody overwrites - assignee unclaims first. Chart: [admin.md](../requirements/admin.md) | `mill_todo_update` claimed |
 | **`unclaim`** | Drop claim -> `open`. An unknown need is refused. | `mill_todo_update` open |
 | **`note`** | Update card body (diary; not mail). Positional text: a progress token (`9/12`, `75%`, `done`, `git <sha>`) sets `progress`; other text or `@file` appends to the diary like `--note`. Progress and a diary line in one call: token positional plus `--note TEXT`. `--eta` sets `eta_at`; `--started` sets `started_at`. Nothing to write is an error. A note that changes nothing does not wake watchers (`changed: false`). The reply and `todo` carry `progress` only once a token set it. | `mill_todo_update` |
-| **`pass`** | claimed -> `shipped`; `shipped` -> `done` (only lifecycle advance verb). An unknown need is refused. | `mill_todo_update` |
+| **`pass`** | claimed -> `shipped` (volunteer); `--done`: `shipped` -> `done` (asker); `--back`: `done` -> `shipped`, `shipped` -> `claimed` (asker or volunteer). A plain `pass` on a shipped or done card is refused naming the form to use; nothing changes (F67). An unknown need is refused. | `mill_todo_update` |
 
 ### hold (one lock per resource)
 

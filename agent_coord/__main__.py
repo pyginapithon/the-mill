@@ -1229,10 +1229,13 @@ def _build_parser() -> MillArgumentParser:
 
     psd = sub.add_parser(
         "pass",
-        help="claimed -> shipped; shipped -> done (only lifecycle advance)",
+        help="claimed -> shipped (volunteer); --done: shipped -> done (asker); --back: one step back",
     )
     psd.add_argument("project")
     psd.add_argument("need")
+    pstep = psd.add_mutually_exclusive_group()
+    pstep.add_argument("--done", action="store_true", help="asker: accept a shipped card (shipped -> done)")
+    pstep.add_argument("--back", action="store_true", help="asker or volunteer: done -> shipped, shipped -> claimed")
 
     inv = sub.add_parser(
         "invite",

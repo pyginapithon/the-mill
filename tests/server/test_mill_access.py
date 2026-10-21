@@ -261,7 +261,7 @@ def test_whomay_pass_shipped_to_done_allows_asker_with_names():
     with patch("agent_coord.server.records.todo.find", return_value=_named_hit("shipped")), patch(
         "agent_coord.server.records.todo.update"
     ) as upd, patch("agent_coord.server.api.mill.rpc._poke"):
-        out = rpc._h_pass(c, {"need": "63"}, "office", "ask")
+        out = rpc._h_pass(c, {"need": "63", "step": "done"}, "office", "ask")
     assert out["ok"] is True and out["status"] == "done"
     upd.assert_called_once()
 
@@ -273,7 +273,7 @@ def test_whomay_pass_shipped_to_done_refuses_third_desk():
         "agent_coord.server.records.todo.update"
     ) as upd, patch("agent_coord.server.api.mill.rpc._poke"):
         with pytest.raises(CoordError) as ei:
-            rpc._h_pass(c, {"need": "63"}, "office", "intruder")
+            rpc._h_pass(c, {"need": "63", "step": "done"}, "office", "intruder")
     assert "shipped->done is the asker" in str(ei.value)
     upd.assert_not_called()
 

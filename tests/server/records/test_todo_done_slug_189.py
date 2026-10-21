@@ -56,7 +56,7 @@ def _to_done(cn, slug_s: str) -> int:
     book = _Book(cn)
     rpc._h_claim(book, {"need": slug_s}, "pk_real", "pk_me")
     rpc._h_pass(book, {"need": slug_s}, "pk_real", "pk_me")
-    rpc._h_pass(book, {"need": slug_s}, "pk_real", "pk_me")
+    rpc._h_pass(book, {"need": slug_s, "step": "done"}, "pk_real", "pk_me")
     return tid
 
 
