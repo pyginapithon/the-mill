@@ -52,7 +52,7 @@ Entries that match the frame are walked in list order: the frame's own key and `
 - PING never enters the chain.
 - A frame whose idempotency key (`idem`) this sit already handled never enters the chain. The check runs before the first redirector.
 - A JOIN with no route stays skip, not a poke.
-- The webhook POST uses the same walk for that desk, with the same key check.
+- The webhook POST uses the same walk for that desk, with the same key check. A receiver that runs mill passes the POST body to `accept_wake`. That checks the poke key (`idem` must be the one the wall stamps for this desk and frame; a forged key or another desk's key is skipped), then walks the chain. A webhook desk's missed and held-back hints reach the chain when it connects: the sync rows that were `missed` walk the same chain, and a hint no route takes stays on the sync line with no vendor poke ([connect.md](connect.md#webhook-wake)).
 
 ## Two chain styles
 

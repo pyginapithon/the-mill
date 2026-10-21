@@ -288,7 +288,42 @@ def _issue_here(c: Book, body: dict[str, Any]) -> dict[str, Any]:
     }
     if desk_id:
         out["desk_id"] = desk_id
+    delivery = body.get("delivery")
+    if isinstance(delivery, dict):
+        # #618: after the upsert, so the seat token has authenticated this desk.
+        out["wake"] = _join_delivery(c, registered, delivery)
     return out
+
+
+def _join_delivery(c: Book, desk: str, delivery: dict[str, Any]) -> dict[str, Any]:
+    """Set the desk's delivery on its join row (#618). websocket, or webhook URL + its own key.
+
+    The webhook is test-fired once, and stored only on a 2xx; a failed test
+    leaves the old state and raises the fix. The same URL and key again are a
+    no-op (no second test POST). No answer, log line or error carries the URL
+    path or the key.
+    """
+    from agent_coord.server import wake
+    from agent_coord.server.records import join as rec_join
+
+    mode = str(delivery.get("mode") or "").strip().lower()
+    if mode == "websocket":
+        rec_join.wake_off(c._cn, desk)
+        return {"webhook": "off", "delivery": "websocket"}
+    if mode != "webhook":
+        raise CoordError("join: delivery is websocket or webhook")
+    try:
+        url, host = wake.check_url(str(delivery.get("url") or ""))
+        key = wake.normalize_key(str(delivery.get("key") or ""))
+    except wake.WakeRefused as e:
+        raise CoordError(str(e)) from None
+    if rec_join.wake_target(c._cn, desk) == (url, key):
+        return {"webhook": "armed", "host": host, "test": "unchanged"}
+    got = wake.test_fire(url, key, desk)
+    if not got["ok"]:
+        raise CoordError("join: webhook not armed: " + str(got.get("fix") or "test POST failed"))
+    rec_join.wake_arm(c._cn, desk, url, key)
+    return {"webhook": "armed", "host": host, "test": got["status"]}
 
 
 def _h_doing(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:

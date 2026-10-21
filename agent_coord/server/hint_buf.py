@@ -160,7 +160,7 @@ class HintBuf:
             pass
 
 
-def _drain_one(buf: HintBuf, frame: dict[str, Any], hint: str, t0: float) -> None:
+def _drain_one(buf: HintBuf, frame: dict[str, Any], hint: str, t0: float, replay: bool = False) -> None:
     """One frame's chain. Waiting for a program must not hold the next frame."""
     import time
 
@@ -171,7 +171,7 @@ def _drain_one(buf: HintBuf, frame: dict[str, Any], hint: str, t0: float) -> Non
     err = ""
     try:
         with bind_exit(buf.push_exit):
-            kind = dispatch_hint(buf.desk, frame)
+            kind = dispatch_hint(buf.desk, frame, replay=replay)
         if kind == "skip":
             print({"watch": "skip", "desk": buf.desk, "route": frame.get("route")}, flush=True)
             ms = (time.perf_counter() - t0) * 1000.0
@@ -224,8 +224,11 @@ def drain_loop(buf: HintBuf, stop: threading.Event) -> None:
         t0 = time.perf_counter()
         frame = public_frame(msg, buf.desk)
         hint = str(frame.get("hint") or "")
+        # #618: a connect-sync replay is already on the sync line; walk it, do not reprint it.
+        replay = bool(msg.get("replay"))
         buf.append_file(frame)
-        print({"HINT": frame}, flush=True)
+        if not replay:
+            print({"HINT": frame}, flush=True)
         if hint == "PING":
             ms = (time.perf_counter() - t0) * 1000.0
             _bc_log(
@@ -235,7 +238,7 @@ def drain_loop(buf: HintBuf, stop: threading.Event) -> None:
             continue
         threading.Thread(
             target=_drain_one,
-            args=(buf, frame, hint, t0),
+            args=(buf, frame, hint, t0, replay),
             name=f"mill-hint-{buf.desk}-{frame.get('id')}",
             daemon=True,
         ).start()

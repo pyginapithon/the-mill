@@ -98,8 +98,27 @@ def _stamp_dispatch(decision: str, frame: dict[str, Any], vendor: str = "") -> N
         pass
 
 
-def dispatch_hint(desk: str, msg: dict[str, Any]) -> str:
-    """work | wake | suppress | skip.
+def expected_key(desk: str, frame: dict[str, Any]) -> str:
+    """The poke key the wall stamps on this frame for this desk (#618): hint or letter."""
+    from agent_coord.server.poke_key import hint_key, letter_key
+
+    try:
+        num = int(frame.get("id") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if str(frame.get("kind") or "").lower() == "mail":
+        return letter_key(num, desk)
+    typ = str(frame.get("type") or "").strip()
+    return hint_key(typ, num, desk) if typ and num else ""
+
+
+def dispatch_hint(desk: str, msg: dict[str, Any], *, replay: bool = False) -> str:
+    """work | wake | suppress | skip | left.
+
+    replay (#618): a frame the connect sync handed over (missed while away, or rung
+    by a webhook doorbell). Same walk and key check; when no route takes it, it is
+    left for the agent reading the sync line ("left"), never a vendor poke: the
+    desk is already awake.
 
     work: a redirector handled the frame. The vendor does not run.
     wake: every redirector returned next. Vendor poke.
@@ -135,6 +154,8 @@ def dispatch_hint(desk: str, msg: dict[str, Any]) -> str:
         return finish("suppress")
     if hint == "JOIN":
         return finish("skip")
+    if replay:
+        return finish("left")
     from agent_coord.client.connectors import poke
     from agent_coord.client.vendor import session_vendor
 
@@ -142,3 +163,31 @@ def dispatch_hint(desk: str, msg: dict[str, Any]) -> str:
     _stamp_dispatch("wake", frame, vendor)
     poke(vendor, frame)
     return "wake"
+
+
+def replay_items(desk: str, sync: list[Any]) -> list[dict[str, Any]]:
+    """Sync rows the chain should walk (#618): hints and letters that were missed.
+
+    A row the socket delivered live (sent) was walked then. A route exit notice
+    (exit) and an expired line are reports, not frames. Each kept frame carries
+    the poke key the wall would have stamped, so the walk's key check is the same.
+    """
+    out: list[dict[str, Any]] = []
+    for row in sync or []:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("outcome") or "") != "missed":
+            continue
+        kind = str(row.get("kind") or "").lower()
+        if kind not in ("hint", "mail") or "exit" in row:
+            continue
+        frame = {k: v for k, v in row.items() if k not in ("outcome", "time")}
+        if kind == "hint":
+            frame.pop("kind", None)
+        key = expected_key(desk, frame)
+        if not key:
+            continue
+        frame["idem"] = key
+        frame["replay"] = 1
+        out.append(frame)
+    return out

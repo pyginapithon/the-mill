@@ -1353,7 +1353,7 @@ def _build_parser() -> MillArgumentParser:
     jn = sub.add_parser(
         "join",
         help="mill join <link> (the seat welcome link; positional, no --url)",
-        usage="mill join <link>",
+        usage="mill join <link> [--webhook-url URL --webhook-key-file PATH] | mill join DESK (--webhook-... | --websocket)",
         description="Join an office with a seat welcome link: mill join <link>. "
         "The office alias defaults to the link's host and becomes the default office; "
         "--office ALIAS picks another local name. Then run the printed next: line.",
@@ -1365,6 +1365,16 @@ def _build_parser() -> MillArgumentParser:
         metavar="link",
         help="seat welcome URL https://<wall>/welcome?desk=&seat=&project=&pem=",
     )
+    # #618: join picks the desk's delivery. Plain join = websocket; the webhook
+    # options = the wall POSTs a wake while the desk's connect is down.
+    jn.add_argument("--webhook-url", default="", help="the routine's https webhook URL")
+    jn.add_argument("--webhook-url-file", default="", help="a file holding the webhook URL")
+    jn.add_argument("--webhook-key-file", default="", help="a file holding the webhook key (or its Authorization line)")
+    jn.add_argument("--webhook-key-env", default="", help="the NAME of an env var holding the webhook key")
+    jn.add_argument("--webhook-key-stdin", action="store_true", help="read the webhook key from stdin")
+    # Refused with a plain line; never echoed (argparse would print an unknown flag's value).
+    jn.add_argument("--webhook-key", default=None, help=argparse.SUPPRESS)
+    jn.add_argument("--websocket", action="store_true", help="switch the desk back to websocket only (forget the webhook)")
 
     sub.add_parser(
         "local",
@@ -1892,6 +1902,17 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
             )
 
             link = (getattr(args, "link", None) or "").strip()
+            from agent_coord.client import wake_cli as _wake
+
+            try:
+                _deliv = _wake.delivery_body(args)
+            except CoordError as e:
+                print(str(e), file=sys.stderr, flush=True)
+                return 2
+            if link and "://" not in link and "?" not in link and _deliv is not None:
+                # #618: `mill join DESK --webhook-...` or `--websocket`: a desk seated on this
+                # machine changes its own delivery with no new link; its seat token is the auth.
+                return _wake.run_seated(link, _deliv)
             # `mill join join ...` used to ignore the extra word and exit 0 (#157).
             if link.lower() in ("join", "mill"):
                 _print_err(
@@ -1936,9 +1957,12 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 # next: is printed once, as its own line after the JSON (#274).
                 line = str(row.pop("next", "") or "").strip()
                 _print(row)
+                rc = 0
+                if _deliv is not None:
+                    rc = _wake.run_seated(str(row.get("desk") or ""), _deliv)
                 if line:
                     print(line, flush=True)
-                return 0
+                return rc
             _print_err(row)
             return 1
         print("unknown mill cmd", getattr(args, "cmd", ""), flush=True)

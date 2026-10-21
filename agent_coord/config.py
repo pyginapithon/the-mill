@@ -25,8 +25,8 @@ DEFAULTS: dict[str, Any] = {
     "directory_client_secret": "",
     "directory_logout_url": "",
     "wake_url": "",
-    # Read at webhook POST time. Not listed in save_config, so it is never written here.
-    "webhook_key": "",
+    # #618: hosts (with a path prefix) a desk's webhook may point at; comma list.
+    "wake_hosts": "api2.cursor.sh/automations/webhook/",
     "bot_wake_url": "",
     "bot_wake_cmd": "",
     "spawn": "",
@@ -58,7 +58,7 @@ _ENV = {
     "directory_client_secret": "AGENT_COORD_DIRECTORY_CLIENT_SECRET",
     "directory_logout_url": "AGENT_COORD_DIRECTORY_LOGOUT_URL",
     "wake_url": "AGENT_COORD_WAKE_URL",
-    "webhook_key": "AGENT_COORD_WEBHOOK_KEY",
+    "wake_hosts": "AGENT_COORD_WAKE_HOSTS",
     "bot_wake_url": "AGENT_COORD_BOT_WAKE_URL",
     "bot_wake_cmd": "AGENT_COORD_BOT_WAKE_CMD",
     "spawn": "AGENT_COORD_SPAWN",
@@ -234,6 +234,7 @@ def save_config(data: dict[str, Any], path: Path | None = None) -> Path:
         "directory_client_secret",
         "directory_logout_url",
         "wake_url",
+        "wake_hosts",
         "bot_wake_url",
         "bot_wake_cmd",
         "spawn",

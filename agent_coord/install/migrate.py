@@ -588,6 +588,26 @@ def _ensure_join_token_hash(cn) -> list[str]:
     return applied
 
 
+def _ensure_join_endpoint_key(cn) -> list[str]:
+    """#618: join.endpoint_key, the desk's own webhook key (per desk, not a host setting)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "join") and not _column_exists(cur, "join", "endpoint_key"):
+            cur.execute(
+                "ALTER TABLE `join` ADD COLUMN endpoint_key "
+                "VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER endpoint_url"
+            )
+            applied.append("join.endpoint_key")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 _TREE_READ_SQL = (
     "CREATE TABLE IF NOT EXISTS tree_read ("
     " desk_id BIGINT UNSIGNED NOT NULL,"
@@ -941,6 +961,8 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(apply_roster_070(cn))
             # Column before the procedure refresh, so mill_label_select can read l.ord.
             applied.extend(_ensure_label_ord(cn))
+            # Column before the procedure refresh: mill_join_wake_* name it (#618).
+            applied.extend(_ensure_join_endpoint_key(cn))
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))

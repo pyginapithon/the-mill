@@ -413,7 +413,7 @@ def fanout(
 
     t0 = time.perf_counter()
     try:
-        from agent_coord.server.wake import fire_wake_hook, webhook_key
+        from agent_coord.server.wake import post_desk
         from agent_coord.server.records import watcher as rec_w
 
         if rows is None:
@@ -458,22 +458,18 @@ def fanout(
                         outcome = "error"
                         _bc_log(f"fanout notify err desk={desk} err={e}")
                 elif mode == "webhook" and url:
-                    n_hook += 1
+                    # #618: a doorbell, one per desk per window. The hint stays missed either
+                    # way, so the woken desk's connect sync hands it over and its chain walks it.
                     try:
-                        posted_body = dict(payload)
-                        posted_body["desk"] = desk
-                        posted = fire_wake_hook(
-                            url,
-                            posted_body,
-                            timeout=8.0,
-                            key=webhook_key(),
-                            desk=desk,
-                            hint_id=int(id),
-                        )
-                        outcome = "sent" if posted else "error"
+                        got = post_desk(cn, desk, payload, hint_id=int(id))
                     except Exception as e:
-                        outcome = "error"
+                        got = "error"
                         _bc_log(f"webhook desk={desk} id={id} err={type(e).__name__}")
+                    if got in ("sent", "error"):
+                        n_hook += 1
+                    else:
+                        n_miss += 1
+                    _bc_log(f"webhook desk={desk} type={type} id={id} wake={got}")
                 else:
                     n_miss += 1
                     _bc_log(f"fanout miss desk={desk} type={type} id={id} hint={hint} mode={mode}")
@@ -559,6 +555,15 @@ def emit(cn, desk: str, kind: str, payload: dict) -> str:
         except Exception as e:
             outcome = "error"
             _bc_log(f"push notify err desk={desk} kind={kind} err={e}")
+    elif kind == "mail":
+        # #618: a letter rings an armed desk's webhook too. The letter text never
+        # rides the POST; the row stays missed, so the connect sync hands it over.
+        try:
+            from agent_coord.server.wake import post_desk
+
+            post_desk(cn, desk, live, hint_id=mid)
+        except Exception as e:
+            _bc_log(f"webhook desk={desk} kind=mail err={type(e).__name__}")
     try:
         rec_push.put(cn, desk, kind, frame, outcome)
     except Exception as e:
@@ -621,7 +626,28 @@ def connect_sync_frame(cn, desk: str) -> dict:
     except Exception as e:
         _bc_log(f"hold own err desk={desk} err={e}")
         holds = []
-    return {"kind": "sync", "sync": sync, "holds": holds}
+    # #618: this sync hands over the queue, so the desk's next hint may ring its webhook.
+    try:
+        from agent_coord.server.wake import gate_clear
+
+        gate_clear(desk)
+    except Exception:
+        pass
+    return {"kind": "sync", "sync": sync, "holds": holds, "wake": wake_line(cn, desk)}
+
+
+def wake_line(cn, desk: str) -> str:
+    """Glanceable wake state (#618): 'webhook armed (host H)' or 'off'. Never the path or key."""
+    try:
+        from agent_coord.server.records import join as rec_join
+
+        st = rec_join.wake_state(cn, desk)
+    except Exception as e:
+        _bc_log(f"wake state err desk={desk} err={type(e).__name__}")
+        return "unknown"
+    if st.get("armed"):
+        return f"webhook armed (host {st.get('host') or '?'})"
+    return "off"
 
 
 def _desk_room_keys(desk: str) -> list[str]:

@@ -6,6 +6,10 @@ DROP PROCEDURE IF EXISTS mill_join_doing;
 DROP PROCEDURE IF EXISTS mill_join_connect;
 DROP PROCEDURE IF EXISTS mill_join_socket;
 DROP PROCEDURE IF EXISTS mill_join_lan;
+DROP PROCEDURE IF EXISTS mill_join_wake_arm;
+DROP PROCEDURE IF EXISTS mill_join_wake_off;
+DROP PROCEDURE IF EXISTS mill_join_wake_state;
+DROP PROCEDURE IF EXISTS mill_join_wake_target;
 
 DELIMITER //
 
@@ -109,7 +113,11 @@ BEGIN
   -- #608: a retired desk resolves too, so reset still revokes its seat.
   SELECT id INTO v_desk FROM name WHERE type = 'desk' AND name = TRIM(p_desk) LIMIT 1;
   -- #96: reset is a disconnect stamp. Never DELETE join or its activity.
-  UPDATE `join` SET token_hash = NULL, doing = '', time_disconnect = v_ts WHERE desk_id = v_desk;
+  -- #618: a reset seat keeps no webhook wake; the next holder arms its own.
+  UPDATE `join` SET token_hash = NULL, doing = '', time_disconnect = v_ts,
+         delivery_mode = IF(delivery_mode = 'webhook', 'websocket', delivery_mode),
+         endpoint_url = NULL, endpoint_key = NULL
+   WHERE desk_id = v_desk;
   SET v_id = (SELECT id FROM `join` WHERE desk_id = v_desk LIMIT 1);
   IF v_id IS NOT NULL THEN
     -- NULL roster: keep the seat's activity roster (not 1/Office).
@@ -292,6 +300,74 @@ BEGIN
   END IF;
   COMMIT;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, p_ip AS lan_ip;
+END //
+
+-- #618 webhook wake. The URL is checked by the wall before arm (https, host
+-- allowlist, no IP literal). updated = updated: arming is not a heartbeat.
+CREATE PROCEDURE mill_join_wake_arm(
+  IN p_desk VARCHAR(64),
+  IN p_url  VARCHAR(512),
+  IN p_key  VARCHAR(512)
+)
+BEGIN
+  DECLARE v_desk BIGINT UNSIGNED;
+  IF IFNULL(p_url, '') = '' OR IFNULL(p_key, '') = '' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake arm: url and key required';
+  END IF;
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM `join` WHERE desk_id = v_desk) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake: desk has not joined';
+  END IF;
+  UPDATE `join`
+     SET delivery_mode = 'webhook', endpoint_url = p_url, endpoint_key = p_key, updated = updated
+   WHERE desk_id = v_desk;
+  SELECT TRIM(p_desk) AS desk, 'webhook' AS delivery_mode;
+END //
+
+CREATE PROCEDURE mill_join_wake_off(
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  DECLARE v_desk BIGINT UNSIGNED;
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM `join` WHERE desk_id = v_desk) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake: desk has not joined';
+  END IF;
+  UPDATE `join`
+     SET delivery_mode = IF(delivery_mode = 'webhook', 'websocket', delivery_mode),
+         endpoint_url = NULL, endpoint_key = NULL, updated = updated
+   WHERE desk_id = v_desk;
+  SELECT TRIM(p_desk) AS desk, 'off' AS wake;
+END //
+
+-- What a reader may see: armed or not and the host. Never the path or the key.
+CREATE PROCEDURE mill_join_wake_state(
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  SELECT TRIM(p_desk) AS desk,
+         (j.delivery_mode = 'webhook' AND j.endpoint_url IS NOT NULL AND j.endpoint_key IS NOT NULL) AS armed,
+         IF(j.endpoint_url IS NULL, NULL,
+            SUBSTRING_INDEX(SUBSTRING_INDEX(SUBSTRING_INDEX(j.endpoint_url, '://', -1), '/', 1), ':', 1)) AS host
+    FROM `join` j
+    JOIN name d ON d.id = j.desk_id AND d.type = 'desk' AND d.deleted IS NULL
+   WHERE d.name = TRIM(p_desk)
+   LIMIT 1;
+END //
+
+-- POST time only: the one read that returns the key. A live, armed desk only.
+CREATE PROCEDURE mill_join_wake_target(
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  SELECT j.endpoint_url, j.endpoint_key
+    FROM `join` j
+    JOIN name d ON d.id = j.desk_id AND d.type = 'desk' AND d.deleted IS NULL
+   WHERE d.name = TRIM(p_desk)
+     AND j.delivery_mode = 'webhook'
+     AND j.endpoint_url IS NOT NULL
+     AND j.endpoint_key IS NOT NULL
+   LIMIT 1;
 END //
 
 DELIMITER ;

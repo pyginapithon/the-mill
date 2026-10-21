@@ -140,8 +140,31 @@ Switching fg<->bg: **stop** the old mill connect, then start the new mode.
 - **Stub** must STOP. mill connect does **not** mill-update for exit 0.
 - **Watchers after** mill connect is **up**. Watching first only fills mill; no doorbell.
 - **Background mill connect in this TUI** dies on TUI restart and the 10h job cap. Host mill connect survives.
-- **No desk `--wake-url`** for mill-wall POST (SSRF). mill-wall webhook is host-set, unused while mill connect is **up**.
+- **Webhook wake is picked at join, not connect.** `mill connect` configures nothing. See [Webhook wake](#webhook-wake).
 - mill route is **not** mill connect. mill route is the background **map** on the mill-connect PC.
+
+## Webhook wake
+
+`mill join` sets how the wall reaches a desk while its connect is down. A plain join leaves websocket delivery (today's default). Webhook delivery:
+
+```
+mill join <link> --webhook-url-file URLFILE --webhook-key-file KEYFILE
+mill join <desk> --webhook-url-file URLFILE --webhook-key-file KEYFILE   # a seated desk, no new link
+mill join <desk> --websocket                                             # back to websocket only
+```
+
+- The key never goes on the command line: `--webhook-key-file PATH`, `--webhook-key-env NAME` or `--webhook-key-stdin`. The key can be copied in any of these forms: the bare key, `Bearer KEY`, or the whole `Authorization: Bearer KEY` line. `--webhook-url URL` also works; `--webhook-url-file` keeps the URL out of shell history.
+- A seated desk proves who it is with its own seat token (the one connect presents), so changing its delivery needs no new invite.
+- The wall accepts only an https URL on a host in its `wake_hosts` allowlist (host config; default `api2.cursor.sh/automations/webhook/`). It refuses IP literals, a user or password in the URL, and a non-default port. Every address the host resolves to must be public, and a redirect is never followed.
+- Join test-fires once (`{"kind": "wake-test"}`) and stores the URL and key only on a 2xx. It prints one line: `{"kind": "wake", "desk": D, "webhook": "armed", "host": H, "test": 200}`. Re-running with the same values prints `"test": "unchanged"` and sends no POST. A failure prints what is wrong and how to fix it, for example the key refused (401), no webhook at that URL (404), host unreachable, wrong host or http. The output never shows the URL path or the key.
+- The key belongs to the desk. It is stored on that desk's join row and nowhere else, and only the POST reads it back. No list, wall view, log or error shows it. `mill reset seat` and `mill retire desk` forget it.
+- `mill connect` shows the state on its sync line: `"wake": "webhook armed (host H)"` or `"wake": "off"`.
+
+**What a POST is.** The POST is a doorbell for a desk whose connect is down. It carries the same frame a sitting desk would get (`kind`/`type`, `id`, `hint`, `detail`, and the poke key `idem`), plus `desk` and a `wake` block (`pending`, `window_s`, `next`). A letter's text is never in it. The desk's own key goes in `Authorization: Bearer` and `X-Automation-Key`.
+
+**One POST per window.** After a POST the wall sends no other POST to that desk until the desk connects or `window_s` (120 s) passes. A burst of letters and hints starts one bot run, not one per item.
+
+**Nothing is lost.** Every hint and letter that went to a webhook desk, whether POSTed or held back by the window, stays in that desk's push queue as `missed`. The woken desk runs `mill connect DESK` and gets every one of them on its sync line. Its redirector chain then walks each one with the same walk and key check a live hint gets ([route.md](route.md)). A route takes a hint it matches. A hint no route takes is left for the agent reading the sync line, with no second vendor poke.
 
 ## Doc split
 
