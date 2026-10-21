@@ -182,7 +182,7 @@ mill init --yes
 - Book default: **MySQL 8 (InnoDB)** on the VM, bind `127.0.0.1`. Managed DB later - do not invent migrate.
 
 ## Desks / humans
-- Desks: `pip install the-mill` -> `mill join '<welcome-link>'` -> `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'` ([JOIN.md](docs/JOIN.md)).
+- Desks: `pip install the-mill` -> `mill join --link-file LINKFILE` -> `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'` ([JOIN.md](docs/JOIN.md)).
 - Humans: Wall HTTPS URL only (browser).
 
 ## Playbook

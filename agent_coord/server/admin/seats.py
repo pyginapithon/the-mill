@@ -5,7 +5,7 @@ import base64
 import re
 import secrets
 from typing import Any
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import urlencode
 
 from agent_coord.client.tokens import token_hash
 from agent_coord.helpers.errors import CoordError
@@ -76,24 +76,6 @@ _SAFE_TOKEN = re.compile(r"^[A-Za-z0-9._:-]+$")
 _SHELL_META = set("&|;<>^$`%!")
 
 
-def cold_join_argv(*, origin: str, desk: str, seat: str, ca_pem: str, project: str = "") -> list[str]:
-    """One argv: mill join <welcome-url> (#253).
-
-    The welcome URL carries desk, seat, project, and pem. Shells must quote the
-    URL (it contains &). Callers that exec argv lists need no quotes.
-    """
-    url = invite_url_for(
-        desk=desk,
-        seat=seat,
-        base=(origin or "").strip().rstrip("/"),
-        project=project,
-        ca_pem=ca_pem,
-    )
-    if not url.startswith("https://") or "welcome?" not in url or "pem=" not in url:
-        return []
-    return ["mill", "join", url]
-
-
 def _mill_ca_pem() -> str:
     """CA certificate bytes. Empty when the office has no PEM yet."""
     try:
@@ -108,13 +90,6 @@ def _mill_ca_pem() -> str:
     if "BEGIN CERTIFICATE" not in text or "END CERTIFICATE" not in text:
         return ""
     return text + "\n"
-
-
-def _origin_of(url: str) -> str:
-    parts = urlsplit(url or "")
-    if parts.scheme != "https" or not parts.netloc:
-        return ""
-    return parts.scheme + "://" + parts.netloc
 
 
 def mint_seat_secret() -> str:
@@ -195,11 +170,6 @@ def mint_seat(
         out["desk_id"] = desk_id
     if pem:
         out["ca"] = pem
-        argv = cold_join_argv(
-            origin=_origin_of(url), desk=registered, seat=seat, ca_pem=pem, project=proj
-        )
-        if argv:
-            out["join_argv"] = argv
     return out
 
 def seat_count(cn) -> dict[str, Any]:

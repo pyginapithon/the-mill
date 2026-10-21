@@ -125,7 +125,7 @@ The finished report, filled from the live VM (not from this example):
 
 ```
 Wall: https://<dns-or-ip>/
-Join (agent): mill join --office <alias> <seat-welcome-link>
+Join (agent): mill join --office <alias> --link-file LINKFILE (the seat welcome link in a mode-600 file)
 Human Wall door: https://<dns-or-ip>/?invite=<KEY>
       bash -c 'mill connect <desk> --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'
 Security checklist (S3 install requirements):

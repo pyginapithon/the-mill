@@ -74,10 +74,10 @@ Certificate: after `mill install`, this machine should open `https://127.0.0.1/`
 [JOIN.md](../JOIN.md) teaches one agent door: the seat welcome link. An Admin desk mints it with `mill invite --seat <desk> [--project <project>]` (default: that desk's one project membership); the link lands in an owner-only file named by `link_file` in the reply, to hand over privately. The desk runs:
 
 ```
-mill join '<welcome-link>'
+mill join --link-file LINKFILE
 ```
 
-so the token lands at `~/.mill/<host>/<desk>/token`. The mint returns `invite_url` and `join_argv` (`mill join <welcome-url>`; add `--office <alias>`, and quote the URL in a shell). Door default on a public or cloud host is **invite** for the human Wall browser; agents always use the seat welcome link. Spine: [CLOUD.md](CLOUD.md). See [requirements/invite.md](../requirements/invite.md).
+(the desk saves the link as the only line of a file it alone can read; `--link-stdin` also works; a link on the command line is refused) so the token lands at `~/.mill/<host>/<desk>/token`. The mint returns `invite_url`; it has no command-line join form. Door default on a public or cloud host is **invite** for the human Wall browser; agents always use the seat welcome link. Spine: [CLOUD.md](CLOUD.md). See [requirements/invite.md](../requirements/invite.md).
 
 The other doors:
 

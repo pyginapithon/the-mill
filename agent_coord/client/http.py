@@ -978,7 +978,7 @@ def mill_here_over_http(args: Any) -> int:
         from agent_coord.client.offices import current_office
 
         err = (
-            "no seat token for this desk here; mill join <link> first"
+            "no seat token for this desk here; mill join --link-file PATH first"
             if current_office()
             else "no session token; mill join first"
         )

@@ -66,7 +66,7 @@ def test_roster_and_unknown_name_read_the_same(office, capsys):
 
 def test_line_names_join_and_connected_without_a_lookup():
     line = seatless_connect_line("x1")
-    assert "mill join '<welcome-link>'" in line
+    assert "mill join --link-file PATH" in line
     assert "mill connected ROSTER" in line
     assert "\n" not in line and line.isascii()
 

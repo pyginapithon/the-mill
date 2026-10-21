@@ -12,7 +12,7 @@ SESSION_INVALID_REJOIN = (
 # A cold agent uses the seat welcome link; an invite office needs its invite key.
 SESSION_JOIN_DENIED = (
     "join refused: this office door needs a valid invite or seat; "
-    "mill join <welcome-link> (ask an Admin to mint a seat)"
+    "mill join --link-file PATH (the welcome link file; ask an Admin to mint a seat)"
 )
 
 # Missing Bearer on a gated verb.

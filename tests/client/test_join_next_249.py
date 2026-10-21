@@ -92,7 +92,9 @@ def test_join_success_prints_the_next_line(monkeypatch, tmp_path, capsys) -> Non
         return {"ok": True, "desk": "build-app", "project": "the-mill", "next": line}
 
     monkeypatch.setattr("agent_coord.client.offices.join_office", fake)
-    rc = main(["join", "--office", "office-a", link])
+    lf = tmp_path.parent / "build-app.link"
+    lf.write_text(link, encoding="utf-8")
+    rc = main(["join", "--office", "office-a", "--link-file", str(lf)])
     out = capsys.readouterr().out
     assert rc == 0
     assert line in [ln.strip() for ln in out.splitlines()]
@@ -166,28 +168,7 @@ def test_join_office_wall_seat_roster_when_link_omits_project(tmp_path, monkeypa
     assert read_seat_project("build-app", host="203.0.113.10", dest=tmp_path) == "the-mill"
 
 
-def test_cold_join_argv_is_welcome_link(monkeypatch) -> None:
-    from agent_coord.server.admin import seats as seats_mod
-
-    argv = seats_mod.cold_join_argv(
-        origin="https://wall.example",
-        desk="bot-z",
-        seat="sekritToken1",
-        ca_pem=_PEM,
-        project="the-mill",
-    )
-    assert argv[0:2] == ["mill", "join"]
-    assert len(argv) == 3
-    url = argv[2]
-    assert url.startswith("https://wall.example/welcome?")
-    q = parse_qs(urlparse(url).query)
-    assert q["desk"] == ["bot-z"]
-    assert q["seat"] == ["sekritToken1"]
-    assert q["project"] == ["the-mill"]
-    assert "pem" in q
-
-
-def test_mint_seat_join_argv_carries_project(monkeypatch) -> None:
+def test_mint_seat_link_carries_project(monkeypatch) -> None:
     from agent_coord.server.admin import seats as seats_mod
 
     def fake_upsert(cn, project, desk, role="", token_hash=None, doing=None):
@@ -206,5 +187,4 @@ def test_mint_seat_join_argv_carries_project(monkeypatch) -> None:
     q = parse_qs(urlparse(row["invite_url"]).query)
     assert q["project"] == ["ops"]
     assert row["project"] == "ops"
-    assert "project=ops" in row["join_argv"][2]
-    assert row["join_argv"][0:2] == ["mill", "join"]
+    assert "join_argv" not in row  # #620: the link is never argv

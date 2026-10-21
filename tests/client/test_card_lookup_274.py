@@ -155,6 +155,12 @@ def _welcome(desk: str) -> str:
     return "https://office.example/welcome?" + urlencode(fields)
 
 
+def _lf(tmp_path, link):
+    f = tmp_path / "welcome.link"
+    f.write_text(link + "\n", encoding="utf-8")
+    return str(f)
+
+
 def _fake_join(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENT_COORD_MILL_HOME", str(tmp_path))
     monkeypatch.setattr("agent_coord.install.packver.checkout_dist_line", lambda: "")
@@ -166,7 +172,7 @@ def _fake_join(monkeypatch, tmp_path):
 
 def test_join_prints_next_once(monkeypatch, tmp_path, capsys):
     _fake_join(monkeypatch, tmp_path)
-    rc = main(["join", _welcome("build-app")])
+    rc = main(["join", "--link-file", _lf(tmp_path.parent, _welcome("build-app"))])
     cap = capsys.readouterr()
     assert rc == 0
     both = cap.out + cap.err
@@ -182,7 +188,7 @@ def test_join_reports_failed_office_save(monkeypatch, tmp_path, capsys):
         raise OSError("read-only file system")
 
     monkeypatch.setattr("agent_coord.client.offices.write_global_active", boom)
-    rc = main(["join", _welcome("build-app")])
+    rc = main(["join", "--link-file", _lf(tmp_path.parent, _welcome("build-app"))])
     cap = capsys.readouterr()
     assert rc == 0
     assert "could not save" in cap.err and "read-only file system" in cap.err and "--office" in cap.err

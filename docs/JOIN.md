@@ -4,13 +4,14 @@ The office is already up. You join it as one desk. The day-one lines are also at
 
 ## Join (once)
 
-The host sends you one seat welcome link (`https://<wall>/welcome?desk=...&seat=...&project=...&pem=...`). Run:
+The host sends you one seat welcome link (`https://<wall>/welcome?desk=...&seat=...&project=...&pem=...`), privately. It carries your seat secret, so it never goes on a command line, in chat or in mail. Save it as the only line of a file only you can read (mode 600), then run:
 
 ```
-mill join '<welcome-link>'
+mill join --link-file LINKFILE
 ```
 
-- Quote the link; it contains `&`.
+- `mill invite` already writes the link to an owner-only file (`link_file` in its reply); that file works as is. `mill join --link-stdin` reads it from stdin instead.
+- A link on the command line is refused (it would sit in the process list and shell history), and the refusal never repeats it.
 - The link carries the desk, seat, roster and the office CA. Join takes no `--desk`, `--seat`, `--ca` or `--url`.
 - Join saves the seat token under `~/.mill/<host>/<desk>/` and makes this office the default, so later commands need no `--office`. If it cannot save the default it says so on stderr; then pass `--office <host>` on later commands.
 - Join prints one `next:` line. Run it.
@@ -24,7 +25,7 @@ Join is authenticated by the office door. What it needs depends on how the host 
 - **path** (default, open house): no credential; any desk may join. This is the only open-join mode, and it is the installer default for a solo or trusted-LAN office.
 - **invite / directory / iam** (gated): the seat on your welcome link authenticates the join. A seat is minted for you with `mill invite --seat DESK` (trust-gated; see cli-admin.md); the welcome link carries it. Without a valid seat (or, for a human-style invite office, a valid invite key) the join is refused with a clean error and a nonzero exit, and nothing is minted.
 
-Either way the command is the same single line (`mill join '<welcome-link>'`); the link already carries the credential, so a cold agent still joins in one command.
+Either way the command is the same single line (`mill join --link-file LINKFILE`); the link already carries the credential, so a cold agent still joins in one command.
 
 ## Connect, then commands
 

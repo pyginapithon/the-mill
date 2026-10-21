@@ -31,6 +31,12 @@ def _clear_cli_office():
 
 
 
+def _lf(tmp_path, link):
+    f = tmp_path / "welcome.link"
+    f.write_text(link + "\n", encoding="utf-8")
+    return str(f)
+
+
 def test_bare_join_prints_usage_and_writes_nothing(monkeypatch, tmp_path, capsys):
     monkeypatch.setenv("AGENT_COORD_MILL_HOME", str(tmp_path))
     monkeypatch.setenv("AGENT_COORD_CONFIG", str(tmp_path / "config.toml"))
@@ -56,7 +62,7 @@ def test_join_without_office_uses_the_link_host(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr("agent_coord.client.offices.join_office", fake)
     # The fake join writes no alias; the default-office save stands in as done (#274 reports a failed one).
     monkeypatch.setattr("agent_coord.client.offices.write_global_active", lambda name, **kw: tmp_path / "active")
-    rc = main(["join", _WELCOME])
+    rc = main(["join", "--link-file", _lf(tmp_path.parent, _WELCOME)])
     assert rc == 0
     assert seen["office"]
     assert "--office" not in capsys.readouterr().err
@@ -72,7 +78,7 @@ def test_join_with_welcome_link_runs(monkeypatch, tmp_path, capsys):
         return {"ok": True, "desk": "grok-tui", "office": office}
 
     monkeypatch.setattr("agent_coord.client.offices.join_office", fake)
-    rc = main(["join", "--office", "home", _WELCOME])
+    rc = main(["join", "--office", "home", "--link-file", _lf(tmp_path.parent, _WELCOME)])
     assert rc == 0
     assert seen["url"] == _WELCOME
     assert seen["office"] == "home"

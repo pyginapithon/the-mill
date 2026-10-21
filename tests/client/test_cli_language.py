@@ -90,10 +90,10 @@ def test_reset_seat(body):
         body("reset --yes")
 
 
-def test_join_usage_is_positional_link(capsys):
+def test_join_usage_is_the_link_file(capsys):
     with pytest.raises(SystemExit):
         _build_parser().parse_args(["join", "--help"])
-    assert "usage: mill join <link>" in capsys.readouterr().out
+    assert "usage: mill join --link-file PATH" in capsys.readouterr().out
 
 
 def test_connect_without_roster_uses_office(monkeypatch):
@@ -153,7 +153,9 @@ def test_join_without_office_uses_link_host(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(off, "join_office", fake)
     monkeypatch.setattr(off, "write_global_active", lambda name, **kw: seen.setdefault("active", name))
     off.bind_cli_office("")
-    rc = m.main(["join", "https://203.0.113.7/welcome?desk=d9&seat=S&project=cold-test&pem=x"])
+    lf = tmp_path.parent / "d9.link"
+    lf.write_text("https://203.0.113.7/welcome?desk=d9&seat=S&project=cold-test&pem=x\n", encoding="utf-8")
+    rc = m.main(["join", "--link-file", str(lf)])
     out = capsys.readouterr().out
     assert rc == 0
     assert seen == {"office": "203.0.113.7", "active": "203.0.113.7"}

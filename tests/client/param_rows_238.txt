@@ -422,6 +422,8 @@ wall-src office
 wall-src yes
 join (verb)
 join link
+join link_file
+join link_stdin
 join webhook_url
 join webhook_url_file
 join webhook_key_file
