@@ -383,9 +383,22 @@ def public_host(host: str) -> bool:
 FRAME_KEYS = ("kind", "type", "id", "hint", "detail", "idem")
 
 
-def wake_body(desk: str, frame: dict[str, Any], *, pending: int, test: bool = False) -> dict[str, Any]:
+def wake_body(
+    desk: str,
+    frame: dict[str, Any],
+    *,
+    pending: int,
+    test: bool = False,
+    roster: str = "",
+    reason: str | None = None,
+    room: str | None = None,
+) -> dict[str, Any]:
     """The POST body: the same frame a sitting desk gets on /ws (with its poke key, idem),
     trimmed to the keys the redirector walk reads, plus one wake block. No letter or card text.
+
+    #627: roster sits next to desk, so a receiver that routes many desks (a room
+    barker) knows the target. wake.reason is addressed or room (null on the join
+    test); wake.room is the room name, or null off a room.
     """
     from agent_coord.server.mill_json import stamp_mill
 
@@ -393,7 +406,10 @@ def wake_body(desk: str, frame: dict[str, Any], *, pending: int, test: bool = Fa
     if test:
         body = {"kind": "wake-test"}
     body["desk"] = desk
+    body["roster"] = str(roster or "") or None
     body["wake"] = {
+        "reason": None if test else (reason or ADDRESSED),
+        "room": None if test else (room or None),
         "pending": int(pending),
         "window_s": int(WAKE_WINDOW_S),
         "next": (
@@ -404,6 +420,21 @@ def wake_body(desk: str, frame: dict[str, Any], *, pending: int, test: bool = Fa
         ),
     }
     return stamp_mill(body)
+
+
+ADDRESSED = "addressed"
+ROOM = "room"
+
+
+def desk_roster(cn, desk: str) -> str:
+    """The roster a wake names next to the desk (#627): the desk's one roster
+    other than Office, else Office. The same rule a send uses for its sender roster."""
+    try:
+        from agent_coord.server.api.mill.rpc import _seat_roster
+
+        return str(_seat_roster(cn, desk) or "")
+    except Exception:
+        return ""
 
 
 def _fix_for(status: int | None, err: str, host: str) -> str:
@@ -418,7 +449,7 @@ def _fix_for(status: int | None, err: str, host: str) -> str:
     return f"{host} answered {status}; try again, or check the routine"
 
 
-def test_fire(url: str, key: str, desk: str) -> dict[str, Any]:
+def test_fire(url: str, key: str, desk: str, *, roster: str = "") -> dict[str, Any]:
     """One test POST. {ok, status, host, fix?}. Never the URL path or the key."""
     try:
         url, host = check_url(url)
@@ -427,7 +458,7 @@ def test_fire(url: str, key: str, desk: str) -> dict[str, Any]:
     if not public_host(host):
         return {"ok": False, "status": None, "host": host,
                 "fix": f"{host} does not resolve to a public address from this wall"}
-    status, err = _post_status(url, wake_body(desk, {}, pending=0, test=True),
+    status, err = _post_status(url, wake_body(desk, {}, pending=0, test=True, roster=roster),
                                timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=None)
     ok = status is not None and 200 <= status <= 299
     out: dict[str, Any] = {"ok": ok, "status": status, "host": host}
@@ -477,7 +508,15 @@ def _wake_log(desk: str, frame: dict[str, Any], hint_id: int | None, outcome: st
         return
 
 
-def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = None) -> str:
+def post_desk(
+    cn,
+    desk: str,
+    frame: dict[str, Any],
+    *,
+    hint_id: int | None = None,
+    reason: str = ADDRESSED,
+    room: str | None = None,
+) -> str:
     """Wake an armed desk that is not sitting. sent | coalesced | error | off.
 
     coalesced: a wake already went out in this window and the desk has not
@@ -514,7 +553,11 @@ def post_desk(cn, desk: str, frame: dict[str, Any], *, hint_id: int | None = Non
     from agent_coord.server.records import push as rec_push
 
     pending = rec_push.pending(cn, desk) + 1
-    status, err = _fire(url, wake_body(desk, frame, pending=pending),
+    # #627: a coalesced burst is addressed when any waiting item is addressed.
+    if reason != ADDRESSED and rec_push.pending_addressed(cn, desk):
+        reason = ADDRESSED
+    body = wake_body(desk, frame, pending=pending, roster=desk_roster(cn, desk), reason=reason, room=room)
+    status, err = _fire(url, body,
                         timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id, quiet=True)
     if status is not None and 200 <= status <= 299:
         _wake_log(desk, frame, hint_id, f"sent status={status}")

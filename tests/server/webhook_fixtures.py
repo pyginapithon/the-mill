@@ -28,6 +28,8 @@ def arm(monkeypatch, *, armed: dict[str, tuple[str, str]] | None = None) -> None
 
     monkeypatch.setattr("agent_coord.server.records.join.wake_target", target)
     monkeypatch.setattr("agent_coord.server.records.push.pending", lambda cn, desk: 0)
+    monkeypatch.setattr("agent_coord.server.records.push.pending_addressed", lambda cn, desk: False)
+    monkeypatch.setattr(wake, "desk_roster", lambda cn, desk: "")
 
 
 def opener(fn):

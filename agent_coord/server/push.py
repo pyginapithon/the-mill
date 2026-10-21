@@ -525,7 +525,7 @@ def _notify_rooms(rooms: list[str], frame: dict) -> None:
             HUB.notify(room, frame)
 
 
-def emit(cn, desk: str, kind: str, payload: dict) -> str:
+def emit(cn, desk: str, kind: str, payload: dict, *, reason: str = "addressed", room: str | None = None) -> str:
     """Hand one async item to a sitting socket, and keep it for the sync report.
 
     outcome is sent, missed, or error. The book row is what a later mill sync returns.
@@ -561,9 +561,13 @@ def emit(cn, desk: str, kind: str, payload: dict) -> str:
         try:
             from agent_coord.server.wake import post_desk
 
-            post_desk(cn, desk, live, hint_id=mid)
+            post_desk(cn, desk, live, hint_id=mid, reason=reason, room=room)
         except Exception as e:
             _bc_log(f"webhook desk={desk} kind=mail err={type(e).__name__}")
+    if reason == "room":
+        # #627: kept on the stored row only, so a later wake knows the burst
+        # held no addressed item; take() drops it before the sync.
+        frame[rec_push.WAKE_REASON] = "room"
     try:
         rec_push.put(cn, desk, kind, frame, outcome)
     except Exception as e:

@@ -53,6 +53,6 @@ def test_the_stored_sync_row_is_the_marked_item(monkeypatch):
     seen = []
     monkeypatch.setattr(mail_push.rec_mail, "letter_row", lambda cn, mid: _letter("z" * (BODY_CAP + 5)))
     monkeypatch.setattr(mail_push.rec_mail, "to_list", lambda cn, mid: DESTS)
-    monkeypatch.setattr("agent_coord.server.push.emit", lambda cn, desk, kind, payload: seen.append(payload))
+    monkeypatch.setattr("agent_coord.server.push.emit", lambda cn, desk, kind, payload, **kw: seen.append(payload))
     mail_push.push_mail(None, 2085)
     assert seen and seen[0]["body_trunc"] is True and seen[0]["read"] == "mill mail-thread 2085"

@@ -66,19 +66,37 @@ def compact_receipt(row: dict) -> dict:
     }
 
 
-def push_mail(cn, mail_id: int) -> None:
-    """Async MAIL item to every mail_to desk. Does not plant a watcher."""
+def _room_name(cn, mail_id: int) -> str | None:
+    """The letter's room name, or None off a room or on a minted thread tree (#627)."""
+    from agent_coord.server.records.tree import is_hidden_tree
+
+    try:
+        name = str((rec_mail.tree_crumbs(cn, int(mail_id)) or {}).get("tree") or "")
+    except Exception:
+        return None
+    return name if name and not is_hidden_tree(name) else None
+
+
+def push_mail(cn, mail_id: int, *, room_only: set[str] | None = None) -> None:
+    """Async MAIL item to every mail_to desk. Does not plant a watcher.
+
+    room_only (#627): dests that get this letter as room members (reply-all);
+    their wake says reason room. Every other dest was named: addressed.
+    """
     from agent_coord.server.push import emit
 
     letter = rec_mail.letter_row(cn, int(mail_id))
     if not letter:
         return
     dests = rec_mail.to_list(cn, int(mail_id))
+    room = _room_name(cn, int(mail_id))
+    members = set(room_only or ())
     for row in dests:
         desk = str(row.get("desk") or "")
         if not desk:
             continue
-        emit(cn, desk, "mail", compact_mail(letter, dests, desk))
+        reason = "room" if desk.strip() in members else "addressed"
+        emit(cn, desk, "mail", compact_mail(letter, dests, desk), reason=reason, room=room)
 
 
 def push_receipt(cn, row: dict) -> None:

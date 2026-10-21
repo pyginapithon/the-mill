@@ -319,7 +319,7 @@ def _join_delivery(c: Book, desk: str, delivery: dict[str, Any]) -> dict[str, An
         raise CoordError(str(e)) from None
     if rec_join.wake_target(c._cn, desk) == (url, key):
         return {"webhook": "armed", "host": host, "test": "unchanged"}
-    got = wake.test_fire(url, key, desk)
+    got = wake.test_fire(url, key, desk, roster=wake.desk_roster(c._cn, desk))
     if not got["ok"]:
         raise CoordError("join: webhook not armed: " + str(got.get("fix") or "test POST failed"))
     rec_join.wake_arm(c._cn, desk, url, key)
@@ -846,7 +846,9 @@ def _offline_dests(c: Book, project: str, resolved, via_roster) -> list[str]:
     return offline
 
 
-def _h_send(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
+def _h_send(
+    c: Book, body: dict[str, Any], project: str, owner: str | None, *, room_only: set[str] | None = None
+) -> Any:
     """Speak. Letter body + mail_tos[{deskId}].
 
     Accept mail_tos in body, or dst (comma To). Top-level roster /
@@ -856,6 +858,9 @@ def _h_send(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     To is *, a project name, project:role, a desk name, or a session role.
     Host room: body name/tree/room (CLI --name) is the plan name.
     Multi-To alone does NOT open a room. Room cast = sender ∪ mail_tos.
+
+    room_only (#627) is set only by reply: the dests that get this letter as
+    room members (reply-all), not by name. A client body cannot set it.
     """
 
     from agent_coord.client.outbound.addressing import parse_mail_to
@@ -1085,7 +1090,7 @@ def _h_send(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     try:
         from agent_coord.server.mail_push import push_mail
 
-        push_mail(c._cn, int(mid))
+        push_mail(c._cn, int(mid), room_only=room_only)
     except Exception as e:
         try:
             from agent_coord.server.push import mill_admin_alert
@@ -1231,6 +1236,9 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         return bare
 
     _check_roster(c._cn, "reply", _stored(body.get("roster")))
+    # #627: who gets this reply only as a room member (reply-all), not by name.
+    # --to-desk names every dest; in reply-all only the parent's sender is named.
+    named: set[str] = set()
     raw_tos = body.get("mail_tos")
     if isinstance(raw_tos, list) and raw_tos:
         # --to-desk replaces the full dest list
@@ -1238,6 +1246,7 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             if not isinstance(item, str):
                 raise CoordError("reply: --to-desk takes desk names")
             _add_dest(_live_desk(item), None)
+        named = set(dest_set)
     else:
         # Default reply-all: parent sender U parent mail_tos, then (in a room)
         # every room participant: sent or received any letter on the TREE.
@@ -1245,6 +1254,7 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         parent_sender_aff_raw = parent_letter.get("sender_roster")
         parent_sender_aff = _stored(parent_sender_aff_raw) if parent_sender_aff_raw else None
         _add_dest(parent_from, parent_sender_aff)
+        named = {parent_from}
         for r in rec_mail.to_list(c._cn, mail_id):
             bare = _stored(r.get("desk") or "")
             aff_raw = r.get("roster")
@@ -1275,7 +1285,7 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     # Optional override of letter sender roster (--roster)
     if body.get("roster") is not None and str(body.get("roster") or "").strip():
         b["roster"] = body.get("roster")
-    rec = _h_send(c, b, project, owner)
+    rec = _h_send(c, b, project, owner, room_only={d for d in dest_set if d not in named})
     # The parent is handled for the desk who answered it. The new letter is not (#195).
     if self_bare:
         from agent_coord.server.records import opened as rec_opened

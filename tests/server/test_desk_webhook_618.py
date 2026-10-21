@@ -262,6 +262,8 @@ class _Queue:
         monkeypatch.setattr(rec_push, "put", put)
         monkeypatch.setattr(rec_push, "take", take)
         monkeypatch.setattr(rec_push, "pending", lambda cn, desk: len([r for r in self.rows if r["_desk"] == desk]))
+        monkeypatch.setattr(rec_push, "pending_addressed", lambda cn, desk: any(
+            r["_desk"] == desk and r.get("wake_reason") != "room" for r in self.rows))
         monkeypatch.setattr("agent_coord.server.records.hold.own", lambda cn, desk: [])
         monkeypatch.setattr("agent_coord.server.records.join.wake_state", lambda cn, desk: {"armed": True, "host": HOOK_HOST})
 

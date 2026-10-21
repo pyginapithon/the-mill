@@ -250,7 +250,7 @@ def test_outsider_reply_joins_gets_push_and_reads_branch(cn, monkeypatch) -> Non
     seed_names(cn, ("ojz", "desk"))
     pushed: list[tuple[str, str, int]] = []
 
-    def _emit(_cn, desk, kind, payload):
+    def _emit(_cn, desk, kind, payload, **kw):
         pushed.append((str(desk), str(kind), int(payload.get("id") or 0)))
         return "sent"
 
