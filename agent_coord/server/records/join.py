@@ -242,11 +242,12 @@ def prune_dead(cn) -> dict:
     }
 
 
-def wake_arm(cn, desk: str, url: str, key: str) -> list[dict]:
-    """#618: store the desk's webhook URL and its own key; delivery becomes webhook."""
+def wake_arm(cn, desk: str, url: str, key: str, wake_on: str = "all") -> list[dict]:
+    """#618: store the desk's webhook URL and its own key; delivery becomes webhook.
+    #628: wake_on is all or addressed (room-only items do not POST)."""
     from agent_coord.server.records.name import bare
 
-    return call(cn, "mill_join_wake_arm", [bare(desk, CONST_DESK), url, key])
+    return call(cn, "mill_join_wake_arm", [bare(desk, CONST_DESK), url, key, wake_on])
 
 
 def wake_off(cn, desk: str) -> list[dict]:
@@ -257,12 +258,16 @@ def wake_off(cn, desk: str) -> list[dict]:
 
 
 def wake_state(cn, desk: str) -> dict:
-    """{armed, host} for one desk. The read never carries the URL path or the key."""
+    """{armed, host, wake_on} for one desk. The read never carries the URL path or the key."""
     from agent_coord.server.records.name import bare
 
     rows = call(cn, "mill_join_wake_state", [bare(desk, CONST_DESK)]) or []
     row = rows[0] if rows else {}
-    return {"armed": bool(int(row.get("armed") or 0)), "host": str(row.get("host") or "")}
+    return {
+        "armed": bool(int(row.get("armed") or 0)),
+        "host": str(row.get("host") or ""),
+        "wake_on": str(row.get("wake_on") or "all"),
+    }
 
 
 def wake_target(cn, desk: str) -> tuple[str, str] | None:

@@ -424,6 +424,9 @@ def wake_body(
 
 ADDRESSED = "addressed"
 ROOM = "room"
+# #628: the desk's choice at join. addressed: a room-only item does not POST.
+WAKE_ON_ALL = "all"
+WAKE_ON = (WAKE_ON_ALL, ADDRESSED)
 
 
 def desk_roster(cn, desk: str) -> str:
@@ -517,7 +520,9 @@ def post_desk(
     reason: str = ADDRESSED,
     room: str | None = None,
 ) -> str:
-    """Wake an armed desk that is not sitting. sent | coalesced | error | off.
+    """Wake an armed desk that is not sitting. sent | coalesced | skipped | error | off.
+
+    skipped (#628): a room-only item for a desk armed with --wake-on addressed.
 
     coalesced: a wake already went out in this window and the desk has not
     connected since; the item waits in the push queue like every other one.
@@ -532,6 +537,11 @@ def post_desk(
     if not target:
         return "off"
     url, key = target
+    if reason == ROOM and rec_join.wake_state(cn, desk).get("wake_on") == ADDRESSED:
+        # #628: this desk wakes for addressed items only. The item still waits in
+        # the queue for its next connect; no window is taken.
+        _wake_log(desk, frame, hint_id, "skipped reason=room-only")
+        return "skipped"
     if not _gate_open(desk, time.monotonic()):
         # A wake already went out in this window: skip the checks and the DNS lookup.
         _wake_log(desk, frame, hint_id, "coalesced reason=window")

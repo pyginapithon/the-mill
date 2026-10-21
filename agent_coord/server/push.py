@@ -650,7 +650,8 @@ def wake_line(cn, desk: str) -> str:
         _bc_log(f"wake state err desk={desk} err={type(e).__name__}")
         return "unknown"
     if st.get("armed"):
-        return f"webhook armed (host {st.get('host') or '?'})"
+        on = ", wake on addressed" if st.get("wake_on") == "addressed" else ""
+        return f"webhook armed (host {st.get('host') or '?'}{on})"
     return "off"
 
 

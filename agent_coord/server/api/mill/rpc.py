@@ -312,18 +312,24 @@ def _join_delivery(c: Book, desk: str, delivery: dict[str, Any]) -> dict[str, An
         return {"webhook": "off", "delivery": "websocket"}
     if mode != "webhook":
         raise CoordError("join: delivery is websocket or webhook")
+    wake_on = str(delivery.get("wake_on") or wake.WAKE_ON_ALL).strip().lower()
+    if wake_on not in wake.WAKE_ON:
+        raise CoordError("join: --wake-on is addressed or all")
     try:
         url, host = wake.check_url(str(delivery.get("url") or ""))
         key = wake.normalize_key(str(delivery.get("key") or ""))
     except wake.WakeRefused as e:
         raise CoordError(str(e)) from None
     if rec_join.wake_target(c._cn, desk) == (url, key):
-        return {"webhook": "armed", "host": host, "test": "unchanged"}
+        # Same routine: no second test POST. #628: a new --wake-on alone is stored.
+        if str(rec_join.wake_state(c._cn, desk).get("wake_on") or wake.WAKE_ON_ALL) != wake_on:
+            rec_join.wake_arm(c._cn, desk, url, key, wake_on=wake_on)
+        return {"webhook": "armed", "host": host, "test": "unchanged", "wake_on": wake_on}
     got = wake.test_fire(url, key, desk, roster=wake.desk_roster(c._cn, desk))
     if not got["ok"]:
         raise CoordError("join: webhook not armed: " + str(got.get("fix") or "test POST failed"))
-    rec_join.wake_arm(c._cn, desk, url, key)
-    return {"webhook": "armed", "host": host, "test": got["status"]}
+    rec_join.wake_arm(c._cn, desk, url, key, wake_on=wake_on)
+    return {"webhook": "armed", "host": host, "test": got["status"], "wake_on": wake_on}
 
 
 def _h_doing(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
