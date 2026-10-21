@@ -196,7 +196,7 @@ def test_run_update_apply_mocked(tmp_path: Path) -> None:
     start_i = next(i for i, c in enumerate(seen) if _is_wall_start(c))
     assert stop_i < pip_i < import_i < start_i
     assert seen[0] and _is_wall_query(seen[0])
-    assert row["schema"] == "applied"  # #614: ensure before start
+    assert row["schema"] == "current"  # #616: checked, never applied
     assert (dest / "config.toml").read_text(encoding="utf-8") == "[office]\n"
     assert row["ok"] is True
     assert row["applied"] is True

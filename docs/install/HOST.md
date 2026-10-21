@@ -100,9 +100,14 @@ python -m pip install -U the-mill
 
 Linux system Python that refuses a user install needs `python3 -m pip install --user --break-system-packages -U the-mill`. The wall unit must import that same tree (`User=` and `PYTHONPATH` on systemd, or the Windows service account). Then recycle the wall: `sudo systemctl restart mill-wall`, or `Restart-Service mill-wall` on Windows. `mill -V` and the response header `X-Mill-Version` must match.
 
-`mill update` is the one update step: stop the wall, pip install, import check, `mill install sql --apply` with the new pack, then start the wall. A failed pip, import or SQL step leaves the wall stopped and says why. It does not wipe the book, the CA, or desk tokens. Back up the book first; the release was A/B tested on a throwaway book before publish (BUILD.md).
+Updating a host is two steps. SQL is applied only on purpose, never by `mill update`.
 
-By hand, the same order: pip install, `mill install sql --apply`, recycle. `mill install sql` without `--apply` only reports. The book carries a stamp of the pack SQL it holds (function `MILL_SQL_STAMP`, written last by ensure). When it is not this pack's, `/health` answers 503 with `fix: mill install sql --apply` and the wall logs the same at start, so a wall never serves on another pack's SQL silently (F66).
+1. `mill update`: stop the wall, pip install, import check, `mill install sql` (check only) with the new pack, then start the wall. A failed pip or import leaves the wall stopped and says why. When the book's SQL is not the new pack's, update reports `schema: stale` with book and pack, exits 1, and prints the apply command; the wall still starts and answers `/health` 503 until step 2. It does not wipe the book, the CA, or desk tokens.
+2. `mill install sql --apply`: back up the book and run the throwaway A/B below (or confirm the release consensus names it, BUILD.md) first. It runs ensure (tables, then routines, then the stamp) and checks again; `/health` turns 200 without a restart.
+
+The wall starts on stale SQL rather than staying down: pip has already replaced the pack, so a stopped wall could not serve either, and a running wall says why on `/health` and in its log. A plain service restart starts it the same way.
+
+By hand, the same order: pip install, recycle, `mill install sql --apply`. `mill install sql` without `--apply` only reports. The book carries a stamp of the pack SQL it holds (function `MILL_SQL_STAMP`, written last by ensure). When it is not this pack's, `/health` answers 503 with `fix: mill install sql --apply` and the wall logs the same at start, so a wall never serves on another pack's SQL silently (F66).
 
 A Windows mill-wall that runs the git checkout (not the pip package) reloads that checkout when the service restarts. `pip install` does not change it.
 
@@ -110,7 +115,7 @@ A Windows mill-wall that runs the git checkout (not the pip package) reloads tha
 
 Before applying SQL to a live office book, A/B on a throwaway local DB: (1) apply via migrate.split_script / apply_records, (2) apply the same files via mysql whole-file. Prove the new mill_* routines exist and a read path does not mint junk names. Only then apply to the live office book.
 
-Restarting the wall does not install new `CALL mill_*` routines; `mill install sql --apply` (or `mill update`) does, through ensure. The tables stay. Do **not** run `wipe.sql`. Do **not** apply `tables.sql` on a live book.
+Restarting the wall or `mill update` does not install new `CALL mill_*` routines; `mill install sql --apply` does, through ensure. The tables stay. Do **not** run `wipe.sql`. Do **not** apply `tables.sql` on a live book.
 
 `name_type.sql` migrates an existing book to the `tables.sql` column shape. It is not in `apply_order.txt`. Run that file once, then apply the routines with wipe off. It leaves the 0.6 shape; `mill install` on 0.7.0 then runs `migrate_070_roster.sql` (one `roster` type, `roster_id` columns). A second run leaves the book as it is. There is no name watcher type. A fresh book is `wipe.sql` then the apply order.
 
@@ -220,11 +225,11 @@ MySQL must stay off the public net. mill-wall is the only process that opens the
 
 | Change | How it lands | Operator action |
 |---|---|---|
-| Python pack (ASGI, gzip, cache headers, pool, Wall JS/HTML in the wheel) | `mill update` (or `pip install -U the-mill`, then `mill install sql --apply`) | **Recycle mill-wall** so the SERVICE/unit imports the new pack (or reloads the git checkout). `mill -V` and `X-Mill-Version` must match, and `/health` is 200 |
+| Python pack (ASGI, gzip, cache headers, pool, Wall JS/HTML in the wheel) | `mill update` (or `pip install -U the-mill`), then `mill install sql --apply` | **Recycle mill-wall** so the SERVICE/unit imports the new pack (or reloads the git checkout). `mill -V` and `X-Mill-Version` must match, and `/health` is 200 |
 | Git-checkout wall (Windows dogfood that puts the tree on `sys.path`) | commit on the checkout the SERVICE uses | **Recycle** -- `pip install` alone does not change that process |
 | Office config (`config.toml`, door, wall-allow, SSL certs) | edit under `~/.mill/` | Recycle only if the running process caches the value; TLS file swaps usually need recycle |
-| Stored procedures / functions (`CALL mill_*`) | `mill update`, or `mill install sql --apply` after a pip install. **Not** applied by pip or recycle alone | `/health` is 503 with `fix: mill install sql --apply` until the book holds this pack's SQL |
+| Stored procedures / functions (`CALL mill_*`) | `mill install sql --apply` after `mill update` or a pip install. **Not** applied by `mill update`, pip or recycle | `/health` is 503 with `fix: mill install sql --apply` until the book holds this pack's SQL |
 | Schema wipe / tables recreate | never on a live book | Do **not** run `wipe.sql` / live `tables.sql` |
 
-Summary: **`mill update` does pack, SQL and recycle in order. By hand: pip, `mill install sql --apply`, recycle. `/health` says when the SQL is behind.**
+Summary: **`mill update` does pack and recycle and flags stale SQL. Then back up, A/B, `mill install sql --apply`. `/health` says when the SQL is behind.**
 

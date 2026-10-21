@@ -909,7 +909,8 @@ def sql_state(cn) -> dict[str, Any]:
 
 
 def install_sql(cn, *, apply: bool) -> dict[str, Any]:
-    """mill install sql: without apply, report; with apply, ensure then verify (#614)."""
+    """mill install sql: without apply, report; with apply, ensure then verify (#614).
+    mill update only reports (#616); applying stays this deliberate step."""
     before = sql_state(cn)
     if not apply:
         return {**before, "applied": False}
@@ -919,7 +920,8 @@ def install_sql(cn, *, apply: bool) -> dict[str, Any]:
 
 
 def ensure(cn) -> dict[str, Any]:
-    """Run the ensure steps, then stamp the book with this pack's SQL digest (#614)."""
+    """The one migration entry: tables, then routines, then the stamp of this
+    pack's SQL digest (#614). mill install and mill install sql --apply call it."""
     res = _ensure_steps(cn)
     _stamp_sql(cn, sql_digest())
     return res
