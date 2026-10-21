@@ -41,7 +41,7 @@ Verb names do not change. `--office <alias>` may appear before or after the verb
 | no `--owner` | `.mill/<host>/active` |
 | `--owner` | that desk, and it updates `.mill/<host>/active` |
 
-`mill join <url> --office Offsite` writes the alias, `ca.crt`, and `url` under the host. It does not change the legacy `config.toml` `mill_url`.
+`mill join --link-file LINKFILE --office Offsite` writes the alias, `ca.crt`, and `url` under the host. It does not change the legacy `config.toml` `mill_url`.
 
 `mill connect --office Offsite` sets `.mill/active` to that alias and opens one websocket to that Wall. If that host has no token file yet, connect copies the token this machine already holds for that desk out of `session/`. It does not ask the Wall for a second token.
 

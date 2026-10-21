@@ -4078,7 +4078,7 @@ Default: **MySQL 8 (InnoDB)** on the VM, bind `127.0.0.1`. Managed DB later. Do 
 ## Done-report shape
 
 - Wall: `https://<dns-or-ip>/`
-- Join: `mill invite --seat <desk> --roster <roster>` mints the welcome link; the desk runs `mill join '<welcome-link>'` then `mill connect DESK` (docs/JOIN.md)
+- Join: `mill invite --seat <desk> --roster <roster>` mints the welcome link; the desk saves it to a file and runs `mill join --link-file LINKFILE` then `mill connect DESK` (docs/JOIN.md)
 - Security checklist ticks: MySQL not public; Wall HTTPS on 443; SSH/RDP locked; invite door; no cloud keys in mill; join fail-closed if CA missing
 
 {cloud_runbook(requested)}
@@ -4116,7 +4116,7 @@ def _write_cloud(dest: Path, provider: str = "self") -> dict[str, Any]:
 
     next_steps = [
         "Wall https://<dns-or-ip>/",
-        "Invite/join: mill invite --seat <desk> --roster <roster>; the desk runs mill join '<welcome-link>' then mill connect DESK (docs/JOIN.md)",
+        "Invite/join: mill invite --seat <desk> --roster <roster>; the desk saves it to a file and runs mill join --link-file LINKFILE then mill connect DESK (docs/JOIN.md)",
         "Security checklist: MySQL not public; Wall HTTPS 443; SSH/RDP locked; invite door; no cloud keys in mill; CA fail-closed",
         "not measured OOTB / #502 until measured",
         f"Provider appendix printed as {pid} (requested {requested}); first-class: aws|azure|gcp|self",

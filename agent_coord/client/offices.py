@@ -443,6 +443,39 @@ def next_connect_line(office: str, project: str, desk: str) -> str:
     return f"next: bash -c '{mill} connect {desk_s} >/dev/null 2>&1 & trap \"kill $!\" EXIT; {mill} inbox'"
 
 
+LINK_ON_ARGV = (
+    "join: the welcome link carries the seat secret, so it never goes on the command line "
+    "(process list, shell history, transcripts). Save it to a file and run: "
+    "mill join --link-file PATH (mill invite writes that file), or pipe it: mill join --link-stdin"
+)
+
+
+def looks_like_link(text: str) -> bool:
+    """True for anything that may be a welcome or invite link (#620): a scheme, a query or a seat."""
+    t = str(text or "").strip().strip("'\"").lower()
+    return bool(t) and ("://" in t or "?" in t or "seat=" in t or "/welcome" in t or "invite=" in t)
+
+
+def read_link(path: str, stdin=None) -> str:
+    """The one welcome link from a file or stdin (#620). ValueError never holds the link."""
+    if stdin is not None:
+        raw = stdin.read(16384)
+        where = "stdin"
+    else:
+        try:
+            raw = Path(path).expanduser().read_text(encoding="utf-8-sig")[:16384]
+        except OSError as e:
+            raise ValueError(f"join: could not read the link file ({e.strerror or type(e).__name__})") from None
+        where = "the link file"
+    lines = [ln.strip().strip("'\"").strip() for ln in raw.splitlines()]
+    lines = [ln for ln in lines if ln]
+    if not lines:
+        raise ValueError(f"join: {where} is empty; it holds the one welcome link mill invite wrote")
+    if len(lines) > 1:
+        raise ValueError(f"join: {where} must hold one line, the welcome link")
+    return lines[0]
+
+
 def alias_from_link(link: str) -> str:
     """Default office alias for mill join: the welcome link's host. Empty if none."""
     from urllib.parse import urlparse

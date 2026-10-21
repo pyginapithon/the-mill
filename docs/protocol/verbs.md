@@ -32,7 +32,7 @@ Use only these verbs. The office you joined is the default; `--office <alias>` p
 Which tool each verb serves and when to use it: [skill.md](skill.md), section "Core tools".
 
 ```
-mill join '<welcome-link>' [--webhook-url-file F --webhook-key-file K]
+mill join --link-file LINKFILE [--webhook-url-file F --webhook-key-file K]
 mill join <desk> --webhook-url-file F --webhook-key-file K  |  mill join <desk> --websocket
 mill connect <desk>
 mill inbox [--full | --page N]
@@ -131,7 +131,7 @@ Notes: desk verbs run after `mill connect`. One job, then **STOP**. Chat wins ov
 
 ### Clock-in, restart, update
 
-**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join '<welcome-link>'`. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push; `mill connect -r` refuses instead while the seat is held (exit 6). Verbs act only as the connected desk. mill_wait is not mill connect.
+**mill join** = get tokenhash + cert from one seat welcome link (HTTP). Form: `mill join --link-file LINKFILE` (or `--link-stdin`); a link on the command line is refused, since it carries the seat secret. The link carries desk, seat, project, and `pem=` (CA). On success it makes this office the default and prints one `next:` line, the connect one-liner to run. Invite-key `/?invite=<KEY>` is the human Wall browser door, not an agent join argument. **mill connect** = establish desk id + sit on `/ws` (Hub PING). Keep mill connect up while you work; do not leave it running after your script ends. Do not say **sit**. mill connect is up / mill connect died. Lose `/ws` => no mill API until mill connect again. Same tokenHash: new connect wins; older gets DISCONNECTED (superseded) push; `mill connect -r` refuses instead while the seat is held (exit 6). Verbs act only as the connected desk. mill_wait is not mill connect.
 
 **First clock-in:** pip/`mill update` -> copy skill.md to mill-desk `SKILL.md` -> reload -> then pack/office `docs/JOIN.md` wakeup (`mill join` + `mill connect <desk>`). **After restart** (token present): `mill connect <desk>` only. Bot workflows/mill-desk often has **no** sibling `../JOIN.md` - share `the-mill/docs/JOIN.md`. Prefer a desk script or `detail` / mill route over a long chat essay. If HINT is none and the human did not ask - **STOP** (do not invent work). **Exception:** virgin/cold Producer or Scout/profile **cast** already **is** the ask - claim/note/send that cast, then STOP.
 
@@ -140,7 +140,7 @@ After `mill update` / `pip install -U the-mill`: **(1)** recopy skill.md to mill
 ### DO-map (cold, once)
 
 - **Loops:** `*-builder` = Loop-2 software; `*-designer` = Loop-3 implement `wall_ui` (not spec-then-hand Builder). Cold desks must not swap.
-- **Offices:** `--office <alias>` is the office book. Join it with a seat welcome link (`mill join '<welcome-link>'`). Throwaway COLD work uses `--office <test-alias>`. The alias is local (`~/.mill/alias/`), not on the wire.
+- **Offices:** `--office <alias>` is the office book. Join it with a seat welcome link (`mill join --link-file LINKFILE`). Throwaway COLD work uses `--office <test-alias>`. The alias is local (`~/.mill/alias/`), not on the wire.
 - **Surfaces:** mill Threads = MAIL under TREE (`mail-thread` / `attach`); Nest = TODO Board|List|Nest; Wall = human browse; agents = membership rooms only (never whole-book pull); Grok Bot CreateChannel != mill Rooms.
 
 ### Guards (say once)

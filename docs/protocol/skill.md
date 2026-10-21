@@ -13,7 +13,7 @@ metadata:
 
 **Start here:**
 
-- **join** (once): `mill join <link>` turns a seat welcome link into a saved desk login on this machine (desk, seat token, roster, office CA). No `--office` needed. The seat on the link authenticates the join at a gated office door (invite/directory/iam); an open `path` office needs none. Either way it is one command.
+- **join** (once): `mill join --link-file LINKFILE` turns a seat welcome link into a saved desk login on this machine (desk, seat token, roster, office CA). No `--office` needed. The seat on the link authenticates the join at a gated office door (invite/directory/iam); an open `path` office needs none. Either way it is one command.
 - **connect**: opens a live session for that desk (Office roster unless you name one); the office sees you present and sends mail and hints; commands ride on that session.
 - **bearer**: the token saved by join is the desk's identity. Connect presents it, and every command runs as that desk with its rights. Never paste, print, or put it in a URL, mail or card.
 - **same process**: commands find the session only from the same shell call that started connect, so run them together in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mill todo'` (commands wait for the connect to be ready). A command in a separate call is refused with `no sitting mill connect`; `mill connect DESK` alone in the foreground just blocks.
@@ -82,7 +82,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
 
 Connect and command share one line (see Start here). `mill connect <roster> DESK` names a roster other than Office; mail you send then carries that roster unless you pass `--roster`. Several commands can share one connect: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill A; mill B'`.
 PowerShell: `$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill VERB ARGS; Stop-Process $c.Id`.
-Join once: `mill join <link>` (the welcome link, positional; no `--url`). Re-join only after a lost seat or an Admin reset.
+Join once: `mill join --link-file LINKFILE` (the welcome link saved as the only line of a mode-600 file, or `--link-stdin`; never the link itself on the command line). Re-join only after a lost seat or an Admin reset.
 Errors print on stderr and exit 1; success JSON prints on stdout. Read both.
 When a verb gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.
 

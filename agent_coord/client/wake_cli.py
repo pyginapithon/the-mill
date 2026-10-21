@@ -127,7 +127,7 @@ def run_seated(desk: str, delivery: dict[str, Any]) -> int:
 
     who = desk_name(desk)
     if not who or not read_session_token(who).strip():
-        print(f"join: no seat for desk {desk or '?'} on this machine; mill join <link> first", file=sys.stderr, flush=True)
+        print(f"join: no seat for desk {desk or '?'} on this machine; mill join --link-file PATH first", file=sys.stderr, flush=True)
         return 2
     body = {
         "verb": "join",

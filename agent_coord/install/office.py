@@ -436,7 +436,7 @@ def init_office(
                 if wel:
                     next_steps.insert(
                         3,
-                        f"Host desk welcome link: mill join --office <alias> {wel}",
+                        f"Host desk welcome link (holds the seat secret; save it to a file, then mill join --office <alias> --link-file PATH): {wel}",
                     )
             finally:
                 try:

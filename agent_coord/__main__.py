@@ -32,13 +32,6 @@ def _format_error(exc: BaseException) -> str:
     return json.dumps({"ok": False, "error": str(exc), "sync": sync}, default=str)
 
 
-def strip_doubled_join_prefix(argv: list[str]) -> list[str]:
-    """join_argv starts with mill, join. Passing that list to `mill join` repeats it (#150)."""
-    if len(argv) >= 3 and argv[0] == "join" and argv[1] == "mill" and argv[2] == "join":
-        return [argv[0], *argv[3:]]
-    return list(argv)
-
-
 def normalize_seat_argv(argv: list[str]) -> list[str]:
     """`--seat -value` becomes `--seat=-value` so a leading dash is the value (#145)."""
     out: list[str] = []
@@ -315,7 +308,7 @@ def _invite_cmd(args) -> int:
             )
             return 1
         inner["link_file"] = str(where)
-        inner["link"] = "written to link_file (owner-only); hand it over privately; --print-link prints it instead"
+        inner["link"] = "written to link_file (owner-only); hand it over privately; the desk saves it and runs mill join --link-file PATH; --print-link prints it instead"
         _print(row)
     else:
         _print(row)
@@ -375,7 +368,7 @@ def seatless_connect_line(who: str) -> str:
     """The one refusal for mill connect NAME with no seat on this computer (#281)."""
     return (
         f"mill connect: no seat for {who} on this computer; a desk joins once with "
-        f"mill join '<welcome-link>' from the office host (a roster is not a desk: "
+        f"mill join --link-file PATH (the welcome link from the office host) (a roster is not a desk: "
         f"mill connected ROSTER lists its desks)"
     )
 
@@ -1352,9 +1345,11 @@ def _build_parser() -> MillArgumentParser:
 
     jn = sub.add_parser(
         "join",
-        help="mill join <link> (the seat welcome link; positional, no --url)",
-        usage="mill join <link> [--webhook-url URL --webhook-key-file PATH] | mill join DESK (--webhook-... | --websocket)",
-        description="Join an office with a seat welcome link: mill join <link>. "
+        help="mill join --link-file PATH (the seat welcome link, from a file or stdin; never on the command line)",
+        usage="mill join --link-file PATH | --link-stdin [--webhook-url URL --webhook-key-file PATH] | mill join DESK (--webhook-... | --websocket)",
+        description="Join an office with a seat welcome link read from a file (--link-file PATH, "
+        "the file mill invite writes) or stdin (--link-stdin). The link carries the seat secret, "
+        "so a link on the command line is refused. "
         "The office alias defaults to the link's host and becomes the default office; "
         "--office ALIAS picks another local name. Then run the printed next: line.",
     )
@@ -1362,9 +1357,12 @@ def _build_parser() -> MillArgumentParser:
         "link",
         nargs="?",
         default="",
-        metavar="link",
-        help="seat welcome URL https://<wall>/welcome?desk=&seat=&project=&pem=",
+        metavar="DESK",
+        help="a desk seated on this machine, to change its delivery (never the welcome link)",
     )
+    # #620: the welcome link carries the seat secret: a file or stdin, never argv.
+    jn.add_argument("--link-file", default="", metavar="PATH", help="a file holding the seat welcome link (mill invite writes one)")
+    jn.add_argument("--link-stdin", action="store_true", help="read the seat welcome link from stdin")
     # #618: join picks the desk's delivery. Plain join = websocket; the webhook
     # options = the wall POSTs a wake while the desk's connect is down.
     jn.add_argument("--webhook-url", default="", help="the routine's https webhook URL")
@@ -1445,7 +1443,7 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
 
     _office, raw = pull_office_flag(list(raw))
     bind_cli_office(_office)
-    args = p.parse_args(normalize_seat_argv(strip_doubled_join_prefix(raw)))
+    args = p.parse_args(normalize_seat_argv(raw))
     if bool(getattr(args, "verbose", False)):
         import os as _dbg_os
 
@@ -1901,41 +1899,80 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 next_connect_line,
             )
 
-            link = (getattr(args, "link", None) or "").strip()
             from agent_coord.client import wake_cli as _wake
+            from agent_coord.client.offices import LINK_ON_ARGV, looks_like_link, read_link
 
+            desk_arg = (getattr(args, "link", None) or "").strip()
+            link_file = str(getattr(args, "link_file", "") or "").strip()
+            link_stdin = bool(getattr(args, "link_stdin", False))
+            if looks_like_link(desk_arg):
+                # #620: the link holds the seat secret. Refuse it on argv; never echo it.
+                print(LINK_ON_ARGV, file=sys.stderr, flush=True)
+                return 2
+            if link_file and link_stdin:
+                print("join: pick one: --link-file PATH or --link-stdin", file=sys.stderr, flush=True)
+                return 2
+            if (link_file or link_stdin) and desk_arg:
+                print(
+                    "join: either a welcome link (--link-file / --link-stdin) or a seated DESK, not both",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return 2
+            if link_stdin and getattr(args, "webhook_key_stdin", False):
+                print(
+                    "join: stdin carries one value: the link (--link-stdin) or the key (--webhook-key-stdin); "
+                    "put the other in a file",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return 2
             try:
                 _deliv = _wake.delivery_body(args)
             except CoordError as e:
                 print(str(e), file=sys.stderr, flush=True)
                 return 2
-            if link and "://" not in link and "?" not in link and _deliv is not None:
+            if desk_arg and _deliv is not None:
                 # #618: `mill join DESK --webhook-...` or `--websocket`: a desk seated on this
                 # machine changes its own delivery with no new link; its seat token is the auth.
-                return _wake.run_seated(link, _deliv)
+                return _wake.run_seated(desk_arg, _deliv)
             # `mill join join ...` used to ignore the extra word and exit 0 (#157).
-            if link.lower() in ("join", "mill"):
+            if desk_arg.lower() in ("join", "mill"):
                 _print_err(
                     {
                         "ok": False,
                         "error": (
                             "mill join: drop the extra join word; "
-                            "pass the seat welcome link"
+                            "pass the seat welcome link with --link-file PATH"
                         ),
                     }
                 )
                 return 1
-            if not link:
+            if desk_arg:
                 print(
-                    "join: need a seat welcome link: mill join <link>",
+                    f"join: {desk_arg[:64]} changes a seated desk's delivery: add --webhook-url-file and "
+                    "--webhook-key-file, or --websocket; a new seat joins with --link-file PATH",
+                    file=sys.stderr,
+                    flush=True,
+                )
+                return 1
+            if not (link_file or link_stdin):
+                print(
+                    "join: need a seat welcome link: mill join --link-file PATH (the file mill invite wrote), "
+                    "or mill join --link-stdin",
                     file=sys.stderr,
                 )
                 print(_subparser(p, "join").format_usage(), file=sys.stderr, end="")
                 return 1
+            try:
+                link = read_link(link_file, sys.stdin if link_stdin else None)
+            except ValueError as e:
+                print(str(e), file=sys.stderr, flush=True)
+                return 2
             explicit = (cli_office() or "").strip()
             office = explicit or alias_from_link(link) or (current_office() or "").strip()
             if not office:
-                print("join: could not read a host from the link: mill join <link>", file=sys.stderr)
+                print("join: could not read a host from the link; check the link file, or pass --office ALIAS", file=sys.stderr)
                 return 1
             row = join_office(link, office)
             if row.get("ok") and not explicit:

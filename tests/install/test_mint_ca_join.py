@@ -6,7 +6,6 @@ import base64
 import json
 from pathlib import Path
 
-_META = set("&|;<>^$`%!'\"")
 
 
 def _skill_line() -> str:
@@ -45,25 +44,14 @@ def test_mint_payload_has_ca_pem_not_fetch_url_or_skill_body(monkeypatch, tmp_pa
     skill_line = _skill_line()
     assert skill_line not in blob
     assert "skill.md" not in blob
-    argv = row["join_argv"]
-    assert argv[0:2] == ["mill", "join"]
-    assert len(argv) == 3
-    url = argv[2]
+    assert "join_argv" not in row  # #620: the link goes in a file, never argv
+    url = row["invite_url"]
     assert url.startswith("https://wall.example/welcome?")
     assert "desk=bot-a" in url
     assert "project=the-mill" in url
     assert "seat=" + row["seat"] in url
     assert "pem=" in url
-    assert "--url" not in argv
-    assert "--desk" not in argv
-    assert "--seat" not in argv
-    assert "--ca" not in argv
-    # URL carries &; shells must quote it. argv list (exec) needs no quotes.
-    assert "&" in url
-    assert "&&" not in " ".join(argv)
-    for tok in argv[:2]:
-        assert not any(ch in tok for ch in _META)
-        assert not any(ch.isspace() for ch in tok)
+    # One line in the link file: no whitespace inside the URL.
     assert not any(ch.isspace() for ch in url)
 
 

@@ -116,13 +116,3 @@ def test_invite_url_for_embeds_pem():
     assert q["seat"] == ["sek"]
     assert q["project"] == ["ops"]
     assert base64.b64decode(q["pem"][0]).decode("utf-8") == _PEM
-
-
-def test_cold_join_argv_empty_without_pem():
-    assert seats_mod.cold_join_argv(
-        origin="https://wall.example",
-        desk="bot",
-        seat="sek",
-        ca_pem="",
-        project="ops",
-    ) == []

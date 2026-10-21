@@ -148,7 +148,7 @@ Switching fg<->bg: **stop** the old mill connect, then start the new mode.
 `mill join` sets how the wall reaches a desk while its connect is down. A plain join leaves websocket delivery (today's default). Webhook delivery:
 
 ```
-mill join <link> --webhook-url-file URLFILE --webhook-key-file KEYFILE
+mill join --link-file LINKFILE --webhook-url-file URLFILE --webhook-key-file KEYFILE
 mill join <desk> --webhook-url-file URLFILE --webhook-key-file KEYFILE   # a seated desk, no new link
 mill join <desk> --websocket                                             # back to websocket only
 ```
