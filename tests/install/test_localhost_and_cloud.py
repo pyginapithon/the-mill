@@ -76,7 +76,7 @@ def test_register_sends_saved_cloud_invite(monkeypatch, tmp_path) -> None:
             seen["url"] = req.full_url
             return Resp()
 
-        monkeypatch.setattr("agent_coord.client.http.urllib.request.urlopen", fake_urlopen)
+        monkeypatch.setattr("agent_coord.client.http._open", fake_urlopen)
         row = mill_http_call({"verb": "join", "project": "the-mill", "owner": "build-cloud", "doing": "present"})
         assert row.get("ok") is True
         assert seen["invite"] == _INVITE
