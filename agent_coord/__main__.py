@@ -987,9 +987,14 @@ def _build_parser() -> MillArgumentParser:
     )
 
     _NAME_TYPES = ("roster", "label", "desk")
-    recm = sub.add_parser("reclaim", help="undo a retire: mill reclaim TYPE NAME (Admin)")
-    recm.add_argument("kind", metavar="TYPE", choices=_NAME_TYPES)
-    recm.add_argument("slug", metavar="NAME")
+    recm = sub.add_parser(
+        "reclaim",
+        help="undo a retire: mill reclaim TYPE NAME (Admin). "
+        "mill reclaim todo ROSTER NEED brings a retired card back (asker or Admin)",
+    )
+    recm.add_argument("kind", metavar="TYPE", choices=_NAME_TYPES + ("todo",))
+    recm.add_argument("slug", metavar="NAME", help="roster, label or desk name; for todo, the ROSTER")
+    recm.add_argument("need", metavar="NEED", nargs="?", default="", help="todo form only: NEED or a comma list")
     recm.add_argument("--yes", action="store_true", help="skip the prompt")
 
     rnm = sub.add_parser("rename", help="mill rename TYPE OLD NEW; you retype NEW at the prompt")
@@ -1001,11 +1006,15 @@ def _build_parser() -> MillArgumentParser:
     rtr = sub.add_parser(
         "retire",
         help="soft delete: mill retire TYPE NAME; you retype NAME. Office never. "
-        "mill retire score ROSTER NAME removes a score (points kept)",
+        "mill retire score ROSTER NAME removes a score (points kept). "
+        "mill retire todo ROSTER NEED takes a card off every list (asker or Admin)",
     )
-    rtr.add_argument("kind", metavar="TYPE", choices=_NAME_TYPES + ("score",))
-    rtr.add_argument("slug", metavar="NAME", help="roster, label or desk name; for score, the ROSTER")
-    rtr.add_argument("score_name", metavar="SCORE", nargs="?", default="", help="score form only: the score NAME")
+    rtr.add_argument("kind", metavar="TYPE", choices=_NAME_TYPES + ("score", "todo"))
+    rtr.add_argument("slug", metavar="NAME", help="roster, label or desk name; for score or todo, the ROSTER")
+    rtr.add_argument(
+        "score_name", metavar="SCORE|NEED", nargs="?", default="",
+        help="score form: the score NAME; todo form: NEED or a comma list",
+    )
     rtr.add_argument("--yes", action="store_true", help="skip the retype prompt")
 
     memb = sub.add_parser("member", help="list this desk's rosters (Office first)")
@@ -1233,9 +1242,9 @@ def _build_parser() -> MillArgumentParser:
         help="claimed -> shipped (volunteer); --done: shipped -> done (asker); --back: one step back",
     )
     psd.add_argument("project")
-    psd.add_argument("need")
+    psd.add_argument("need", help="NEED, or a comma list (a,b,c): one result row per card")
     pstep = psd.add_mutually_exclusive_group()
-    pstep.add_argument("--done", action="store_true", help="asker: accept a shipped card (shipped -> done)")
+    pstep.add_argument("--done", action="store_true", help="asker or Admin: accept a shipped card (shipped -> done)")
     pstep.add_argument("--back", action="store_true", help="asker or volunteer: done -> shipped, shipped -> claimed")
 
     inv = sub.add_parser(

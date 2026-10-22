@@ -276,6 +276,8 @@ def select_rosters(cn, names: list[str], status: str = "") -> list[tuple[str, di
             " LEFT JOIN name un ON un.id = t.updated_id"
             " WHERE t.roster_id IN (" + marks + ")"
             " AND (%s = '' OR t.status = %s)"
+            " AND NOT EXISTS (SELECT 1 FROM activity ra"
+            "  WHERE ra.type = 'todo' AND ra.id = t.id AND ra.deleted IS NOT NULL)"
             " ORDER BY t.updated DESC",
             (*ids, st, st),
         )
@@ -299,6 +301,52 @@ def find(cn, project: str, need: str) -> dict | None:
     for r in rows:
         fields = unpack(r.get("body") or "", r.get("id"))
         if str(fields["need_id"]) == raw:
+            return r
+    return None
+
+
+def retire(cn, todo_id: int, desk: str) -> list[dict]:
+    """#19: soft delete. The card row, plan, labels and watchers stay; lists skip it."""
+    from agent_coord.server.records.name import bare
+
+    return call(cn, "mill_todo_retire", [int(todo_id), bare(desk, CONST_DESK)])
+
+
+def reclaim(cn, todo_id: int, desk: str) -> list[dict]:
+    """#19: undo retire. The card comes back with the status it had."""
+    from agent_coord.server.records.name import bare
+
+    return call(cn, "mill_todo_reclaim", [int(todo_id), bare(desk, CONST_DESK)])
+
+
+def find_retired(cn, project: str, need: str) -> dict | None:
+    """A retired card on this roster by need slug or numeric id (the reclaim lookup)."""
+    from agent_coord.server.records.name import roster_ids
+
+    pairs = roster_ids(cn, [project]) if project else []
+    if not pairs:
+        return None
+    cur = cn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            "SELECT t.id, t.status, t.body, t.creator_id, t.assigned_id,"
+            " cn.name AS creator, sn.name AS assigned"
+            " FROM todo t"
+            " JOIN activity a ON a.type = 'todo' AND a.id = t.id AND a.deleted IS NOT NULL"
+            " LEFT JOIN name cn ON cn.id = t.creator_id"
+            " LEFT JOIN name sn ON sn.id = t.assigned_id"
+            " WHERE t.roster_id = %s ORDER BY t.id",
+            (int(pairs[0][1]),),
+        )
+        rows = list(cur.fetchall())
+    finally:
+        cur.close()
+    raw = str(need or "")
+    for r in rows:
+        if raw.isdigit() and int(r.get("id") or 0) == int(raw):
+            return r
+    for r in rows:
+        if str(unpack(r.get("body") or "", r.get("id"))["need_id"]) == raw:
             return r
     return None
 
