@@ -39,6 +39,58 @@ def client_ip(peer: str, forwarded: str = "") -> str:
     return peer
 
 
+_DEFAULT_PROXIES = ("127.0.0.0/8", "::1")
+
+
+def trusted_proxies() -> list[str]:
+    """Proxies whose X-Forwarded-For door=ip reads. Default: this host's loopback
+    (the installed nginx edge). AGENT_COORD_TRUSTED_PROXIES (IP or CIDR, comma
+    separated) replaces the default; set it to `none` to trust no proxy."""
+    raw = (os.environ.get("AGENT_COORD_TRUSTED_PROXIES") or "").strip()
+    if not raw:
+        return list(_DEFAULT_PROXIES)
+    if raw.lower() == "none":
+        return []
+    return [p.strip() for p in raw.replace(";", ",").split(",") if p.strip()]
+
+
+def _in_rules(ip: str, rules: list[str]) -> bool:
+    try:
+        addr = ipaddress.ip_address((ip or "").split("%")[0].strip())
+    except ValueError:
+        return False
+    for rule in rules:
+        try:
+            if "/" in rule:
+                if addr in ipaddress.ip_network(rule, strict=False):
+                    return True
+            elif addr == ipaddress.ip_address(rule):
+                return True
+        except ValueError:
+            continue
+    return False
+
+
+def door_client(peer: str, forwarded: str = "") -> tuple[str, bool]:
+    """door=ip client address and whether it came from X-Forwarded-For.
+
+    The header is read only when the TCP peer is a trusted proxy (#651). Then
+    the hops are read right to left (the proxy appends the address it saw) and
+    the first hop that is not a trusted proxy is the client; a spoofed left
+    entry is never reached. When every hop is a proxy the leftmost is used,
+    still marked forwarded, so allowed() never treats it as this machine.
+    """
+    peer = (peer or "").strip() or "127.0.0.1"
+    proxies = trusted_proxies()
+    hops = [h.strip() for h in (forwarded or "").split(",") if h.strip()]
+    if not hops or not _in_rules(peer, proxies):
+        return peer, False
+    for hop in reversed(hops):
+        if not _in_rules(hop, proxies):
+            return hop[:64], True
+    return hops[0][:64], True
+
+
 def is_loopback(ip: str) -> bool:
     try:
         return ipaddress.ip_address((ip or "").split("%")[0]).is_loopback
@@ -71,27 +123,24 @@ def workstation_ip(peer: str) -> str:
     return got[:45]
 
 
-def allowed(ip: str, rules: list[str] | None = None, *, empty_open: bool = True) -> bool:
-    """empty_open=True: no rules means anyone (human Wall). False: mill host loopback only (door=ip)."""
-    if is_loopback(ip):
+def allowed(
+    ip: str,
+    rules: list[str] | None = None,
+    *,
+    empty_open: bool = True,
+    forwarded: bool = False,
+) -> bool:
+    """empty_open=True: no rules means anyone (human Wall). False: mill host loopback only (door=ip).
+
+    forwarded=True: ip came from X-Forwarded-For, so a loopback value is not
+    this machine and must be on the allow list like any other address (#651).
+    """
+    if is_loopback(ip) and not forwarded:
         return True
     rules = load_allow() if rules is None else rules
     if not rules:
         return bool(empty_open)
-    try:
-        addr = ipaddress.ip_address((ip or "").split("%")[0])
-    except ValueError:
-        return False
-    for rule in rules:
-        try:
-            if "/" in rule:
-                if addr in ipaddress.ip_network(rule, strict=False):
-                    return True
-            elif addr == ipaddress.ip_address(rule):
-                return True
-        except ValueError:
-            continue
-    return False
+    return _in_rules(ip, rules)
 
 
 def is_mill_verb(path: str) -> bool:

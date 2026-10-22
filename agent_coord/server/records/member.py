@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_coord.const import CONST_OFFICE, CONST_ROSTER
+from agent_coord.const import CONST_ROSTER
 
 from .db import call
 
@@ -48,4 +48,7 @@ def delete_admin(cn, desk: str) -> list[dict]:
 
 
 def put_office(cn, desk: str) -> list[dict]:
-    return put(cn, CONST_OFFICE, desk)
+    # #722: the Office roster is id 1 whatever an Admin renamed it to.
+    from agent_coord.server.admin.guard import office_name
+
+    return put(cn, office_name(cn), desk)
