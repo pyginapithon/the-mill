@@ -137,6 +137,26 @@ person or host leaks:
    Force-push only your own branch. Never force-push `main` or another
    desk's branch.
 
+## The Validator gate
+
+The merge queue keeps a PR only after Validator passed its exact head
+(`validator_pass`, F110 and F111):
+
+- The verdict is a commit status with context `validator`.
+- Only a status posted by `si4ai-validator[bot]` (the si4ai-validator
+  GitHub App) counts. A `validator` status from anyone else, a person or a
+  token seat, is ignored: it neither passes nor blocks.
+- It is posted on the exact PR head sha. Any new push is a new head and
+  needs a fresh verdict.
+- PASS and PASS WITH WARN are `success`; FAIL is `failure`. The latest app
+  status on the head decides.
+- On `pull_request` the `validator_pass` check only reports, so it is
+  always green: the PR must stay enqueue-able while it waits. Its log line,
+  `::notice` annotation and job summary start `WAITING:` (no verdict yet,
+  or not success) or `REPORT:`; green there is not a PASS.
+- On `merge_group` it enforces, fail-closed: a missing, pending or failed
+  app verdict on any PR head in the entry takes the entry out of the queue.
+
 ## Moving an old branch that carries commits main already has
 
 If your branch was cut from an old `main` (or carries commits that are
