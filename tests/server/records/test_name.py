@@ -49,12 +49,12 @@ def cn():
     c.close()
 
 
-def test_n4_office_seed_never_rename_retire_reclaim(cn) -> None:
-    """N4: Office is id 1. Never renamed (#722), retired or reclaimed."""
+def test_n4_office_seed_rename_ok_never_retire_reclaim(cn) -> None:
+    """N4: Office is id 1. Host may rename. Never retire / reclaim."""
     assert rec_name.get(cn, "Office", "roster") == 1
-    with pytest.raises(Exception, match="cannot rename Office"):
-        rec_name.rename(cn, "Office", "East-Office", "roster")
-    assert rec_name.get(cn, "Office", "roster") == 1
+    rec_name.rename(cn, "Office", "East-Office", "roster")
+    assert rec_name.get(cn, "East-Office", "roster") == 1
+    rec_name.rename(cn, "East-Office", "Office", "roster")
     with pytest.raises(Exception, match="Office"):
         rec_name.retire(cn, "Office", "roster")
     with pytest.raises(Exception, match="live"):

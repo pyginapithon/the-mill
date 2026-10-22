@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Security: the reserved rosters Office (id 1) and Admin (id 2) keep their names (#722).
+"""Security: the reserved Admin roster (id 2) keeps its name (#722).
 
-mill_name_rename refused nothing for ids 1 and 2, while the Admin guards looked
-Admin up by name. A rename of id 2 (then naming another roster Admin) moved who
-the guards treated as Admin. Now SQL and the handler refuse renaming ids 1 and
-2, and is_role_admin / is_human_admin read roster id 2, never the name.
+mill_name_rename refused nothing for id 2, while the Admin guards looked Admin
+up by name. A rename of id 2 (then naming another roster Admin) moved who the
+guards treated as Admin. Now SQL and the handler refuse renaming id 2, and
+is_role_admin / is_human_admin read roster id 2, never the name. Office (id 1)
+may be renamed by an Admin: see test_sec_office_rename_722.py.
 """
 from __future__ import annotations
 
@@ -20,7 +21,6 @@ from tests.server.records.conftest import seed_names
 pytestmark = pytest.mark.sql
 
 ADMIN_SPELLINGS = ("Admin", "admin", " ADMIN ", "\u00c1dmin")
-OFFICE_SPELLINGS = ("Office", "office", "\u00d3ffice")
 HASH_ADMIN = "a7" * 32
 HASH_PLAIN = "b7" * 32
 
@@ -66,21 +66,12 @@ def test_sql_rename_admin_roster_refused(cn, book, spelling):
     assert _name_of(cn, ADMIN_ROSTER_ID) == "Admin"
 
 
-@pytest.mark.parametrize("spelling", OFFICE_SPELLINGS)
-def test_sql_rename_office_roster_refused(cn, book, spelling):
-    with pytest.raises(mysql.connector.Error) as ei:
-        rec_name.rename(cn, spelling, "r722-new", "roster")
-    assert "cannot rename Office" in str(ei.value)
-    assert _name_of(cn, 1) == "Office"
-
-
-@pytest.mark.parametrize("spelling", ADMIN_SPELLINGS + OFFICE_SPELLINGS)
-def test_handler_rename_reserved_roster_refused(cn, book, spelling):
+@pytest.mark.parametrize("spelling", ADMIN_SPELLINGS)
+def test_handler_rename_admin_roster_refused(cn, book, spelling):
     body = {"old": spelling, "new": "r722-new", "confirm": "r722-new", "yes": True, "name_type": "roster"}
     with pytest.raises(CoordError) as ei:
         admin_cat.rename(cn, "r722-admin", body)
-    assert "reserved roster" in str(ei.value)
-    assert _name_of(cn, 1) == "Office"
+    assert "reserved Admin roster" in str(ei.value)
     assert _name_of(cn, ADMIN_ROSTER_ID) == "Admin"
 
 
