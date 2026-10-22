@@ -173,3 +173,18 @@ def test_collapsed_rail_shows_roster_names():
     assert _value(400, _rail(False), "display") == "block"
     assert _value(400, _rail(True), "font-weight") == "700"
     assert _value(400, _rail(False), "font-size") == "10px"
+
+
+def test_long_roster_name_cannot_widen_the_collapsed_rail():
+    # A 64-char roster name once grew every rail row to about 316 px inside a 63 px rail.
+    row = _rail(False)[:-1]
+    name = _rail(False)
+    rail = [_el("body", "", "rail-narrow"), _el("aside", "rail")]
+    assert _value(400, rail, "grid-template-columns") == "minmax(0, 1fr)"
+    assert _value(400, row, "min-width") == "0"
+    assert _value(400, row, "max-width") == "100%"
+    assert _value(400, name, "min-width") == "0"
+    assert _value(400, name, "overflow") == "hidden"
+    assert _value(400, name, "text-overflow") == "ellipsis"
+    assert _value(400, name, "white-space") == "nowrap"
+    assert _value(400, name, "contain") == "inline-size"

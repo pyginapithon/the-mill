@@ -120,9 +120,15 @@
     }
     /* #716: the collapsed rail keeps each roster's name under its icon and count, so the
        picked roster can still be read at phone width. */
-    body.rail-narrow #rail .rail-book .rail-row[data-ico] { flex-wrap: wrap; row-gap: .12rem; }
+    /* A long name must not set the row's width: the row may shrink to the rail and the
+       name is cut with an ellipsis (full name in the row's title). */
+    body.rail-narrow #rail .rail-book .rail-row[data-ico] {
+      flex-wrap: wrap; row-gap: .12rem; min-width: 0; max-width: 100%;
+    }
     body.rail-narrow #rail .rail-book .rail-row[data-ico] .nm {
-      display: block; flex: 1 0 100%; order: 3; max-width: 100%;
+      display: block; flex: 0 1 100%; order: 3; min-width: 0; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      contain: inline-size; /* the name's length adds nothing to the rail's min width */
       font-size: 10px; letter-spacing: 0; line-height: 1.15; text-align: center; color: var(--dim);
     }
     body.rail-narrow #rail .rail-book .rail-row.on[data-ico] .nm { color: var(--ink); font-weight: 700; }
@@ -135,7 +141,7 @@
     #rail .rail-empty { color: var(--dim); font-size: 11px; padding: .15rem .35rem; }
     body.rail-narrow #rail {
       flex-basis: 4.6rem; padding: .35rem .2rem;
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(0, 1fr);
     }
     body.rail-narrow #rail .rail-lbl,
     body.rail-narrow #rail .rail-empty { display: none; }
