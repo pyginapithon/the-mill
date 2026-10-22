@@ -274,9 +274,12 @@ CREATE PROCEDURE mill_mail_update(
   IN p_body VARCHAR(4096)
 )
 BEGIN
+  -- #656: only the letter's sender or an Admin desk may rewrite it; anyone else
+  -- is refused and nothing changes.
   DECLARE v_ts DATETIME(6);
   DECLARE v_proj BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE v_sender BIGINT UNSIGNED;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
     ROLLBACK;
@@ -285,7 +288,19 @@ BEGIN
   START TRANSACTION;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
-  SELECT roster_id INTO v_proj FROM mail WHERE id = p_id;
+  SET v_sender = (SELECT desk_id FROM mail WHERE id = p_id);
+  SET v_proj = (SELECT roster_id FROM mail WHERE id = p_id);
+  IF v_sender IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'mail: no such letter';
+  END IF;
+  -- An unknown caller desk (NULL) is never the sender and never Admin.
+  IF IFNULL(v_desk, 0) <> v_sender
+     AND NOT EXISTS (SELECT 1 FROM member
+                      WHERE name_id = MILL_NAME_GET('roster', 'Admin')
+                        AND desk_id = IFNULL(v_desk, 0)) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'mail: only the sender or an Admin desk may change this letter';
+  END IF;
   UPDATE mail SET body = IFNULL(p_body, body) WHERE id = p_id;
   CALL mill_activity_put('mail', p_id, v_ts, v_desk, v_proj, MILL_WEIGHT('mail'), LENGTH(p_body));
   COMMIT;
@@ -299,8 +314,11 @@ CREATE PROCEDURE mill_mail_delete(
 BEGIN
   -- Soft-delete: off every tree plan (children move up), queued pushes dropped, letter
   -- deleted (mail_to cascades), activity.deleted stamped. No mill_activity_put; desk_id kept.
+  -- #656: only the sender or an Admin desk; anyone else is refused, the row stays.
   DECLARE v_ts DATETIME(6);
   DECLARE v_gone INT DEFAULT 0;
+  DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE v_sender BIGINT UNSIGNED;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
     ROLLBACK;
@@ -308,7 +326,17 @@ BEGIN
   END;
   START TRANSACTION;
   SET v_ts = MILL_NOW();
-  IF EXISTS (SELECT 1 FROM mail WHERE id = p_id) THEN
+  SET v_desk = IFNULL(MILL_NAME_GET('desk', p_desk), 0);
+  SET v_sender = (SELECT desk_id FROM mail WHERE id = p_id);
+  -- An unknown caller desk (0) is never the sender and never Admin.
+  IF v_sender IS NOT NULL AND v_desk <> v_sender
+     AND NOT EXISTS (SELECT 1 FROM member
+                      WHERE name_id = MILL_NAME_GET('roster', 'Admin')
+                        AND desk_id = v_desk) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'mail: only the sender or an Admin desk may change this letter';
+  END IF;
+  IF v_sender IS NOT NULL THEN
     CALL mill_tree_detach('mail', p_id);
   END IF;
   DELETE FROM push_queue
