@@ -2014,19 +2014,9 @@
         const el = document.getElementById(row[0]);
         if (!el) return;
         const key = row[1];
-        let ready = !!_stripReady[key];
-        if (!ready) {
-          let body = document.getElementById(row[2]);
-          if (key === "floor" && !body) body = document.getElementById("floor-view");
-          if (key === "todo" && (!body || !wallHasRealContent(body))) {
-            const alt = document.getElementById("jobs-list") || document.getElementById("jobs-outline");
-            if (alt) body = alt;
-          }
-          if (body && wallHasRealContent(body)) {
-            ready = true;
-            _stripReady[key] = true;
-          }
-        }
+        /* Ready only when this scope's payload carried the part (strip()). A painted
+           pane is no proof: it can still hold the previous roster's rows (#715). */
+        const ready = key === "score" ? !!_officeScoreSeen : !!_stripReady[key];
         if (ready) {
           el.classList.remove("kpi-loading");
           el.setAttribute("data-wall-strip-loading", "0");
@@ -2036,12 +2026,17 @@
           el.classList.add("kpi-loading");
           el.setAttribute("data-wall-strip-loading", "1");
           if (!el.querySelector(".kpi-load")) {
-            const b = el.querySelector("b");
+            const bNow = el.querySelector("b");
             const tmp = document.createElement("span");
             tmp.innerHTML = wallStripLoadHtml();
             const node = tmp.firstChild;
-            if (node) el.insertBefore(node, b || null);
+            if (node) el.insertBefore(node, bNow || null);
           }
+          /* Not loaded is not zero: drop the count and cue left from the last scope. */
+          const b = el.querySelector("b");
+          if (b) b.textContent = key === "mail" ? "\u2014" : "...";
+          const cue = el.querySelector(".kpi-cue");
+          if (cue) try { cue.remove(); } catch (eCue) {}
         }
       });
     }
@@ -3017,6 +3012,10 @@
       _railPickApplied = "";
       window._floorBook = null;
       window._floorRaw = null;
+      /* #715: progressive paints merge into window._floor; a new scope must not
+         inherit the last scope's rows and parts (the strip counted them). Panes
+         keep their DOM until the new paint lands. */
+      window._floor = null;
     }
     function bookIsProject(query) {
       return !!_floorBook && _floorBookKey === ("project:" + String(query || ""));
@@ -3916,9 +3915,10 @@
       packVer = (j && j.version) ? String(j.version) : "";
       paintWallClock();
     }).catch(function () {});
-    const _stripLast = { hereN: null, openN: null, scoreOff: null, mailUnreadN: null, waitingN: null, claimedN: null };
+    const _stripLast = { hereN: null, openN: null, scoreOff: null, mailUnreadN: null, waitingN: null, claimedN: null, sharedN: null };
     let _stripFillKey = "";
     let _stripFillTries = 0;
+    let _stripSharedKey = "";
     function wallResetStripReady() {
       _stripReady.session = false;
       _stripReady.floor = false;
@@ -3933,6 +3933,8 @@
       _stripLast.mailUnreadN = null;
       _stripLast.waitingN = null;
       _stripLast.claimedN = null;
+      _stripLast.sharedN = null;
+      _stripSharedKey = "";
     }
     function wallStripFillScope() {
       /* A station scope asks the lan procedure for todos, and that call 500s.
@@ -3943,12 +3945,30 @@
       } catch (eProj) {}
       return floorScope();
     }
+    function wallFillStripShared() {
+      /* COLLAB counts Between rows (/api/activity window=between), the same read as
+         its pane. Other tabs never carry them, so read them once per scope. */
+      let between;
+      try { between = activityBetweenQuery(); } catch (eQ) { return; }
+      if (!between || _stripSharedKey === between.key) return;
+      _stripSharedKey = between.key;
+      wallFetchFloorV1({ key: between.key, query: "" }, [{ path: between.url, kind: "between", absolute: true }]).then(function (res) {
+        const rows = res && !res.down && res.raw && res.raw.between;
+        if (!Array.isArray(rows)) { _stripSharedKey = ""; return; }
+        if (activityBetweenQuery().key !== between.key) return;
+        _stripLast.sharedN = (floorShared({ between: rows }) || {}).rows || 0;
+        _stripReady.floor = true;
+        strip(window._floor || {});
+      }).catch(function () { _stripSharedKey = ""; });
+    }
     function wallFillStripCounts() {
       /* Chips stay on the spinner until their part has been fetched. The open tab's
          poll stays narrow. One pass fills TODO and MAIL. SCORE is the Office book. */
       const need = [];
+      if (!_stripReady.session) need.push("agents");
       if (!_stripReady.todo) need.push("todos");
       if (!_stripReady.mail) need.push("mail");
+      if (!_stripReady.floor) wallFillStripShared();
       if (!need.length || _stripFillTries >= 2) return;
       let scope;
       try { scope = wallStripFillScope(); } catch (eScope) { return; }
@@ -3965,7 +3985,7 @@
         } catch (eFill) {}
       }).then(function (res) {
         if (!res || res.down) _stripFillKey = "";
-        else if (!_stripReady.todo || !_stripReady.mail) _stripFillKey = "";
+        else if (!_stripReady.session || !_stripReady.todo || !_stripReady.mail) _stripFillKey = "";
       }).catch(function () { _stripFillKey = ""; });
     }
     function strip(d) {
@@ -3979,22 +3999,15 @@
       const hasTodos = parts.indexOf("todos") >= 0 || (Array.isArray(d.needs) && d.needs.length > 0) || (Array.isArray(d.issues) && d.issues.length > 0);
       const hasScores = parts.indexOf("scores") >= 0 || (Array.isArray(d.kpis) && d.kpis.length > 0);
       const hasMail = parts.indexOf("mail") >= 0 || (Array.isArray(d.mailbox) && d.mailbox.length > 0);
-      if (hasAgents) { _stripReady.session = true; _stripReady.floor = true; }
+      /* #715: a chip is known only once this scope's payload carried its part
+         (resetFloorBook clears all of it on a rail switch). Until then it shows
+         the loading mark, never a 0 counted from rows that were not read. */
+      if (hasAgents) _stripReady.session = true;
       if (hasTodos) _stripReady.todo = true;
       if (hasScores) _stripReady.score = true;
       if (hasMail) _stripReady.mail = true;
-      try {
-        const hereEl = document.getElementById("here");
-        if (hereEl && wallHasRealContent(hereEl)) _stripReady.session = true;
-        const floorEl = document.getElementById("floor-map") || document.getElementById("floor-view");
-        if (floorEl && wallHasRealContent(floorEl)) _stripReady.floor = true;
-        const todoEl = document.getElementById("parked") || document.getElementById("jobs-list") || document.getElementById("jobs-outline");
-        if (todoEl && wallHasRealContent(todoEl)) _stripReady.todo = true;
-        const scoreEl = document.getElementById("score-desk-table");
-        if (scoreEl && wallHasRealContent(scoreEl)) _stripReady.score = true;
-        const mailEl = document.getElementById("mail");
-        if (mailEl && wallHasRealContent(mailEl)) _stripReady.mail = true;
-      } catch (eReady) {}
+      const hasShared = Array.isArray(d.between);
+      if (hasShared) _stripReady.floor = true;
       const live = uniqueDesksByOwner((d.agents || []).filter(a => a.alive));
       let hereN = live.length;
       if (!hasAgents && _stripLast.hereN != null) hereN = _stripLast.hereN;
@@ -4064,7 +4077,12 @@
       else if (_stripLast.scoreOff != null) scoreOff = _stripLast.scoreOff;
       const sessCue = waitingN ? (waitingN + " waiting") : "all working";
       let sharedN = 0;
-      try { sharedN = (floorShared(d) || {}).rows || 0; } catch (eSharedN) {}
+      if (hasShared) {
+        try { sharedN = (floorShared(d) || {}).rows || 0; } catch (eSharedN) {}
+        _stripLast.sharedN = sharedN;
+      } else if (_stripLast.sharedN != null) {
+        sharedN = _stripLast.sharedN;
+      }
       const floorCue = "shared";
       const todoCue = claimedN ? (claimedN + " moving") : "none moving";
       const scoreCue = scoreOff ? "off target" : "on target";
@@ -4730,6 +4748,25 @@
       if (noun) return noun;
       return n;
     }
+    /* #717: a plan row's face. Most plans carry only a 10-hex name, so the head was
+       "unnamed plan" on every row. With no plan name the root card's title is the head and
+       the line under it says the root's status and who has it; a named plan keeps its name
+       as the head and the root title as the line. */
+    function millPlanRowFace(label, rootPayload, root) {
+      const p = rootPayload || {};
+      const title = String(p.title || "").replace(/\s+/g, " ").trim();
+      const name = String(label || "").trim();
+      if (name) return { head: name, line: title, full: name };
+      if (title) {
+        const bits = [String(p.status || "").trim(), String(p.who || "").trim()].filter(Boolean);
+        /* The plans column is narrow: keep the head to about two lines. */
+        const head = title.length > 64 ? (title.slice(0, 63).replace(/\s+\S*$/, "") + "\u2026") : title;
+        return { head: head, line: bits.join(" | "), full: title };
+      }
+      const id = root && root.id != null && String(root.id) !== "" ? String(root.id) : "";
+      const head = id ? ("card " + id) : "plan";
+      return { head: head, line: String(p.status || "").trim(), full: head };
+    }
     /* #33: one nested-set pass per nodes array. Parent map + depth memo (a parent's
        depth is set before its kids in lft order), O(n log n) once, O(1) per lookup.
        Overlap, ties, inverted rows, or a repeated row mark the index bad and callers
@@ -5152,7 +5189,7 @@
         if (!todos.length) return;
         if (q && !todos.some(n => todoTreeMatch(d, n, q))) return;
         const planId = String((t && (t.name || t.id)) || ("t" + ti));
-        forests.push({ planId: planId, label: millTreePlanLabel(t) || "unnamed plan", todos: todos });
+        forests.push({ planId: planId, label: millTreePlanLabel(t), todos: todos });
       });
       let hitN = 0;
       if (q) forests.forEach(f => { f.todos.forEach(n => { if (todoTreeMatch(d, n, q)) hitN += 1; }); });
@@ -5185,12 +5222,12 @@
       const roots = forest ? millTodoRootsOf(forest.todos).filter(n => todoTreeOnSpine(forest.todos, n, d, q)) : [];
       const forestRows = forests.map(f => {
         const root = millTodoRootsOf(f.todos)[0];
-        const line = root ? millTreePayload(d, root).title : "";
+        const face = millPlanRowFace(f.label, root ? millTreePayload(d, root) : null, root);
         const on = forest && f.planId === forest.planId ? " on" : "";
         return { key: f.planId, html: `<button type="button" class="todo-tree-row${on}" data-plan="${esc(f.planId)}">` +
-          `<b>${esc(f.label)}</b>` +
+          `<b title="${esc(face.full)}">${esc(face.head)}</b>` +
           `<span class="todo-tree-n">${f.todos.length}</span>` +
-          `<span class="todo-tree-line">${esc(line)}</span>` +
+          `<span class="todo-tree-line">${esc(face.line)}</span>` +
           `</button>` };
       });
       const forestHtml = forestRows.map(r => r.html).join("");
