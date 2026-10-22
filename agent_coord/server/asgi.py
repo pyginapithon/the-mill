@@ -28,6 +28,15 @@ _SAMPLE_CAP = 200
 _n = 0
 _ms_max = 0.0
 
+# The most body bytes one HTTP request may carry (#747). The largest real
+# request is a todo or a letter: one text field of at most 4096 characters
+# (MAIL_BODY_MAX, todo BODY_MAX) plus short fields. The client sends JSON
+# with ASCII escapes, so a character outside the BMP costs 12 bytes and a
+# 4096-character field at most about 48 KiB. 256 KiB keeps several such fields
+# and a long mark id list under the cap, and stops a client that would stream
+# megabytes into memory before the door or the seat is checked.
+BODY_MAX_BYTES = 256 * 1024
+
 
 def hold_envelope_ok(verb: str, result: Any) -> bool:
     """Top-level ok matches a refused hold or a refused drop (#207, #227)."""
@@ -358,6 +367,45 @@ def make_asgi_app(
                 media_type="application/json; charset=utf-8",
             )
 
+    def _body_refusal(code: int, text: str) -> Response:
+        from agent_coord.server.mill_json import dumps_mill_bytes
+
+        return Response(
+            content=dumps_mill_bytes({"error": text}),
+            status_code=code,
+            media_type="application/json; charset=utf-8",
+            headers={"Connection": "close"},
+        )
+
+    async def _read_body_capped(request: Request) -> bytes | Response:
+        """The request body, or a 413/400 refusal; never more than BODY_MAX_BYTES (#747).
+
+        A declared Content-Length over the cap is refused before one byte is
+        read. Any body, declared or chunked, is read through the stream with a
+        running count, so a wrong header cannot get more than the cap past it.
+        """
+        cap = BODY_MAX_BYTES
+        too_big = "request body too large: the most is %d bytes (413)" % cap
+        declared = request.headers.get("content-length")
+        if declared is not None:
+            d = declared.strip()
+            if not d.isdigit():
+                return _body_refusal(400, "bad Content-Length")
+            if int(d) > cap:
+                return _body_refusal(413, too_big)
+        parts: list[bytes] = []
+        got = 0
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            got += len(chunk)
+            if got > cap:
+                return _body_refusal(413, too_big)
+            parts.append(chunk)
+        body = b"".join(parts)
+        request._body = body  # later readers see the same bytes
+        return body
+
     async def _dispatch_inner(request: Request, t0: float) -> Response:
         path = request.url.path
         from .allow import allowed, client_ip, door_client, is_mill_verb
@@ -383,7 +431,9 @@ def make_asgi_app(
                     status_code=403,
                     media_type="text/plain; charset=utf-8",
                 )
-        body = await request.body()
+        body = await _read_body_capped(request)
+        if isinstance(body, Response):
+            return body
         if request.url.query:
             path = path + "?" + request.url.query
         handler = Handler.__new__(Handler)
