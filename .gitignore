@@ -9,6 +9,7 @@ build/
 .pytest-tmp-*/
 .pytest-basetemp/
 pack-deps.txt
+pack-floors.txt
 *.prev
 *.tmp.*
 tmp/
