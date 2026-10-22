@@ -1290,7 +1290,18 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                 _add_dest(bare, None)
 
     if not dest_set:
-        raise CoordError("reply: no destinations after the reply-all default")
+        # A letter needs a reader other than its sender (no self-To). Name the
+        # forms that work instead of the reply-all default (letters 2199/2200).
+        if isinstance(raw_tos, list) and raw_tos:
+            raise CoordError(
+                "reply: --to-desk names only you, and a reply never goes to its sender; "
+                f"post to the room with mill reply {mail_id} --body-file PATH (reply-all), "
+                "name another desk with --to-desk DESK, or keep a private line with mill note on a card"
+            )
+        raise CoordError(
+            f"reply: you are the only desk on it, so reply-all reaches no one; "
+            f"name a desk with mill reply {mail_id} --to-desk DESK --body-file PATH"
+        )
 
     # If parent is not on a TREE, open a room: parent becomes root, reply nests under it.
     if not rec_tree.on_tree(c._cn, "mail", mail_id):
