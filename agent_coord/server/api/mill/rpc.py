@@ -1949,16 +1949,26 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     elif step == "done":
         if st != "shipped":
             raise CoordError(f"pass --done: {need} is {st}, not shipped; nothing changed")
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass shipped->done is the asker")
+        # #655: an asker that does not resolve is not a pass for everyone;
+        # only the volunteer may still finish the card.
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass shipped->done is the asker"
+                if ask
+                else "who-may: pass shipped->done is the asker; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "done"
     else:
         if st not in ("shipped", "done"):
             raise CoordError(
                 f"pass --back: {need} is {st}; only shipped or done steps back (unclaim releases a claim)"
             )
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass --back is the asker or the volunteer")
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass --back is the asker or the volunteer"
+                if ask
+                else "who-may: pass --back is the asker or the volunteer; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "shipped" if st == "done" else ("claimed" if vol else "open")
     rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=nxt)
     rec = {"ok": True, "need": need, "status": nxt, "was": st, "id": int(hit["id"])}
@@ -2295,13 +2305,21 @@ def _poke_tree(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None
         pass
 
 
+def _tree_id(c: Book, typ: str, raw: Any, ref: Any, verb: str) -> int:
+    """A tree verb's id, or its todo named ROSTER/NEED resolved to the id (#706, as #274)."""
+    nid = int(raw or 0)
+    if not nid and ref:
+        nid = _card_ref_id(c._cn, {"ref": ref, "type": typ}, verb)
+    return nid
+
+
 def _h_attach(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import tree as rec_tree
 
     parent_t = str(body.get("type_a") or body.get("parent_type") or "")
-    parent_id = int(body.get("id_a") or body.get("parent_id") or 0)
+    parent_id = _tree_id(c, parent_t, body.get("id_a") or body.get("parent_id"), body.get("ref_a"), "attach")
     child_t = str(body.get("type_b") or body.get("type") or "")
-    child_id = int(body.get("id_b") or body.get("id") or 0)
+    child_id = _tree_id(c, child_t, body.get("id_b") or body.get("id"), body.get("ref_b"), "attach")
     tree = str(body.get("tree") or "")
     rows = rec_tree.add(c._cn, parent_t, parent_id, child_t, child_id, tree=tree)
     _poke_tree(c, child_t, child_id, owner=owner)
@@ -2339,9 +2357,9 @@ def _h_move(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     from agent_coord.server.records import tree as rec_tree
 
     child_t = str(body.get("type") or body.get("type_b") or "")
-    child_id = int(body.get("id") or body.get("id_b") or 0)
+    child_id = _tree_id(c, child_t, body.get("id") or body.get("id_b"), body.get("ref"), "move")
     parent_t = str(body.get("parent_type") or body.get("type_a") or "")
-    parent_id = int(body.get("parent_id") or body.get("id_a") or 0)
+    parent_id = _tree_id(c, parent_t, body.get("parent_id") or body.get("id_a"), body.get("parent_ref"), "move")
     tree = str(body.get("tree") or "").strip()
     if not tree:
         plans = rec_tree.plan_names(c._cn, child_t, child_id)
@@ -2364,7 +2382,7 @@ def _h_prune(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     from agent_coord.server.records import tree as rec_tree
 
     typ = str(body.get("type") or body.get("type_b") or "")
-    nid = int(body.get("id") or body.get("id_b") or 0)
+    nid = _tree_id(c, typ, body.get("id") or body.get("id_b"), body.get("ref"), "prune")
     tree = str(body.get("tree") or "")
     rows = rec_tree.prune(c._cn, typ, nid, tree=tree)
     _poke_tree(c, typ, nid, owner=owner)
@@ -2375,7 +2393,7 @@ def _h_detach(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     from agent_coord.server.records import tree as rec_tree
 
     typ = str(body.get("type") or body.get("type_b") or "")
-    nid = int(body.get("id") or body.get("id_b") or 0)
+    nid = _tree_id(c, typ, body.get("id") or body.get("id_b"), body.get("ref"), "detach")
     tree = str(body.get("tree") or "")
     rows = rec_tree.remove(c._cn, typ, nid, tree=tree)
     _poke_tree(c, typ, nid, owner=owner)

@@ -71,7 +71,7 @@ Certificate: after `mill install`, this machine should open `https://127.0.0.1/`
 
 ## Doors
 
-[JOIN.md](../JOIN.md) teaches one agent door: the seat welcome link. An Admin desk mints it with `mill invite --seat <desk> [--project <project>]` (default: that desk's one project membership); the link lands in an owner-only file named by `link_file` in the reply, to hand over privately. The desk runs:
+[JOIN.md](../JOIN.md) teaches one agent door: the seat welcome link. An Admin desk mints it with `mill invite --seat <desk> [--roster <roster>]` (default: that desk's one non-Office roster); the link lands in an owner-only file named by `link_file` in the reply, to hand over privately. The desk runs:
 
 ```
 mill join --link-file LINKFILE

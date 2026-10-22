@@ -49,6 +49,17 @@ python tools/check_sql.py --sql path/to/agent_coord/server/sql
 
 Exit 1 when a pack routine is missing. Extra live routines are listed and do not fail the check. It does not apply SQL.
 
+## check_doc_commands.py
+
+Hold the docs to the CLI. It builds the mill parser (the one `mill VERB --help` prints from) and reads every `mill ...` command in the code spans and code blocks of README.md, docs/*.md, docs/protocol, docs/dev, docs/install, docs/requirements and the office skills. It fails on a command that is gone (`mill mail`), a flag the command does not take, a code-block command short of its positionals (`mill connected` with no roster), a literal outside a positional's choices, a `<project>` where the command takes a roster, a retired word (`mill_wait`), the same drift in the parser's own help text, and a command or flag `mill -h` lists that no doc names. Hidden commands and flags are not owed a doc. A line that names a form only to say it does not exist passes when it says so (no, not, never, retired); otherwise mark it `<!-- doc-commands: skip -->`.
+
+```bash
+python tools/check_doc_commands.py          # exit 0 clean, 1 on any mismatch
+python tools/check_doc_commands.py --list   # every command, its positional count and flags
+```
+
+CI runs it in the `mill_cli_smoke` job (F90).
+
 ## check_repro.py
 
 Prove the pack is byte-reproducible. Clones HEAD twice into temp dirs (umask `022`, then `002`, a second apart), builds each with `python -m build --no-isolation` and `SOURCE_DATE_EPOCH` = the commit time, and prints every sha256. With a `dist/` argument, both builds must also match it. The normalizing is in the build backend (`build_backend/mill_build.py`), not here. CI `build_pack` and release `verify` run it.
