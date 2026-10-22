@@ -62,7 +62,7 @@ Cold-read SKILL + dry-run stub with sample MAIL/TODO/PING JSON (no live mill con
 ## 2026-10-20 - mill todo #353
 
 - Deleted `REMEASURE-PATCH-1.md`, `LOOP-2-mill-route.md`, and `MILL-DESK-DO-LINE.md`. They still said `mill route` was blocked or not packaged. The command ships.
-- `--owner` is not on `mill route` or `mill connect`. The desk is the sitting connect. Desk commands run in that same parent shell: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB'`.
+- `--owner` is not on `mill route` or `mill connect`. The desk is the sitting connect. Desk commands run in that same parent shell: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill COMMAND'`.
 - Tag commands are `mill label` and `mill unlabel`.
 - A letter frame is `{kind: mail}` (no `type` or `hint`). Its route key is `mail:MAIL`. The lib follows `route_chain.route_key` (PR #31).
 - Vendor-poke fallback, in `spawn.md`: `AGENT_COORD_SPAWN`, then `<desk>.spawn` (`type:hint`, then `*`), then config `spawn`, then `bot_wake_cmd`. A letter does not match `mail:MAIL` on that map.
