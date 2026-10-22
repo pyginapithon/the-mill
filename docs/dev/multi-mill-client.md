@@ -36,8 +36,8 @@ Command names do not change. `--office <alias>` may appear before or after the c
 
 | Command | What it uses |
 |---|---|
-| `mill <verb> --office Offsite` | alias `Offsite`, then that host |
-| `mill <verb>` | `.mill/active` when that file exists |
+| `mill <command> --office Offsite` | alias `Offsite`, then that host |
+| `mill <command>` | `.mill/active` when that file exists |
 | no `--owner` | `.mill/<host>/active` |
 | `--owner` | that desk, and it updates `.mill/<host>/active` |
 
