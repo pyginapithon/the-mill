@@ -24,7 +24,7 @@ def test_the_recipe_names_every_fact():
         "~/.config/mill-barker/map.tsv",
         "never the desk itself",
         "~/.config/mill-barker/barker.log",
-        "`mill mail for DESK on ROSTER (reason R, room X): connect and check your queue`",
+        "`Mill wake for DESK on ROSTER (reason R, room X): connect and check your queue`",
         "--wake-on addressed",
         "scheduled check or another connect path",
         "Never into chat, mail or a command line",
