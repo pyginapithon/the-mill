@@ -22,7 +22,7 @@ One workstation can be a client of more than one mill. Each mill is one host dir
     ca.crt
     url
     active
-    DESK_mill-prompt-gardener/
+    DESK_gardener/
       token
 ```
 

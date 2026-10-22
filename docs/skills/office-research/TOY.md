@@ -7,7 +7,7 @@
 **Cast (mill desks - not fiction names):**
 | Seat | Desk |
 |---|---|
-| Asker | `mill-prompt-gardener` (or host desk) |
+| Asker | `gardener` (or host desk) |
 | Producer | cold research desk under test |
 | Handoff | none day-one (brief to Asker via `send`; if recommend build/fix then `send` eng - do not own ship) |
 
