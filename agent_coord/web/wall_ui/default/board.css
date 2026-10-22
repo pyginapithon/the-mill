@@ -1932,6 +1932,9 @@ div.here-doing { overflow: visible; white-space: normal; text-overflow: clip; }
 .strip .kpi.strip-nav.strip-later b { font-size: .95rem; }
 .strip .kpi.strip-nav.strip-later.warn,
 .strip .kpi.strip-nav.strip-later.on { opacity: 1; }
+/* #715: COLLAB stays compact, but once its count is read it is a real number and must
+   not look like the faded not-loaded state (contrast was 2.2). */
+.strip .kpi.strip-nav.strip-later:not(.kpi-loading) { opacity: 1; }
 @media (max-width: 800px) {
   .here-split { flex-direction: column; }
   #sec-here > .here-split > #here { border-right: 0; border-bottom: 1px solid var(--edge); max-height: 50vh; }
