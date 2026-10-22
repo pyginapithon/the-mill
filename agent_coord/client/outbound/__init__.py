@@ -412,6 +412,9 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["done"] = True
     if verb == "todo" and bool(getattr(args, "fixtures", False)):
         body["fixtures"] = True
+    if verb == "todo" and bool(getattr(args, "mine", False)):
+        # #667: the wall sends only this desk's cards; focus.order_mine still ranks them.
+        body["mine"] = True
     if bool(getattr(args, "dead", False)):
         body["dead"] = True
     if verb == "score" and bool(getattr(args, "retire_score", False)):

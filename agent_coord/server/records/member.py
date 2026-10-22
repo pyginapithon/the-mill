@@ -37,5 +37,15 @@ def select(cn, group: str = "", desk: str = "", kind: str = "") -> list[dict]:
     return call(cn, "mill_member_select", [k, slot, d])
 
 
+def put_admin(cn, desk: str) -> list[dict]:
+    """Office host only (#675): the caller has checked the wall-set host flag."""
+    return call(cn, "mill_member_admin_put", [(desk or "").strip()])
+
+
+def delete_admin(cn, desk: str) -> list[dict]:
+    """Office host only (#675): the caller has checked host and Admin."""
+    return call(cn, "mill_member_admin_delete", [(desk or "").strip()])
+
+
 def put_office(cn, desk: str) -> list[dict]:
     return put(cn, CONST_OFFICE, desk)
