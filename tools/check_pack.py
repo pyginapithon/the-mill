@@ -410,6 +410,10 @@ NAME_TOKEN_REVIEWED = frozenset(
 # The first word of a line, after an optional bullet, list number or card
 # number ("- ", "1. ", "2) ", "#338 "). Sentence case puts a capital there.
 _LINE_START_RE = re.compile(r"^[ \t]*(?:(?:[-*+>]|\d+[.)]|#\d+:?)[ \t]+)*([A-Z][a-z]{2,20})\b", re.MULTILINE)
+# The first word of a sentence inside a line: after ".", "!" or "?" (and an
+# optional closing quote or bracket) and a space. Sentence case puts a capital
+# there too, mid-line (#724: "... under 2 KB. Live 0.7.14, ...").
+_SENTENCE_START_RE = re.compile(r"(?<=[.!?])[\"')\]]*[ \t]+([A-Z][a-z]{2,20})\b")
 _WORDS_FILE = Path(__file__).resolve().parent / "hygiene_words.txt"
 _LOWER_WORD_RE = re.compile(r"\b[a-z]{3,21}\b")
 
@@ -446,11 +450,19 @@ def text_has_personal_name_token(text: str, vocab: set[str] | frozenset[str] = f
 
     The first word of a line (after a bullet, list number or card number) also
     passes when its lower-case form is in vocab, the ordinary words of the tree
-    (#338). Mid-line tokens keep the allow-list rule only.
+    (#338). So does the first word of a sentence inside a line, after ". ",
+    "! " or "? " (#724). Any other mid-line token keeps the allow-list rule
+    only, and a token whose lower-case form is not an ordinary word fails at
+    any position.
     """
     if not text:
         return False
-    starts = {m.start(1) for m in _LINE_START_RE.finditer(text) if m.group(1).casefold() in vocab}
+    starts = {
+        m.start(1)
+        for rx in (_LINE_START_RE, _SENTENCE_START_RE)
+        for m in rx.finditer(text)
+        if m.group(1).casefold() in vocab
+    }
     for match in _NAME_TOKEN_RE.finditer(text):
         if match.start() in starts:
             continue
