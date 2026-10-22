@@ -60,6 +60,7 @@ def test_drift_fails(text, kind):
         "There is no `mill use`.",
         "HINT poke (not mill_wait).",
         "mill leftover verb: retired.",
+        "`mill install cloud --ssh <user>@<host>` (planned, not in this pack)",
         "```mermaid\nflowchart TD\n  X[no connect: mill holds data]\n  P[mill pass]\n```",
         "Join with `mill join --link-file LINKFILE`; then `mill connect <desk>`.",
         "<!-- doc-verbs: skip -->\n`mill mail 12`",

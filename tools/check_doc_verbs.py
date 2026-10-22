@@ -47,6 +47,7 @@ DOC_GLOBS = (
     "docs/protocol/hint-handler/*.md",
     "docs/dev/*.md",
     "docs/install/*.md",
+    "docs/install/cloud/*.md",
     "docs/requirements/*.md",
     "docs/skills/*/SKILL.md",
 )
@@ -204,10 +205,10 @@ def code_pieces(text: str):
         if skip_here:
             continue
         if fence:
-            yield n, line, "prose" if lang == "mermaid" else "block", ""
+            yield n, line, "prose" if lang == "mermaid" else "block", "", ""
             continue
         for span in re.finditer(r"(`+)(.+?)\1", line):
-            yield n, span.group(2), "span", line[: span.start()]
+            yield n, span.group(2), "span", line[: span.start()], line[span.end() :]
 
 
 def tokens_after(piece: str, start: int, prose: bool) -> list:
@@ -236,12 +237,13 @@ def tokens_after(piece: str, start: int, prose: bool) -> list:
 
 
 def _negated(piece: str, start: int, end: int) -> bool:
-    """`no mill sync verb`, `do not run mill install`, `mill leftover: retired`."""
+    """`no mill sync verb`, `do not run mill install`, `mill leftover: retired`,
+    `mill install cloud --ssh` (planned): the line says the form is not a shipped one."""
     before = piece[max(0, start - 24) : start].lower()
     after = piece[end : end + 48].lower()
     return bool(
         re.search(r"\b(no|not|never|without)\b[^.;]*$", before)
-        or re.search(r"^[^.;]*\b(retired|removed|is gone|was dropped)\b", after)
+        or re.search(r"^[^.;]{0,24}\b(retired|removed|is gone|was dropped|planned|not in this pack)\b", after)
     )
 
 
@@ -321,12 +323,16 @@ BLOCK_AT = re.compile(r"(?:^\s*(?:\$\s+|>\s+)?|(?:;|&&?|\|\|?|\(|\$\(|'|\bthen|\
 
 
 def check_text(text: str, verbs: dict, where: str, prose: bool = False):
-    pieces = ((0, text, "prose", ""),) if prose else code_pieces(text)
-    for n, piece, mode, before in pieces:
+    pieces = ((0, text, "prose", "", ""),) if prose else code_pieces(text)
+    for n, piece, mode, before, after in pieces:
         loc = f"{where}:{n}" if n else where
         finder = BLOCK_AT if mode == "block" else MILL_AT
         for m in finder.finditer(piece):
-            if _negated(before + piece, len(before) + m.start(), len(before) + m.end() + 24):
+            stop = piece.find("`", m.end())
+            stop = len(piece) if stop < 0 else stop
+            if mode == "prose":
+                stop = m.end() + 24
+            if _negated(before + piece + after, len(before) + m.start(), len(before) + stop):
                 continue
             yield from check_command(piece, m.end(), verbs, mode, loc)
 
