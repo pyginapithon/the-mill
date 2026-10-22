@@ -61,6 +61,9 @@ jobs:
         run: python tools/check_pack.py dist
       - run: python tools/precommit_hygiene.py tree
       - run: python -m twine check --strict dist/*
+      # F78: rebuild the tagged commit twice; PyPI gets these bytes only if
+      # both rebuilds match dist/ (ci.txt pins the same build tools as build.txt).
+      - run: python tools/check_repro.py dist
 
   publish_pypi:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
