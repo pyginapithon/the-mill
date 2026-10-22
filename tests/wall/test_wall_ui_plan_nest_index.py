@@ -11,6 +11,7 @@ from pathlib import Path
 from agent_coord.web.wall_logic.packs import wall_ui_root
 
 BOOT = wall_ui_root() / "default" / "boot.js"
+TODO_PAINT = wall_ui_root() / "default" / "todo" / "todo-paint.js"
 
 SCRIPT = r"""
 const fs = require('fs');
@@ -109,7 +110,10 @@ def _run() -> dict:
         raise AssertionError("Node.js is not on PATH, so the plan nest index cannot run.")
     src = BOOT.read_text(encoding="utf-8")
     start = src.index("function millTreeHexName(")
-    end = src.index("    function paintPlan(d) {")
+    end = src.index("    function hereKpiName(")
+    # #710: the plan tree helpers boot.js keeps, then the split TODO paint file
+    src = src[:end] + "\n" + TODO_PAINT.read_text(encoding="utf-8")
+    end = len(src)
     with tempfile.TemporaryDirectory() as folder:
         tmp = Path(folder)
         js = tmp / "nest.js"
@@ -130,7 +134,7 @@ def test_nest_index_matches_old_scans_and_is_linear():
 
 
 def test_plan_chart_reuses_rows():
-    src = BOOT.read_text(encoding="utf-8")
+    src = BOOT.read_text(encoding="utf-8") + TODO_PAINT.read_text(encoding="utf-8")
     assert "function millNestBuild(" in src
     assert "function todoPertSync(" in src
     assert "wallKeyedSync(forestBox, forestRows);" in src
