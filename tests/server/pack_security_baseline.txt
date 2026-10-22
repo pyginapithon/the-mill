@@ -8,5 +8,5 @@ agent_coord/server/sql/sp_opened.sql|unbounded-read|SELECT 'mail' AS type, t.id,
 agent_coord/server/sql/sp_score.sql|unbounded-read|SELECT s.type, s.id, s.created, s.updated, s.desk_id, s.roster_id, s.kpi,
 agent_coord/server/sql/sp_todo.sql|unbounded-read|SELECT t.type, t.id, t.created, t.updated, t.updated_id, t.roster_id, t.creator_id,
 agent_coord/server/sql/sp_tree.sql|unbounded-read|SELECT t.name_id, t.type, t.id, t.lft, t.rgt, n.name AS tree, n.type AS tree_type
-agent_coord/web/wall_ui/default/boot.js|wall-html|tlEl.innerHTML = note + '<div class="idle">No activity in the last 15 minutes.</div>';
-agent_coord/web/wall_ui/default/boot.js|wall-html|tlEl.innerHTML = note + `<div class="idle">${empty}</div>`;
+agent_coord/web/wall_ui/default/floor/floor-paint.js|wall-html|tlEl.innerHTML = note + '<div class="idle">No activity in the last 15 minutes.</div>';
+agent_coord/web/wall_ui/default/floor/floor-paint.js|wall-html|tlEl.innerHTML = note + `<div class="idle">${empty}</div>`;
