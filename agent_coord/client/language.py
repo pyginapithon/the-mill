@@ -71,6 +71,15 @@ def _desks(raw: str) -> list[str]:
     return [d.strip() for d in str(raw or "").split(",") if d.strip()]
 
 
+# #706: (type arg, id arg, ref body key) per tree verb; a ROSTER/NEED id rides as the ref key.
+_TREE_IDS: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "attach": (("type_a", "id_a", "ref_a"), ("type_b", "id_b", "ref_b")),
+    "move": (("type", "id", "ref"), ("parent_type", "parent_id", "parent_ref")),
+    "prune": (("type", "id", "ref"),),
+    "detach": (("type", "id", "ref"),),
+}
+
+
 def card_ref(raw: str, typ: str, verb: str) -> int | str:
     """An activity id (a number above 0), a todo as ROSTER/NEED (#274), or a hold by name (#327).
 
@@ -151,6 +160,21 @@ def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
         else:
             args.id = ref
         args.cmd = "label-add" if cmd == "label" else "label-remove"
+        return args
+
+    if cmd in _TREE_IDS:
+        # #706: a todo goes by ROSTER/NEED here too, as in label and watch; the wall resolves it.
+        for typ_key, id_key, ref_key in _TREE_IDS[cmd]:
+            raw = getattr(args, id_key, None)
+            if raw is None or str(raw).strip() == "":
+                continue
+            typ = str(getattr(args, typ_key, "") or "").strip().lower()
+            ref = card_ref(raw, typ, cmd)
+            if isinstance(ref, str):
+                setattr(args, ref_key, ref)
+                setattr(args, id_key, None)
+            else:
+                setattr(args, id_key, ref)
         return args
 
     if cmd == "connected":

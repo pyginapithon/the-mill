@@ -31,6 +31,14 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
+  -- #674: the reserved Admin roster (id 2) is granted only by member-add on the
+  -- office host. Never by join, as the project or the role, in any spelling the
+  -- name collation resolves to it. Refuse before any write.
+  IF MILL_NAME_GET('roster', p_project) = 2
+     OR (IFNULL(p_role, '') <> '' AND (LOWER(p_role) = 'admin' OR MILL_NAME_GET('roster', p_role) = 2)) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT = 'Admin is not granted by join: roster Admin is granted only by member-add on the office host';
+  END IF;
   START TRANSACTION;
   SET v_ts = MILL_NOW();
   SET v_proj = MILL_NAME_PUT('roster', p_project);
@@ -58,7 +66,7 @@ BEGIN
   IF ROW_COUNT() = 1 THEN
     UPDATE name SET n = n + 1 WHERE id = 1;
   END IF;
-  IF v_proj IS NOT NULL AND v_proj <> 1 THEN
+  IF v_proj IS NOT NULL AND v_proj <> 1 AND v_proj <> 2 THEN
     INSERT IGNORE INTO member (name_id, desk_id) VALUES (v_proj, v_desk);
     IF ROW_COUNT() = 1 THEN
       UPDATE name SET n = n + 1 WHERE id = v_proj;

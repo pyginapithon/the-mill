@@ -91,7 +91,8 @@ def test_outsider_mail_names_the_room_and_the_join(cn) -> None:
         rpc._h_trail(book, {"node": f"mail:{fid}"}, "unit", "outsider")
     msg = str(ei.value)
     assert "not a participant" in msg
-    assert f"mill reply {rid}" in msg
+    assert f"mill reply {rid} --body-file PATH to join" in msg
+    assert "<body>" not in msg
     assert "mill add" in msg
     assert "sender or recipient" not in msg
 

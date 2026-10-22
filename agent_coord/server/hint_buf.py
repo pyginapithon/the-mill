@@ -173,7 +173,10 @@ def _drain_one(buf: HintBuf, frame: dict[str, Any], hint: str, t0: float, replay
         with bind_exit(buf.push_exit):
             kind = dispatch_hint(buf.desk, frame, replay=replay)
         if kind == "skip":
-            print({"watch": "skip", "desk": buf.desk, "route": frame.get("route")}, flush=True)
+            if not replay:
+                # #670: a live skip answers the HINT line just printed. A replay is
+                # not reprinted (#618), so its skip has nothing to answer; the log keeps it.
+                print({"watch": "skip", "desk": buf.desk, "route": frame.get("route")}, flush=True)
             ms = (time.perf_counter() - t0) * 1000.0
             _bc_log(
                 f"hint drain desk={buf.desk} hint={hint} id={frame.get('id')} ok={ok} watch=skip q={buf.q.qsize()}"
