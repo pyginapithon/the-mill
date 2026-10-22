@@ -1,4 +1,4 @@
-"""#635: doing stays as the desk wrote it; a read verb bumps the seat only (F77)."""
+"""#635: doing stays as the desk wrote it; a read verb bumps the seat only (F79)."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
