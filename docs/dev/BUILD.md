@@ -38,6 +38,26 @@ Neither file starts mill-wall or MySQL. They only install the mill package (`mil
 
 Use the tarball, not only the wheel. If the tarball is dirty, a source install is dirty.
 
+## Reproducible pack
+
+Two builds of the same commit give byte-identical wheel and sdist, so anyone can rebuild a release and compare sha256 with PyPI. Date the build by the commit:
+
+```
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" python -m build --no-isolation
+python tools/check_repro.py dist
+```
+
+Use the build tools pinned in `tools/ci-lock/build.txt` (setuptools, build) and Python 3.12, as CI does: another setuptools or zlib can write other bytes. The backend is `build_backend/mill_build.py` (`[build-system]` in `pyproject.toml`). It runs `setuptools.build_meta`, then rewrites both archives without touching member bytes:
+
+- every member mtime and the sdist gzip header time are `SOURCE_DATE_EPOCH`, and the gzip header has no file name (setuptools dates only the wheel by it; the sdist kept checkout mtimes and the build time)
+- sdist members are sorted by name, owner `0/0` with empty user and group names (it kept the builder's uid, gid and login)
+- files are `0644` (`0755` with an execute bit), directories `0755`, in both archives (the checkout umask leaked in)
+- a link or other special member in the sdist fails the build; the wheel keeps its member order
+
+PKG-INFO, the data-files and the member order already came out the same. Without `SOURCE_DATE_EPOCH` the build still works, but member times stay the checkout times, so two builds differ. `tools/check_repro.py` clones HEAD twice into temp dirs under umask `022` and `002`, a second apart, builds each with the commit time, prints every sha256 and fails unless both builds (and `dist/`, when given) match. CI `build_pack` and release `verify` run it. Regression row F78 (sdist-repro).
+
+The license is the SPDX form (`license = "MIT"`, `license-files = ["LICENSE"]`, setuptools 77 or later); the table form stops building after 2027-02-18.
+
 ## Local pack (no PyPI)
 
 Office dogfood **without** steps 3-5. After a commit:
@@ -92,7 +112,7 @@ full commit sha (the repo also requires sha pinning), no workflow uses
 
 - `ci.yml` runs on every pull request, every push to `main`, and when
   `release.yml` calls it. It never publishes. Jobs:
-  1. `build_pack` - `python -m build --no-isolation` from the hash-locked `tools/ci-lock/build.txt`, dated by the commit (`SOURCE_DATE_EPOCH`) -> `dist/` (uploaded as the `dist` artifact)
+  1. `build_pack` - `python -m build --no-isolation` from the hash-locked `tools/ci-lock/build.txt`, dated by the commit (`SOURCE_DATE_EPOCH`) -> `dist/`, then `python tools/check_repro.py dist` (two more builds must match byte for byte, see [Reproducible pack](#reproducible-pack)) -> uploaded as the `dist` artifact
   2. `check_pack` - `python tools/check_pack.py dist` (with the `MILL_PRIVATE_NAMES` secret, see What must not be in either artifact), then `pip-audit` (no installs) on the runtime floors (`pack-floors.txt`) and on `tools/ci-lock/ci.txt`
   3. `mill_cli_smoke` - install the sdist, run `python tools/mill_cli_smoke.py` (`mill -V`, `mill connect --help`, no retired verbs on `--help`, and the real-path rows in `RUN_ROWS`: `mill connect` runs its whole body against a closed local port and must reach the socket loop with no traceback), then `tools/check_skill_copy.py --installed`
   4. `pytest_no_sql` and `pytest_sql` - the test suites (see step 4 of Release order)
@@ -124,7 +144,7 @@ and uses PyPI trusted publishing (OIDC). No PyPI token is stored anywhere.
 1. The version bump is merged on `main` and `ci` on that sha is green.
 2. Ship GO consensus on that exact sha: each desk your office assigns to the builder, validator and shipper roles sends GO naming the sha. A silent desk is not a GO; there is no timeout and no quorum. A NOGO blocks. When desks are unavailable or a NOGO is stuck, the human office owner judges and may override.
 3. Push an annotated tag `v<version>` (same as `pyproject.toml`) on that sha: `git tag -a v<version> -m "the mill <version>" <sha>`, then `git push origin v<version>`. An annotated tag records who tagged and when; a lightweight tag does not. The tag ruleset lets only the repository admin create, move or delete `v*` tags.
-4. `release.yml` calls `ci.yml` (every job above), then `verify` refuses unless `dist/` is exactly the `the_mill-<version>` wheel + sdist for the tag, `tools/check_pack.py dist` passes and `twine check --strict` passes.
+4. `release.yml` calls `ci.yml` (every job above), then `verify` refuses unless `dist/` is exactly the `the_mill-<version>` wheel + sdist for the tag, `tools/check_pack.py dist` passes, `twine check --strict` passes, and `tools/check_repro.py dist` rebuilds the tagged commit twice to the same sha256 as `dist/`.
 5. `publish_pypi` runs in the `pypi` environment, which accepts only `v*` tags and waits for a required-reviewer approval. Builder approves it through the GitHub API (`POST /repos/{owner}/{repo}/actions/runs/{run_id}/pending_deployments` with body `environment_ids` = [the `pypi` environment id], `state` = `approved`, and a `comment`), using the repo token from its env var, never printed. The human is not in the loop for mill releases; the reviewer gate exists only to stop a stray tag from publishing. It then uploads `dist/` with `pypa/gh-action-pypi-publish` using a short-lived OIDC token.
 6. Hosts then update from PyPI as in step 6 of Release order.
 
