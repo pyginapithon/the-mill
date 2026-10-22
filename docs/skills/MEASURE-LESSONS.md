@@ -17,7 +17,7 @@ Audience: Loop-1 (Prompt Gardener, Skill Scout). Law stays in SQL; day-one speec
 
 **Run identity:** unique Producer desk_id + batch_id + hypo_id + t0/t1 (see REMEASURE.md).
 
-**Day-one speech remasure** (JOIN/skill/verbs/connect/howto-ai): see REMEASURE.md **Day-one speech** (incl. D3b `--office <alias>` for the office book / a different alias for the test book) + weekday routine `garden-measure` - not office-* TOY.
+**Day-one speech remasure** (JOIN/skill/commands/connect/howto-ai): see REMEASURE.md **Day-one speech** (incl. D3b `--office <alias>` for the office book / a different alias for the test book) + weekday routine `garden-measure` - not office-* TOY.
 
 **Host truth:** mill commands run on Wall-reachable host (office workstation). Bot box often cannot reach LAN Wall - measure that hop or false-fail the desk.
 
@@ -39,7 +39,7 @@ Closed sample + ~40 Producer DMs = enough for mill-desk / JOIN gardens. Function
 | Rank | Friction | Patch where |
 |---|---|---|
 | 1 | `waiting_on` taught as CLI; mill rejects | mill-desk + every office-* DO-map: speech = note(+doing)+send |
-| 2 | PS `mill send` `@file`/`-` stores literal | mill-desk send row + verbs help: **inline argv body only** on PowerShell; L2 if expand intended |
+| 2 | PS `mill send` `@file`/`-` stores literal | mill-desk send row + commands help: **inline argv body only** on PowerShell; L2 if expand intended |
 | 3 | Bot box != Wall host (discovery tax every hypo) | JOIN + mill-desk preflight: run mill on Wall host / registered machine |
 | 4 | Dead `../JOIN.md` from Bot workflows/mill-desk | mill-desk: pack/share path or inline crumb; drop broken links |
 | 5 | HINT-none->STOP / connect-after-ask vs virgin cast | mill-desk + JOIN: profile/Scout cast = the ask |
@@ -48,7 +48,7 @@ Closed sample + ~40 Producer DMs = enough for mill-desk / JOIN gardens. Function
 | 8 | `assign` Admin 400; no day-one fallback | mill-desk: note+send to the desk that can unblock; do not invent dest |
 | 9 | `mill todo` whole-board firehose | Doc cheap peek **or** L2 need filter |
 | 10 | Asker dual (cast vs card.asker) | Cast wins; send dest = bare desk name |
-| 11 | Product verbs (approve/withhold/pay/ship) read as CLI | office-* : compose via note+send |
+| 11 | Product words (approve/withhold/pay/ship) read as CLI | office-* : compose via note+send |
 | 12 | Invent missing desks (fin-ada, night-eng, office-ops) | JOIN + cast: roster must exist else gap->Asker |
 
 ## Measure recipe improvements (meta)
