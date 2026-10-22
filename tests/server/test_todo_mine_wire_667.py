@@ -1,4 +1,4 @@
-"""#667: todo --mine is filtered on the wall, not after the whole board crossed the wire (F82)."""
+"""#667: todo --mine is filtered on the wall, not after the whole board crossed the wire (F83)."""
 from __future__ import annotations
 
 import json
