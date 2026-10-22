@@ -11,34 +11,18 @@
  */
     let showDead = false;
 
-    /* WALL_HUMAN_READONLY: humans glance on Wall; agents mill send / mill reply.
-     * Default ON. Escape: localStorage factory-human-readonly=off OR ?human_write=1
+    /* WALL_HUMAN_READONLY: humans only read on the Wall; agents write with mill send / mill reply.
+     * #770: the glass carries no human write path, so there is no escape to turn it off.
      */
     function wallHumanReadonly() {
-      try {
-        const q = new URLSearchParams((typeof location !== "undefined" && location.search) || "");
-        const hw = String(q.get("human_write") || "").trim().toLowerCase();
-        if (hw === "1" || hw === "on" || hw === "true" || hw === "yes") return false;
-        const ls = String(localStorage.getItem("factory-human-readonly") || "").trim().toLowerCase();
-        if (ls === "off" || ls === "0" || ls === "false" || ls === "no") return false;
-      } catch (eRo) {}
       return true;
     }
     function wallApplyHumanReadonly() {
-      if (!wallHumanReadonly()) {
-        try {
-          document.documentElement.classList.remove("wall-human-readonly");
-          document.documentElement.removeAttribute("data-wall-human-readonly");
-        } catch (eOff) {}
-        return false;
-      }
       try {
         document.documentElement.classList.add("wall-human-readonly");
         document.documentElement.setAttribute("data-wall-human-readonly", "1");
       } catch (eOn) {}
       const ids = [
-        "mail-compose", "compose-overlay", "compose-sheet", "desk-form",
-        "park-overlay", "park-form", "plan-park", "edit-overlay", "edit-form",
         "admin-mint", "admin-lan-on", "admin-lan-off"
       ];
       for (let i = 0; i < ids.length; i++) {
@@ -4489,15 +4473,8 @@
       const rootTip = String(agent.session_root || agent.root || "").trim();
       const tip = rootTip ? ` title="${esc(rootTip)}"` : "";
       /* OFFICE_GLANCE P0: mill desk_unread badge; hide/mute zero */
-      const n = Math.max(0, Number(unreadN || 0) | 0);
-      const badge = n > 0
-        ? `<span class="sg-unread" data-n="${n}" title="${n} agent-unread">${n > 99 ? "99+" : n}</span>`
-        : "";
       /* SESSION_COL_ORDER: under desk = node:pid ONLY (no project id). session_root tooltip OK. */
-      const mailBit = owner
-        ? ` <button type="button" class="sg-mail" data-mail-to="${esc(owner)}" aria-label="Mail ${esc(owner)}${n ? (", " + n + " unread") : ""}" title="Mail ${esc(owner)}${n ? (" | " + n + " unread") : ""}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2 3.5h12v9H2z"/><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2.5 4l5.5 4.2L13.5 4"/></svg>${badge}</button>`
-        : "";
-      return `<div class="sg-who-stack"${tip}><div class="sg-who-line"><span class="sg-who">${esc(deskLabel)}</span>${mailBit}${roleBit}</div>` +
+      return `<div class="sg-who-stack"${tip}><div class="sg-who-line"><span class="sg-who">${esc(deskLabel)}</span>${roleBit}</div>` +
         (nodeLabel ? `<div class="sg-node" data-sg-node="1">${esc(nodeLabel)}</div>` : "") + `</div>`;
     }
     function sgJobLine(g) {
@@ -6071,7 +6048,6 @@
     /* #710 MAIL paint code lives in mail/mail-paint.js (lib/lazy.js MODULES.mailPaint); it loads with
      * the pane. Until then each entry below loads it and replays the call; the file's
      * function declarations replace these stubs as globals. */
-    function ackMailHuman() { return wallLazyCall("mailPaint", "ackMailHuman", ackMailHuman, arguments); }
     function ensureMailPaint() { return wallLazyCall("mailPaint", "ensureMailPaint", ensureMailPaint, arguments); }
     function mail() { return wallLazyCall("mailPaint", "mail", mail, arguments); }
     function paintMailRooms() { return wallLazyCall("mailPaint", "paintMailRooms", paintMailRooms, arguments); }
@@ -6160,56 +6136,6 @@
           b.classList.toggle("on", b.dataset.planView === view);
         });
       } catch (e) {}
-    }
-    function planAuthPayload() {
-      return parkAuth();
-    }
-    function setEdit(on, row) {
-      const ov = document.getElementById("edit-overlay");
-      if (!ov) return;
-      ov.hidden = !on;
-      if (!on || !row) return;
-      document.getElementById("edit-id").value = String(row.id || "");
-      document.getElementById("edit-title-input").value = row.title || "";
-      document.getElementById("edit-cut").value = row.cut || "";
-      document.getElementById("edit-label").value = row.label || "";
-      document.getElementById("edit-detail").value = row.detail || "";
-      const err = document.getElementById("edit-err");
-      if (err) err.textContent = "";
-    }
-    async function planPost(payload) {
-      if (wallHumanReadonly()) throw new Error("Wall is human-readonly"); /* WALL_HUMAN_READONLY */
-      const r = await fetch("/api/v1/issues", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(data.error || "request failed");
-      return data;
-    }
-    async function persistPlanOrder(ids) {
-      await planPost({
-        ...planAuthPayload(),
-        action: "reorder",
-        order: ids,
-        cut: planCut(),
-        project: (window._floor && window._floor.project) || "mill",
-      });
-      tick();
-    }
-    function visiblePlanIds() {
-      return [...document.querySelectorAll("#issue-list .plan-card[data-id]")].map(el => el.dataset.id);
-    }
-    async function movePlanId(id, dir) {
-      const ids = visiblePlanIds();
-      const i = ids.indexOf(String(id));
-      if (i < 0) return;
-      const j = dir < 0 ? i - 1 : i + 1;
-      if (j < 0 || j >= ids.length) return;
-      const next = ids.slice();
-      const tmp = next[i]; next[i] = next[j]; next[j] = tmp;
-      await persistPlanOrder(next.map(Number));
     }
     function group(rows, key) {
       const g = {};
@@ -8040,11 +7966,6 @@
         if (wallTickGenAlive(tickGen)) {
           try { wallClearActivePaneOverlay(); } catch (eOv1) {}
         }
-        const acl = (raw.desk_acl || {});
-        const err = document.getElementById("desk-err");
-        if (acl.required && err && !err.textContent) {
-          err.dataset.hint = "desk src required";
-        }
         enhanceTables(document);
         markOverflow();
         requestAnimationFrame(() => { try { markOverflow(); } catch (eMore) {} });
@@ -8064,55 +7985,6 @@
       v.classList.add("copied");
       setTimeout(() => v.classList.remove("copied"), 600);
     });
-    const composeOverlay = document.getElementById("compose-overlay");
-    const composeBtn = document.getElementById("mail-compose");
-    const composeMore = document.getElementById("compose-more");
-    const BADGE_KEY = "factory-desk-badge";
-    /* OPEN_MAIL_POPUP: shared Wall mail modal API (Session desk icon first; Jobs/Mail later) */
-    function humanBadge() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(BADGE_KEY) || "null");
-        if (saved && saved.name && saved.token) return saved;
-      } catch (e) {}
-      const name = ((document.getElementById("desk-src") || {}).value || "").trim();
-      const token = ((document.getElementById("desk-token") || {}).value || "").trim();
-      if (name && token) return { name, token };
-      return null;
-    }
-    function setCompose(on, opts) {
-      opts = opts || {};
-      if (on && wallHumanReadonly()) return; /* WALL_HUMAN_READONLY: no compose sheet */
-      composeOverlay.hidden = !on;
-      composeBtn.setAttribute("aria-expanded", on ? "true" : "false");
-      if (on) {
-        if (opts.to != null) {
-          const toEl = document.getElementById("desk-dst");
-          if (toEl) toEl.value = String(opts.to);
-        }
-        if (opts.body != null) {
-          const bodyEl = document.getElementById("desk-body");
-          if (bodyEl) bodyEl.value = String(opts.body);
-        }
-        const title = document.getElementById("compose-title");
-        if (title) title.textContent = opts.label ? String(opts.label) : "COMPOSE";
-        if (opts.more && composeMore) composeMore.open = true;
-        const err = document.getElementById("desk-err");
-        if (opts.needBadge && err) {
-          err.textContent = "badge required: collect link from your agent, or enter name + badge under more - no silent send";
-        }
-        const focusId = opts.focus || (opts.needBadge ? "desk-token" : (opts.to != null ? "desk-body" : "desk-dst"));
-        const el = document.getElementById(focusId);
-        if (el) setTimeout(() => el.focus(), 0);
-        composeOverlay._trap = true;
-      } else {
-        composeOverlay._trap = false;
-        const title = document.getElementById("compose-title");
-        if (title) title.textContent = "COMPOSE";
-        if (document.activeElement && composeOverlay.contains(document.activeElement)) {
-          composeBtn.focus();
-        }
-      }
-    }
     /* wow144 lean list + detail-on-open (Wall contract card rule-lean-rows: mill todo wall-contract rule-lean-rows).
      * List/poll paints snippets (body/doing/detail <=256 + *_trunc flags).
      * On human open of a truncated mail/todo: GET detail, merge into local
@@ -8654,77 +8526,8 @@
     } catch (eWinPage) {}
     try { wallWireListInfiniteScroll(); } catch (eWire0) {}
 
-    function markMailReadHuman(ids, desk) {
-      if (wallHumanReadonly()) return Promise.resolve(null); /* WALL_HUMAN_READONLY: no human write */
-      const badge = humanBadge();
-      if (!badge || !ids || !ids.length || !desk) return Promise.resolve(null);
-      const payload = {
-        action: "mark_read",
-        mark_read: true,
-        project: "mill",
-        src: badge.name,
-        token: badge.token,
-        desk: desk,
-        ids: ids
-      };
-      return fetch("/api/desk", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-      }).then(r => r.json()).catch(() => null);
-    }
-    function openMailPopup(opts) {
-      opts = opts || {};
-      if (wallHumanReadonly()) return false; /* WALL_HUMAN_READONLY */
-      const to = (opts.to != null) ? String(opts.to).trim() : "";
-      /* never default To: * unless caller explicitly passes * */
-      const badge = humanBadge();
-      if (!badge) {
-        setCompose(true, {
-          to: to,
-          body: opts.body,
-          label: opts.label || (to ? ("MAIL " + to) : "COMPOSE"),
-          more: true,
-          needBadge: true,
-          focus: "desk-token",
-        });
-        return false;
-      }
-      const srcEl = document.getElementById("desk-src");
-      const tokEl = document.getElementById("desk-token");
-      if (srcEl && badge.name) srcEl.value = badge.name;
-      if (tokEl && badge.token) tokEl.value = badge.token;
-      setCompose(true, {
-        to: to,
-        body: opts.body,
-        label: opts.label || (to ? ("MAIL " + to) : "COMPOSE"),
-        focus: to ? "desk-body" : "desk-dst",
-      });
-      return true;
-    }
-    window.openMailPopup = openMailPopup;
-    document.addEventListener("click", ev => {
-      const btn = ev.target && ev.target.closest && ev.target.closest("button.mail-ack-human");
-      if (!btn) return;
-      ev.preventDefault();
-      const id = parseInt(btn.getAttribute("data-ack-id") || "0", 10);
-      if (!id) return;
-      btn.disabled = true;
-      ackMailHuman([id]).finally(() => { btn.disabled = false; });
-    });
-    composeBtn.addEventListener("click", () => {
-      if (wallHumanReadonly()) return;
-      setCompose(true);
-    });
-    document.getElementById("compose-close").addEventListener("click", () => setCompose(false));
-    document.getElementById("compose-backdrop").addEventListener("click", () => setCompose(false));
     document.addEventListener("keydown", ev => {
       if (ev.key === "Escape") {
-        if (!composeOverlay.hidden) {
-          ev.preventDefault();
-          setCompose(false);
-          return;
-        }
         const openHelp = document.querySelector(".help-box:not([hidden])");
         if (openHelp) {
           ev.preventDefault();
@@ -8733,51 +8536,16 @@
           else openHelp.hidden = true;
         }
       }
-      if (ev.key === "Tab" && composeOverlay && !composeOverlay.hidden && composeOverlay._trap) {
-        const focusables = composeOverlay.querySelectorAll("button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
-        const list = Array.from(focusables).filter(el => !el.disabled && el.offsetParent !== null);
-        if (!list.length) return;
-        const first = list[0], last = list[list.length - 1];
-        if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
-        else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
-      }
     });
-    document.addEventListener("click", ev => {
-      const btn = ev.target.closest(".sg-mail");
-      if (!btn) return;
-      ev.preventDefault();
-      const to = (btn.getAttribute("data-mail-to") || "").trim();
-      if (!to) return;
-      openMailPopup({ to: to });
-    });
-    /* dual-read: Wall open/view -> party=human (soft). Does not clear agent-unread.
-     * wow144 lean: on open, if body_trunc / doing_trunc / detail_trunc, fetch detail
+    /* wow144 lean: on open, if body_trunc / doing_trunc / detail_trunc, fetch detail
      * and merge into local _floor then re-paint (Wall contract card rule-lean-rows: mill todo wall-contract rule-lean-rows). */
     document.addEventListener("click", ev => {
       const tr = ev.target.closest("#mail tr[data-mail-id]");
       if (tr) {
         const id = parseInt(tr.getAttribute("data-mail-id") || "0", 10);
-        const desk = (tr.getAttribute("data-mail-dst") || "").trim();
-        const project = (tr.getAttribute("data-mail-project") || "mill").trim() || "mill";
         if (id) {
           try { wallOpenMailIfTrunc(id); } catch (eLeanMail) {}
         }
-        if (!id || !desk || mailIsBareHumanMailbox(desk)) return;
-        markMailReadHuman([id], desk).then(row => {
-          if (!row || row.error) return;
-          if (window._floor && Array.isArray(window._floor.mailbox)) {
-            const m = window._floor.mailbox.find(x => Number(x.id) === id && millGid(x) === project);
-            if (m) {
-              const who = desk + ":human";
-              m.reads = (m.reads || []).slice();
-              if (!m.reads.some(r => String(r.party || "").toLowerCase() === "human" && mailReadMatchesDst(r, desk))) {
-                m.reads.push({ desk: desk, reader: desk, party: "human", vendor: "", who: who });
-              }
-              m.readers = (m.reads || []).map(r => r.who).filter(Boolean);
-              mail(window._floor);
-            }
-          }
-        });
         return;
       }
       const roomMsg = ev.target.closest(".mail-room-msg[data-mail-id]");
@@ -8788,7 +8556,7 @@
         }
         return;
       }
-      if (ev.target.closest("button, a, input, select, textarea, [data-plan-act]")) return;
+      if (ev.target.closest("button, a, input, select, textarea")) return;
       const todoEl = ev.target.closest("[data-todo-id]");
       if (!todoEl) return;
       const tid = parseInt(todoEl.getAttribute("data-todo-id") || "0", 10);
@@ -9288,151 +9056,6 @@
       } catch (eExp) {}
     })();
 
-    const DEV_KEY = "factory-desk-device";
-    function deskDevice() {
-      let id = "";
-      try { id = localStorage.getItem(DEV_KEY) || ""; } catch (e) {}
-      if (!id) {
-        id = (window.crypto && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : (Date.now().toString(36) + Math.random().toString(36).slice(2));
-        try { localStorage.setItem(DEV_KEY, id); } catch (e) {}
-      }
-      return id;
-    }
-    try {
-      const saved = JSON.parse(localStorage.getItem(BADGE_KEY) || "null");
-      if (saved && saved.name) {
-        document.getElementById("desk-src").value = saved.name;
-        if (saved.token) document.getElementById("desk-token").value = saved.token;
-        if (saved.dst) document.getElementById("desk-dst").value = saved.dst;
-        const isrc = document.getElementById("issue-src");
-        const itok = document.getElementById("issue-token");
-        if (isrc) isrc.value = saved.name;
-        if (itok && saved.token) itok.value = saved.token;
-      }
-    } catch (e) {}
-    async function collectBadge() {
-      const code = (new URLSearchParams(location.search).get("collect") || "").trim();
-      if (!code) return;
-      showTab("mail");
-      setCompose(true, { more: true, focus: "desk-phrase" });
-      const err = document.getElementById("desk-err");
-      err.textContent = "collecting badge on this phone...";
-      const body = JSON.stringify({ code, device: deskDevice() });
-      try {
-        let r = await fetch("/api/v1/collect", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        });
-        if (r.status === 404) {
-          r = await fetch("/api/collect", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body,
-          });
-        }
-        const data = await r.json();
-        if (!r.ok) {
-          err.textContent = data.error || "collect failed; ask your agent for a new link";
-          return;
-        }
-        const name = data.human || "";
-        const token = data.token || "";
-        const dst = data.agent || "coord";
-        document.getElementById("desk-src").value = name;
-        document.getElementById("desk-token").value = token;
-        document.getElementById("desk-dst").value = dst;
-        try {
-          localStorage.setItem(BADGE_KEY, JSON.stringify({ name, token, dst }));
-        } catch (e) {}
-        err.textContent = "badge is on this phone. send once with your align phrase (to = your agent).";
-        const u = new URL(location.href);
-        u.searchParams.delete("collect");
-        history.replaceState({}, "", u);
-      } catch (e) {
-        err.textContent = "collect failed; ask your agent for a new link";
-      }
-    }
-    collectBadge();
-    document.getElementById("desk-form").addEventListener("submit", async ev => {
-      ev.preventDefault();
-      if (wallHumanReadonly()) {
-        const errRo = document.getElementById("desk-err");
-        if (errRo) errRo.textContent = "Wall is human-readonly; agents mill send / mill reply";
-        return;
-      }
-      const err = document.getElementById("desk-err");
-      err.textContent = "";
-      const allow = wallProjects();
-      const src = (document.getElementById("desk-src").value || "human").trim() || "human";
-      const token = (document.getElementById("desk-token").value || "").trim();
-      const dst = (document.getElementById("desk-dst").value || "*").trim() || "*";
-      const payload = {
-        project: allow[0] || "mill",
-        src,
-        dst,
-        token,
-        phrase: (document.getElementById("desk-phrase").value || "").trim(),
-        orders: document.getElementById("desk-orders").checked,
-        human_required: !!(document.getElementById("desk-human-required") && document.getElementById("desk-human-required").checked),
-        body: (document.getElementById("desk-body").value || "").trim(),
-        device: deskDevice(),
-      };
-      try {
-        localStorage.setItem(BADGE_KEY, JSON.stringify({ name: src, token, dst }));
-        const r = await fetch("/api/desk", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await r.json();
-        if (!r.ok) {
-          err.textContent = data.error || "send failed";
-          return;
-        }
-        document.getElementById("desk-body").value = "";
-        const hrEl = document.getElementById("desk-human-required");
-        if (hrEl) hrEl.checked = false;
-        setCompose(false);
-        tick();
-      } catch (e) {
-        err.textContent = "send failed";
-      }
-    });
-    function issueAuth() {
-      return {
-        src: (document.getElementById("issue-src").value || document.getElementById("desk-src").value || "human").trim() || "human",
-        token: (document.getElementById("issue-token").value || document.getElementById("desk-token").value || "").trim(),
-        phrase: (document.getElementById("issue-phrase").value || document.getElementById("desk-phrase").value || "").trim(),
-        device: deskDevice(),
-        project: (wallProjects()[0] || "mill"),
-      };
-    }
-    /* WALL_PLAN_TAB: issue-form/kanban status clicks removed; park sheet below */
-        function setPark(on) {
-      const ov = document.getElementById("park-overlay");
-      const btn = document.getElementById("plan-park");
-      if (!ov) return;
-      ov.hidden = !on;
-      if (btn) btn.setAttribute("aria-expanded", on ? "true" : "false");
-      if (on) {
-        const cutEl = document.getElementById("park-cut");
-        if (cutEl && !cutEl.value) cutEl.value = planCut() || "";
-        const title = document.getElementById("park-title-input");
-        if (title) setTimeout(() => title.focus(), 30);
-      }
-    }
-    function parkAuth() {
-      const src = ((document.getElementById("park-src") || {}).value || "").trim();
-      const token = ((document.getElementById("park-token") || {}).value || "").trim();
-      const phrase = ((document.getElementById("park-phrase") || {}).value || "").trim();
-      const out = { src };
-      if (token) out.token = token;
-      if (phrase) out.phrase = phrase;
-      return out;
-    }
     (function bindPlanChrome() {
       const cut = document.getElementById("plan-cut");
       const label = document.getElementById("plan-label");
@@ -9458,132 +9081,6 @@
           savePlanChrome();
           paintPlanView();
         });
-      });
-      const listRoot = document.getElementById("issue-list");
-      if (listRoot && !listRoot.dataset.planActs) {
-        listRoot.dataset.planActs = "1";
-        listRoot.addEventListener("click", async ev => {
-          const btn = ev.target.closest("[data-plan-act]");
-          if (!btn) return;
-          ev.preventDefault();
-          const id = btn.dataset.id;
-          const act = btn.dataset.planAct;
-          const floor = window._floor || {};
-          const row = (floor.issues || []).find(r => String(r.id) === String(id));
-          try {
-            if (act === "edit") {
-              if (!row) { toast("row not loaded"); return; }
-              setEdit(true, row);
-              return;
-            }
-            if (act === "pull") {
-              await planPost({ ...planAuthPayload(), action: "pull", id: Number(id), project: "mill" });
-              toast("pulled to floor");
-              tick();
-              return;
-            }
-            if (act === "up") { await movePlanId(id, -1); return; }
-            if (act === "down") { await movePlanId(id, 1); return; }
-          } catch (e) {
-            toast(String(e.message || e));
-          }
-        });
-      }
-      const parkBtn = document.getElementById("plan-park");
-      if (parkBtn) parkBtn.addEventListener("click", () => setPark(true));
-      const parkClose = document.getElementById("park-close");
-      const parkBack = document.getElementById("park-backdrop");
-      if (parkClose) parkClose.addEventListener("click", () => setPark(false));
-      if (parkBack) parkBack.addEventListener("click", () => setPark(false));
-      const parkForm = document.getElementById("park-form");
-      if (parkForm) parkForm.addEventListener("submit", async ev => {
-        ev.preventDefault();
-        if (wallHumanReadonly()) return; /* WALL_HUMAN_READONLY */
-        const err = document.getElementById("park-err");
-        if (err) err.textContent = "";
-        const payload = {
-          ...parkAuth(),
-          title: (document.getElementById("park-title-input").value || "").trim(),
-          detail: (document.getElementById("park-detail").value || "").trim(),
-          who: (document.getElementById("park-who").value || "").trim(),
-          cut: (document.getElementById("park-cut").value || "").trim(),
-          label: (document.getElementById("park-label").value || "").trim(),
-          status: "parked",
-          kind: "next",
-        };
-        try {
-          const r = await fetch("/api/v1/issues", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-          const data = await r.json();
-          if (!r.ok) {
-            if (err) err.textContent = data.error || "park failed";
-            return;
-          }
-          document.getElementById("park-title-input").value = "";
-          document.getElementById("park-detail").value = "";
-          document.getElementById("park-label").value = "";
-          setPark(false);
-          tick();
-        } catch (e) {
-          if (err) err.textContent = "park failed";
-        }
-      });
-      const editClose = document.getElementById("edit-close");
-      const editBack = document.getElementById("edit-backdrop");
-      if (editClose) editClose.addEventListener("click", () => setEdit(false));
-      if (editBack) editBack.addEventListener("click", () => setEdit(false));
-      const editForm = document.getElementById("edit-form");
-      if (editForm) editForm.addEventListener("submit", async ev => {
-        ev.preventDefault();
-        if (wallHumanReadonly()) return; /* WALL_HUMAN_READONLY */
-        const err = document.getElementById("edit-err");
-        if (err) err.textContent = "";
-        const srcEl = document.getElementById("edit-src");
-        const tokEl = document.getElementById("edit-token");
-        const phrEl = document.getElementById("edit-phrase");
-        // mirror park auth fields when filled
-        const parkSrc = document.getElementById("park-src");
-        const parkTok = document.getElementById("park-token");
-        const parkPhr = document.getElementById("park-phrase");
-        if (srcEl && srcEl.value && parkSrc && !parkSrc.value) parkSrc.value = srcEl.value;
-        if (tokEl && tokEl.value && parkTok && !parkTok.value) parkTok.value = tokEl.value;
-        if (phrEl && phrEl.value && parkPhr && !parkPhr.value) parkPhr.value = phrEl.value;
-        const payload = {
-          ...planAuthPayload(),
-          id: Number(document.getElementById("edit-id").value || 0),
-          title: (document.getElementById("edit-title-input").value || "").trim(),
-          detail: (document.getElementById("edit-detail").value || "").trim(),
-          cut: (document.getElementById("edit-cut").value || "").trim(),
-          label: (document.getElementById("edit-label").value || "").trim(),
-          src: (srcEl && srcEl.value) || undefined,
-          token: (tokEl && tokEl.value) || undefined,
-          phrase: (phrEl && phrEl.value) || undefined,
-        };
-        try {
-          await planPost(payload);
-          setEdit(false);
-          tick();
-        } catch (e) {
-          if (err) err.textContent = String(e.message || e);
-        }
-      });
-      document.addEventListener("keydown", ev => {
-        if (ev.key === "Escape") {
-          const ov = document.getElementById("park-overlay");
-          if (ov && !ov.hidden) {
-            ev.preventDefault();
-            setPark(false);
-            return;
-          }
-          const evov = document.getElementById("edit-overlay");
-          if (evov && !evov.hidden) {
-            ev.preventDefault();
-            setEdit(false);
-          }
-        }
       });
       restorePlanChrome();
       paintPlanView();
@@ -9699,11 +9196,6 @@
       openFilter: function () {
         var btn = document.getElementById("wall-add");
         if (btn) btn.click();
-      },
-      openCompose: function () {
-        if (wallHumanReadonly()) return; /* WALL_HUMAN_READONLY */
-        if (typeof openMailPopup === "function") openMailPopup({});
-        else if (typeof setCompose === "function") setCompose(true);
       },
       toggleFloorAgg: function () {
         if (typeof setFloorAgg !== "function") return;

@@ -1699,25 +1699,13 @@
     }
 
 
-/* WALL_HUMAN_READONLY: hide / inert human write chrome; GET polls stay. */
-html.wall-human-readonly #mail-compose,
-html.wall-human-readonly #compose-overlay,
-html.wall-human-readonly #compose-sheet,
-html.wall-human-readonly .mail-rooms-reply,
-html.wall-human-readonly button.sg-mail,
-html.wall-human-readonly button.mail-ack-human,
-html.wall-human-readonly #park-overlay,
-html.wall-human-readonly #park-form,
-html.wall-human-readonly #plan-park,
-html.wall-human-readonly #edit-overlay,
-html.wall-human-readonly #edit-form,
+/* WALL_HUMAN_READONLY: the glass has no human write chrome (#770); the admin invite controls stay hidden. */
 html.wall-human-readonly #admin-mint,
 html.wall-human-readonly #admin-lan-on,
 html.wall-human-readonly #admin-lan-off,
 html.wall-human-readonly .admin-actions.admin-full-only {
   display: none !important;
 }
-html.wall-human-readonly #compose-overlay[hidden] { display: none !important; }
 
 /* wow176: welcome Nest popup - compact card + translucent backdrop (Nest through) */
 #wall-welcome {

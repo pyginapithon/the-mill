@@ -91,33 +91,6 @@
     /* WALL_UI_DEFAULT_MAIL: mailBareDst from domain module */
     /* WALL_UI_DEFAULT_MAIL: mailIsBareHumanMailbox from domain module */
     /* WALL_UI_DEFAULT_MAIL: mailActiveRows from domain module */
-    function fillMailToList(d) {
-      const dl = document.getElementById("mail-to-list");
-      if (!dl) return;
-      const roles = wallRoleNames();
-      const desks = new Set();
-      (d.agents || []).forEach(a => {
-        const o = String(a.owner || "").trim();
-        if (o && !BARE_HUMAN_MAILBOX.has(o.toLowerCase())) desks.add(o);
-      });
-      ((d.office_glance && d.office_glance.desks) || []).forEach(x => {
-        const o = String(x.owner || "").trim();
-        if (o && !BARE_HUMAN_MAILBOX.has(o.toLowerCase())) desks.add(o);
-      });
-      const proj = wallProjectName() || String((d.wall && d.wall[0]) || ((d.groups || d.projects) && (d.groups || d.projects)[0]) || "").trim();
-      const opts = [];
-      [...desks].sort().forEach(o => opts.push(o));
-      roles.forEach(r => opts.push(r));
-      opts.push(proj);
-      opts.push("*");
-      const seen = new Set();
-      dl.innerHTML = opts.filter(x => {
-        const k = String(x);
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      }).map(x => `<option value="${esc(x)}"></option>`).join("");
-    }
     /* MAIL_BOOT_FIX: paint Mail on enter / when pane visible - same family as Floor cold load */
     function ensureMailPaint(opts) {
       /* Wave 3: one paint path. opts.chromeOnly skips mail() when tick already painted. */
@@ -211,18 +184,6 @@
       mailSelectedSrc = String(src || "").trim();
       try { localStorage.setItem(MAIL_SRC_KEY, mailSelectedSrc); } catch (e) {}
       if (window._floor) mail(window._floor);
-    }
-    function ackMailHuman(ids) {
-      const badge = humanBadge();
-      if (!badge || !ids || !ids.length) return Promise.resolve(null);
-      return fetch("/api/desk", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          action: "ack_human", ack_human: true,
-          project: wallProjectName(), src: badge.name, token: badge.token, ids: ids
-        })
-      }).then(r => r.json()).then(data => { if (window.tick) tick(); return data; }).catch(() => null);
     }
     /* WALL_UI_DEFAULT_MAIL: mailMsgHumanRequiredOpen from domain module */
     /* WALL_UI_DEFAULT_MAIL: mailMsgAgentUnread from domain module */
@@ -387,7 +348,6 @@
           const readers = chipList.length ? " " + chipList.join(" ") : "";
           const hrChip = hr ? `<span class="mail-chip needs-human mail-hr-chip" title="Needs human (human_required)">Needs human</span>` : "";
           const mid = String(m.id || "");
-          const hrAck = hr ? ` <button type="button" class="mail-ack-human" data-ack-id="${esc(mid || m.id)}" title="Done / Ack human">Ack human</button>` : "";
           const st = (mailDst(m) === "*") ? (unread ? "star-unread" : "star-read") : (floor ? "floor" : (unread ? "agent-unread" : (humanOpen ? "read" : "agent-read")));
           const guess = mailEtaText(unread, eta);
           const atVal = (typeof mailAt === "function") ? mailAt(m) : (m.at || m.created || "");
@@ -407,7 +367,7 @@
           `<td>${esc(millGid(m))}</td>` +
           `<td>${esc(srcVal)}</td><td title="${esc(cast.map(c => c.deskId).join(", "))}">${esc(dstShow)}</td>` +
           `<td>${esc(m.kind || "note")}</td>` +
-          `<td class="body">${esc(m.body)}${millWatchBadge("mail", m.id)}${hrChip}${hrAck}</td>` +
+          `<td class="body">${esc(m.body)}${millWatchBadge("mail", m.id)}${hrChip}</td>` +
           `<td class="note">${st}${readers}</td>` +
           `<td class="note" data-sort="${esc((eta && (eta.at || eta.kind)) || "")}">${esc(guess)}</td></tr>`;
         }).join("") +
@@ -449,7 +409,7 @@
           const cue = unread
             ? ' | <span class="unread-dot" title="agent-unread">unread</span>'
             : (hr ? "" : (humanOpen ? " | read" : ' | read <span class="human-cue" title="human not opened">|</span>'));
-          const hrBit = hr ? ' | <span class="mail-chip needs-human mail-hr-chip" title="Needs human (receipt)">Needs human</span> <button type="button" class="mail-ack-human" data-ack-id="' + esc(m.id) + '" title="Done / Ack human">Ack human</button>' : "";
+          const hrBit = hr ? ' | <span class="mail-chip needs-human mail-hr-chip" title="Needs human (receipt)">Needs human</span>' : "";
           const dstShow = mailDst(m);
           const atShow = (typeof mailAt === "function") ? mailAt(m) : (m.at || m.created || "");
           return `<li>` +
@@ -580,22 +540,6 @@
         needsAttention: agentUnread > 0 || humanRequired > 0
       };
     }
-    function mailRoomReplyTo(d, t) {
-      const mails = mailRoomMailNodes(t);
-      for (let i = 0; i < mails.length; i++) {
-        const m = mailRoomMailbox(d, mails[i]);
-        if (!m) continue;
-        const src = (typeof mailSenderDesk === "function") ? mailSenderDesk(m) : String(m.src || "").trim();
-        const desks = (typeof mailDstDesks === "function") ? mailDstDesks(m) : [String(m.dst || "").trim()];
-        for (let j = 0; j < desks.length; j++) {
-          const dst = String(desks[j] || "").trim();
-          if (dst && dst !== "*" && dst !== src) return dst;
-        }
-        const primary = mailDst(m);
-        if (primary && primary !== "*") return primary;
-      }
-      return "";
-    }
     function mailRoomMatchesQ(d, t, q) {
       if (!q) return true;
       const needle = String(q || "").toLowerCase();
@@ -707,8 +651,6 @@
         return `<div class="col-empty">no mail in this room</div>`;
       }
       const visible = mailRoomsNestVisible(d, allNodes, mailNodes, q);
-      const replyTo = mailRoomReplyTo(d, t);
-      const reply = wallHumanReadonly() ? "" : `<button type="button" class="mail-rooms-reply" data-mail-room-reply="1" data-mail-reply-to="${esc(replyTo)}" title="Reply into this thread (compose to thread dest)">Reply in thread</button>`;
       const rows = mailNodes.map(function (n, i) {
         if (q && !visible[i]) return "";
         const lft = Number(n && n.lft) || 0;
@@ -749,9 +691,9 @@
           `</div>`;
       }).filter(Boolean).join("");
       if (!rows) {
-        return reply + `<div class="col-empty">${q ? "no messages match filter" : "empty room"}</div>`;
+        return `<div class="col-empty">${q ? "no messages match filter" : "empty room"}</div>`;
       }
-      return reply + `<div class="mail-rooms-nest">${rows}</div>`;
+      return `<div class="mail-rooms-nest">${rows}</div>`;
     }
     function paintMailRooms(d, opts) {
       const railOnly = !!(opts && opts.railOnly);
@@ -923,23 +865,12 @@
       }
       if (el) {
         const nestSig = mailRoomsNestSig(d, picked.tree, q, mailSelectedRoom);
-        const nestChrome = !!(el.querySelector(".mail-rooms-nest") || el.querySelector("[data-mail-room-reply]") || el.querySelector(".col-empty") || el.querySelector(".idle"));
+        const nestChrome = !!(el.querySelector(".mail-rooms-nest") || el.querySelector(".col-empty") || el.querySelector(".idle"));
         if (nestSig !== _mailRoomsNestSig || !nestChrome) {
           el.innerHTML = mailRoomsNestHtml(d, picked.tree, q);
           try { paintMailPartyCol(d, picked.tree); } catch (eParty) {}
           if (typeof wallPerfFirst === "function") wallPerfFirst("mail_rooms_body");
           _mailRoomsNestSig = nestSig;
-          const replyBtn = el.querySelector("[data-mail-room-reply]");
-          if (replyBtn) {
-            replyBtn.addEventListener("click", function () {
-              const to = String(replyBtn.getAttribute("data-mail-reply-to") || "").trim();
-              if (typeof openMailPopup === "function") {
-                openMailPopup({ to: to, label: to ? ("REPLY " + to) : "Reply in thread" });
-              } else if (typeof setCompose === "function") {
-                setCompose(true, { to: to, label: to ? ("REPLY " + to) : "Reply in thread" });
-              }
-            });
-          }
         }
       }
     }
@@ -1067,7 +998,6 @@
       });
     }
     function mail(d) {
-      fillMailToList(d || {});
       /* Rooms is the only other live view. list and graph stay off this glass. */
       if (mailView !== "rooms") {
         mailView = "letters";

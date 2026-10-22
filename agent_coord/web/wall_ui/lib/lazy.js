@@ -111,7 +111,7 @@
       marker: "WALL_UI_DEFAULT_ADMIN_INVITE"
     },
     mailPaint: {
-      js: "/mail/mail-paint.js?v=wow292",
+      js: "/mail/mail-paint.js?v=wow318",
       marker: "WALL_UI_DEFAULT_MAIL_PAINT",
       domain: "mail"
     },
@@ -121,12 +121,12 @@
       domain: "score"
     },
     floorPaint: {
-      js: "/floor/floor-paint.js?v=wow317",
+      js: "/floor/floor-paint.js?v=wow318",
       marker: "WALL_UI_DEFAULT_FLOOR_PAINT",
       with: ["floorMap"]
     },
     todoPaint: {
-      js: "/todo/todo-paint.js?v=wow315",
+      js: "/todo/todo-paint.js?v=wow318",
       marker: "WALL_UI_DEFAULT_TODO_PAINT",
       domain: "todo"
     }
