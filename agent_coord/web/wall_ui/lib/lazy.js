@@ -78,7 +78,8 @@
     todo: {
       js: "/todo/todo.js?v=wow182",
       css: "/todo/todo.css?v=wow311",
-      marker: "WALL_UI_DEFAULT_TODO"
+      marker: "WALL_UI_DEFAULT_TODO",
+      modules: ["todoPaint"]
     }
   };
 
@@ -123,6 +124,11 @@
       js: "/floor/floor-paint.js?v=wow307",
       marker: "WALL_UI_DEFAULT_FLOOR_PAINT",
       with: ["floorMap"]
+    },
+    todoPaint: {
+      js: "/todo/todo-paint.js?v=wow315",
+      marker: "WALL_UI_DEFAULT_TODO_PAINT",
+      domain: "todo"
     }
   };
 
