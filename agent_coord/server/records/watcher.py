@@ -9,9 +9,13 @@ from .db import call
 NOT_ON_MAIL = "watchers do not watch mail; mail has recipients: mill add mail:ID WHO"
 
 
+def _is_mail(type: str) -> bool:
+    return str(type or "").strip().lower() == CONST_MAIL
+
+
 def _watchable(type: str) -> None:
     """mail is not a watcher kind (#270): refuse plainly before the ENUM does."""
-    if str(type or "").strip().lower() == CONST_MAIL:
+    if _is_mail(type):
         raise CoordError(NOT_ON_MAIL)
 
 
@@ -21,6 +25,10 @@ def put(cn, type: str, id: int, desk_id: int) -> list[dict]:
 
 
 def select(cn, type: str, id: int) -> list[dict]:
+    """Watchers of one activity. A letter has recipients, not watchers (#270), so a
+    label or tree move on mail reads none instead of tripping the ENUM (#639)."""
+    if _is_mail(type):
+        return []
     return call(cn, "mill_watcher_select", [type, id])
 
 
