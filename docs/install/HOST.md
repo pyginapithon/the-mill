@@ -65,7 +65,7 @@ Open the configured Wall URL (or the share URL mill install prints). Tabs: **SES
 
 `mill install wall --http nginx` = TLS in front of FastAPI mill-wall. `--http service` = mill-wall as the httpd (loopback).
 
-Optional human-page ACL: `~/.mill/wall-allow.txt` (or `AGENT_COORD_WALL_ALLOW`). Empty = no extra ACL. Applies to Wall HTML and `/api/floor`, not `POST /mill/v1/*`.
+Optional human-page ACL: `~/.mill/wall-allow.txt` (or `AGENT_COORD_WALL_ALLOW`). Empty = no extra ACL. Applies to Wall HTML and `/api/floor`, not `POST /mill/v1/*`. It reads `X-Forwarded-For` the same way as door=ip below (trusted proxy only, last hop that is not a proxy), and so does the glance keypad lockout; a forwarded loopback address must be on the list.
 
 Certificate: after `mill install`, this machine should open `https://127.0.0.1/` without a warning (mill CA, never `wall.crt`). Other devices may need Advanced then Proceed.
 

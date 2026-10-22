@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from agent_coord.server.allow import allowed, client_ip, is_mill_verb
+from agent_coord.server.allow import allowed, door_client, is_mill_verb
 
 
 def test_empty_allow_is_open() -> None:
@@ -17,11 +17,15 @@ def test_cidr_and_exact() -> None:
     assert not allowed("198.51.100.1", rules)
 
 
-def test_forwarded_from_loopback() -> None:
-    assert client_ip("127.0.0.1", "203.0.113.9, 127.0.0.1") == "203.0.113.9"
+def test_forwarded_from_loopback(monkeypatch) -> None:
+    monkeypatch.delenv("AGENT_COORD_TRUSTED_PROXIES", raising=False)
+    # The last hop that is not a proxy (#731); a proxy hop is skipped and a
+    # spoofed left entry is unused.
+    assert door_client("127.0.0.1", "203.0.113.9, 127.0.0.1") == ("203.0.113.9", True)
+    assert door_client("127.0.0.1", "198.51.100.1, 203.0.113.9") == ("203.0.113.9", True)
     # A global address stays split so the pack check does not see a complete host.
     peer = ".".join(("8", "8", "8", "8"))
-    assert client_ip(peer, ".".join(("1", "2", "3", "4"))) == peer
+    assert door_client(peer, ".".join(("1", "2", "3", "4"))) == (peer, False)
 
 
 def test_asgi_wall_403(monkeypatch) -> None:

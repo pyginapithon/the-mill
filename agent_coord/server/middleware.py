@@ -1985,7 +1985,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                 _note_wall_api(self.path, t0)
 
         def _glance_tap(self) -> None:
-            from agent_coord.server.allow import client_ip
+            from agent_coord.server.allow import door_client
             from agent_coord.server.glance import GLANCE_COOKIE, _SESSION_S, accept_tap
 
             n = int(self.headers.get("Content-Length") or "0")
@@ -2003,7 +2003,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
             except Exception:
                 taps = []
             peer = (self.client_address or ("", 0))[0]
-            ip = client_ip(str(peer or ""), str(self.headers.get("x-forwarded-for") or ""))
+            # The lockout bucket is the trusted-proxy client, never a forged hop (#731).
+            ip, _via = door_client(str(peer or ""), str(self.headers.get("x-forwarded-for") or ""))
             token = accept_tap(taps, word, ip=ip)
             if not token:
                 self._send(404, b"not found\n", "text/plain; charset=utf-8")
