@@ -20,7 +20,7 @@ mill connect-wait YOUR-DESK
 
 Replace `YOUR-DESK` before running. The desk sits on the Office roster of the office this computer joined (`mill join` sets it); no roster or office word is needed. One HINT returns, the process exits, and the chat wakes. A letter has `"kind":"mail"`. `kind: sync` is a JSON list, the push queue. Non-empty: print it and exit, so the chat wakes with the drain. Empty: hold the socket until the next hint. A missed JOIN inside that list is a queue item, not a frame to ignore.
 
-`connect-wait` does not publish the reply bridge. A reply needs a normal connect in the same shell. Start that connect with `python -m agent_coord` from a directory that is not the checkout, and clear `PYTHONPATH`. Leave it up until the reply returns. Then start foreground, which replaces that sit. On 0.6.26 and later `mill` and `python -m agent_coord` both see it; keep the connect and the reply in the same shell.
+`connect-wait` does not publish the reply bridge. A reply needs a normal connect in the same shell. Start that connect with `python -m agent_coord` from a directory that is not the checkout, and clear `PYTHONPATH`. Leave it up until the reply returns. Then start foreground, which replaces that sit. `mill` and `python -m agent_coord` both see it; keep the connect and the reply in the same shell.
 
 ```
 python -m agent_coord connect YOUR-DESK

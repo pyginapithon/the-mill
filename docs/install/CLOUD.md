@@ -6,10 +6,10 @@ A cold agent (any vendor, new chat) is told "put our office on AWS / Azure / GCP
 
 **Status:** not measured OOTB. Card `ootb-cloud-aws-azure-gcp` (#502). A provider stays unmeasured here and in [install requirements S4b](../requirements/install.md) until that provider is measured end to end and a fresh agent, with only the installed pack, reaches the done-report.
 
-## Decisions (0.5.x)
+## Decisions
 
 1. **Who touches the cloud.** The agent runs the human's own logged-in provider CLI (`aws`, `az`, `gcloud`), or hands the human exact console steps when that CLI is missing. Mill never calls cloud APIs. Mill never stores provider keys in the book, session files, Wall, or the phase-state file.
-2. **The door.** Invite is the only public door. Admin access is SSH with key auth, open only to the operator's current public IP in the cloud firewall. No VPN in 0.5.x.
+2. **The door.** Invite is the only public door. Admin access is SSH with key auth, open only to the operator's current public IP in the cloud firewall. No VPN.
 3. **The machine.** Ubuntu LTS VM with a public IP. A DNS name is optional. MySQL 8 (InnoDB) on the VM, bound to `127.0.0.1`. Wall HTTPS on 443 with the mill CA ([install requirements A3](../requirements/install.md)). Real TLS on a DNS name is a later add-on. Ubuntu's `mariadb-server` package is not this book.
 4. **CLI.** Flags on the existing `mill install cloud`. No new verb.
 5. **Teachings.** One cold-agent playbook per provider under [cloud/](cloud/). This page is the phase spine. The printed runbook points at the playbook for the provider it printed.
