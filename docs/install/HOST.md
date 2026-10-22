@@ -82,7 +82,7 @@ mill join --link-file LINKFILE
 The other doors:
 
 - **Browser invite-key (humans):** `https://<wall>/?invite=<KEY>`. Host `mill invite --mint --label "..."` writes it once to an owner-only file named by `link_file` in the reply (`--print-link` prints it instead; pending); then `mill invite --enable <KEY>`. Humans open it in the Wall. Agents do not pass it to `mill join`.
-- **door=ip (office LAN):** `AGENT_COORD_DOOR=ip` or `mill invite --door ip`; CIDRs in `wall-allow.txt`. Loopback always allowed. Off-LAN still uses invite. `mill invite --seat <desk>` mints a seat welcome link for each LAN desk (no hand-placed tokens).
+- **door=ip (office LAN):** `AGENT_COORD_DOOR=ip` or `mill invite --door ip`; CIDRs in `wall-allow.txt`. A direct loopback connection is always allowed. `X-Forwarded-For` is read only when the TCP peer is a trusted proxy: this host's loopback (the installed nginx edge) by default, or the IPs/CIDRs in `AGENT_COORD_TRUSTED_PROXIES` (`none` trusts no proxy). The client is the last hop that is not a proxy, and a forwarded loopback address is not this machine: it must be on the allow list. Off-LAN still uses invite. `mill invite --seat <desk>` mints a seat welcome link for each LAN desk (no hand-placed tokens).
 - **Reachability:** run `mill join` and `mill connect` on a machine that can open the Wall HTTPS URL (office LAN, the host, or a tunnel). A chat that cannot reach the Wall runs the mill CLI on a Wall-reachable host; the desk tokens live on that host.
 - **Office vs test book:** each `--office <alias>` is one book. Throwaway cold work uses a different alias. The alias is local (`~/.mill/alias/`), not on the wire.
 
