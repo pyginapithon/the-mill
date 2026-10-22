@@ -24,7 +24,7 @@
 ## Scenario B - happy path (Inputs given)
 
 **Human says:**  
-"Remasure Claims on need toy-research-connect-cloud. Subject: mill 0.4.10 pack on the office host. Method: black-box mill create/claim/pass still works. Evidence: paste CLI transcript path in note. Decide desk: the host."
+"Remasure Claims on need toy-research-connect-cloud. Subject: the installed mill pack on the office host. Method: black-box mill create/claim/pass still works. Evidence: paste CLI transcript path in note. Decide desk: the host."
 
 **Expected:** Inputs enough -> `create todo` / `claim` / `note` / `send` as skill map -> product Done -> **STOP**.
 

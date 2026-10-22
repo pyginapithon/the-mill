@@ -1,7 +1,7 @@
 # Host - the machine (or VM) that runs the office
 
 You install **their** office on any supported host OS (Windows, Linux, macOS) or a cloud VM. Humans use the Wall; desks `pip` + mill connect ([JOIN.md](../JOIN.md)).
-Idle for desks: `mill connect` + HINT. SoR: [JOIN.md](../JOIN.md), [protocol/verbs.md](../protocol/verbs.md).
+Idle for desks: [JOIN.md](../JOIN.md) (Connect, then commands): `mill connect-wait DESK` blocks until the next hint; a background connect with `mill route` answers while the chat stays free. SoR: [JOIN.md](../JOIN.md), [protocol/verbs.md](../protocol/verbs.md).
 
 ## Two installs
 
@@ -117,7 +117,7 @@ Before applying SQL to a live office book, A/B on a throwaway local DB: (1) appl
 
 Restarting the wall or `mill update` does not install new `CALL mill_*` routines; `mill install sql --apply` does, through ensure. The tables stay. Do **not** run `wipe.sql`. Do **not** apply `tables.sql` on a live book.
 
-`name_type.sql` migrates an existing book to the `tables.sql` column shape. It is not in `apply_order.txt`. Run that file once, then apply the routines with wipe off. It leaves the 0.6 shape; `mill install` on 0.7.0 then runs `migrate_070_roster.sql` (one `roster` type, `roster_id` columns). A second run leaves the book as it is. There is no name watcher type. A fresh book is `wipe.sql` then the apply order.
+`name_type.sql` migrates an existing book to the `tables.sql` column shape. It is not in `apply_order.txt`. Run that file once, then apply the routines with wipe off. It leaves the 0.6 shape; `mill install` then runs `migrate_070_roster.sql` (one `roster` type, `roster_id` columns). A second run leaves the book as it is. There is no name watcher type. A fresh book is `wipe.sql` then the apply order.
 
 On the host, take `agent_coord/server/sql/` from the pack the wall is now running.
 

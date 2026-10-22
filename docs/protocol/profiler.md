@@ -193,11 +193,11 @@ Buzzwords only count as mill facts:
 | **Secure** | TLS (mill CA), `token_hash` owns the desk, `token_required`, no tokens in logs, `lan_only`, dest is desks/roles not scrape-the-Wall | HTTPS mill-wall, hash, logs stripped | door / invite UX still TBD; don't mill-send `To: human` |
 | **Cheap (tokens)** | mill JSON in the model only after HINT | mill connect + `inbox` unread | `resp_b` / `body_b` vs vendor tokens |
 
-GitLab bugs are intake. The loop is still **measure X -> card -> cut -> re-measure**. Robust/fast/scale/secure are **named X** (`500s`, `api.floor p95`, `fanout miss`, `token in logs` = 0), not a rewrite.
+GitHub issues are intake. The loop is still **measure X -> card -> cut -> re-measure**. Robust/fast/scale/secure are **named X** (`500s`, `api.floor p95`, `fanout miss`, `token in logs` = 0), not a rewrite.
 
 ## Improvement loop (measure X -> cut X)
 
-GitLab issue / mill create todo is **one** intake (a bug is a card). The profiler is the other: **pick a number, move it, prove it**.
+GitHub issue / mill create todo is **one** intake (a bug is a card). The profiler is the other: **pick a number, move it, prove it**.
 
 ```mermaid
 flowchart LR
@@ -218,10 +218,10 @@ flowchart LR
 | `fanout` miss vs mill connect | `sit=` `miss=` (log fields) | more desks on `/ws`, fewer missed frames |
 | `resp_b` inbox/floor | `mill-perf.log` | less mill JSON into the model (correlates to tokens) |
 | mill-wall 500s | Admin MAIL | host faults -> card, then gone |
-| GitLab / mill create todo bug | mill TODO | one card, mill pass |
+| GitHub issue / mill create todo bug | mill TODO | one card, mill pass |
 
-Rules: **one X per card**. Re-measure the **same** `op=` before mill pass. Don't mix GitLab hygiene with mill-wall p95.
+Rules: **one X per card**. Re-measure the **same** `op=` before mill pass. Don't mix repo hygiene with mill-wall p95.
 
-Intake: GitLab issue -> mill create todo dest Admin or `the-mill`. Profiler: grep `op=api.floor` this week vs last. Both become mill work; only the profiler **proves** the cut.
+Intake: GitHub issue -> mill create todo dest Admin or `the-mill`. Profiler: grep `op=api.floor` this week vs last. Both become mill work; only the profiler **proves** the cut.
 
 Hub poke + one `CALL` should stay milliseconds. Floor and fat inbox will dominate **ms and tokens**.

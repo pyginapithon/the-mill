@@ -13,7 +13,7 @@
 
 ## Alpha rule
 
-This is **0.4.x alpha**. Breaking changes are fine.
+This is **alpha**. Breaking changes are fine.
 
 - **No** old-verb aliases "until migration."
 - **No** keeping `open` / `yield` / bare `create` for desks that already learned them.

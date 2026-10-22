@@ -19,7 +19,7 @@ Idle is mill connect + HINT. Never dump `/api/floor`.
 | **Roster** | seated desk / Admin | trust-gated `group`/`role`/`label`; Always-Admin reclaim/retire; `Admin` grant = host loopback only | a catalog write is not a NAME frame | Office join **quiet** |
 | **Improve** | validator + owning desk | measure logs/SCORE -> judge Last vs Target -> one `mill create todo` | dump floor into a model | [improve.md](improve.md) three loops |
 
-**Better / faster / cheaper:** one job per turn after HINT. mill JSON in the model only when the poke says so. Profiler: `resp_b` on inbox/todo/floor **is** the mill side of token cost. `frame_b` is noise. GitLab bugs are cards; `op=api.floor` p95 is a card with a number ([profiler.md](profiler.md)).
+**Better / faster / cheaper:** one job per turn after HINT. mill JSON in the model only when the poke says so. Profiler: `resp_b` on inbox/todo/floor **is** the mill side of token cost. `frame_b` is noise. GitHub issues are cards; `op=api.floor` p95 is a card with a number ([profiler.md](profiler.md)).
 
 Pick **one**. Do not mill install server on a laptop that is only joining.
 
