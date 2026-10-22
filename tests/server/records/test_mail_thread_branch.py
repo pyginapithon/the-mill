@@ -138,15 +138,15 @@ def test_after_implies_room_and_works_with_scopes(cn) -> None:
         rpc._h_mail_thread(r["book"], {"mail_id": r["root"], "scope": "bogus"}, "unit", r["a"])
 
 
-def test_outsider_refusal_names_join_route(cn) -> None:
+def test_outsider_reads_branch_without_joining(cn) -> None:
+    # #672 S-3: a desk not in the room reads it; the read joins no one.
     r = _room(cn, "rf")
     seed_names(cn, ("rfz", "desk"))
-    with pytest.raises(CoordError) as ei:
-        rpc._h_mail_thread(r["book"], {"mail_id": r["r1a"]}, "unit", "rfz")
-    msg = str(ei.value)
-    assert f"run mill reply {r['root']} --body-file PATH to join" in msg
-    assert "<body>" not in msg
-    assert "ask a participant to mill add you" in msg
+    got = rpc._h_mail_thread(r["book"], {"mail_id": r["r1a"]}, "unit", "rfz")
+    assert r["r1a"] in _ids(got)
+    from agent_coord.server.records import mail as rec_mail
+
+    assert "rfz" not in rec_mail.room_participants(cn, r["root"])
 
 
 def test_exchange_reply_reads_stay_small(cn) -> None:
