@@ -200,6 +200,7 @@ reset office
 reclaim (verb)
 reclaim kind
 reclaim slug
+reclaim need
 reclaim yes
 reclaim office
 rename (verb)
