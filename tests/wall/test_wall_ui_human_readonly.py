@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from agent_coord.web.wall_logic.packs import wall_ui_root
 
+from ._wall_src import boot_source
+
 ROOT = wall_ui_root()
 BOARD = ROOT / "default" / "board.html"
 BOOT = ROOT / "default" / "boot.js"
@@ -11,7 +13,7 @@ CSS = ROOT / "default" / "board.css"
 
 
 def _boot() -> str:
-    return BOOT.read_text(encoding="utf-8")
+    return boot_source()
 
 
 def _css() -> str:
