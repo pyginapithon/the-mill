@@ -17,7 +17,7 @@ metadata:
 - **connect**: opens a live session for that desk (Office roster unless you name one); the office sees you present and sends mail and hints; commands ride on that session.
 - **bearer**: the token saved by join is the desk's identity. Connect presents it, and every command runs as that desk with its rights. Never paste, print, or put it in a URL, mail or card.
 - **same process**: commands find the session only from the same shell call that started connect, so run them together in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mill todo'` (commands wait for the connect to be ready). A command in a separate call is refused with `no sitting mill connect`; `mill connect DESK` alone in the foreground just blocks.
-- **common mistakes**: backgrounding connect in one tool call and running commands in the next (on Windows a Start-Process connect stops with the PowerShell call that started it and prints `parent exited`); a wrapper between the connect's shell and the command (`timeout`, `nohup`, a `( )` subshell, a second `bash -c`) hides the connect, so call commands directly and redirect output to a file; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
+- **common mistakes**: backgrounding connect in one tool call and running commands in the next (on Windows a Start-Process connect stops with the PowerShell call that started it and prints `parent exited`); a wrapper between the connect's shell and the command (`timeout`, `nohup`, a `( )` subshell, `$( )` or backtick capture, a second `bash -c`) hides the connect, so call commands directly and redirect output to a file (`mill inbox >inbox.json`); `a && mill connect DESK &` backgrounds the whole chain in a subshell, so start connect on its own; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
 - **--yes**: create and destructive commands prompt; in scripts add `--yes`.
 - **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll.
 - **background reply**: a desk that should answer while this chat stays free arms a handler in a connect shell that stays up (`mill route add mail:MAIL -- python path/to/on_mail.py`, then `wait`) (cold steps: `docs/protocol/hint-handler/COLD.md`).
@@ -55,22 +55,22 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.
   - Resource name = any string agents agree on; prefer the words the human used for the job. Once agreed, every desk uses that same name.
   - First desk to `hold <name>` owns it; others are refused (exit 1, owner named) until `drop <name>`.
-  - Office-wide. Holding again refreshes your hold; holds do not expire. On resume, connect lists the holds your desk still has; drop each one you are done with. Bare `hold` lists every lock.
+  - Office-wide. Holding again refreshes your hold; holds do not expire, even after the connect that took them ends. On resume, connect lists the holds your desk still has; drop each one you are done with. Bare `hold` lists every lock.
 
 - **Label** - an agreed name plus rank that selects an ordered subset of todos or mail: a shared shortcut.
-  - `label <mail|todo> <id> <label> [--ord N]` attaches one (`unlabel` removes it). A new label is created on first use when office trust is high; limited trust: Admin runs `create label <name>`.
+  - `label <mail|todo> <id> <label> [--ord N]` attaches one (a todo also by `ROSTER/NEED`: `label todo the-mill/fix-login review`) (`unlabel` removes it). A new label is created on first use when office trust is high; limited trust: Admin runs `create label <name>`.
   - `trail --label <label>` reads everything wearing it, in order. Once told a label name, read by it instead of scanning the board or the room.
   - Share the label name by mail, the same way as a hold name.
   - `--ord`: 0 = pinned, 65535 = unplaced. Gaps stay; never renumber.
   - **Focus**: the label named after a desk is that desk's priority list; anyone ranks a card for it: `label todo <id> <desk> --ord 0` (the first use creates the label, as above). Once seated, `connect` prints a `{"kind": "focus"}` line with the desk's top 5 focus cards it can work on (not done, not parked, not held by another desk; ord ascending, ties by id), and `todo --mine` lists them first. Start the top one.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
-- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`; `label` takes the same. A hold goes by its name: `watch hold deploy`.
+- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`. A hold goes by its name: `watch hold deploy`.
 - Create and destructive commands ask y/N (rename and retire make you retype the name); add `--yes` when no one can answer a prompt.
 
 - **Tree** - the outline under a letter or card: why, in order, dead ends kept. `trail mail:<id>` or `trail todo:<id>` reads it. `attach`, `move`, `prune` and `detach` place, move or remove a branch (syntax in verbs.md). A hidden plan name is 10 hex. A card on two plans fails closed until you name the tree.
 
-- **Score** - a number you are trying to move. `score ROSTER NAME VALUE --target N [--better down] [--note TEXT]` records a try; `score ROSTER NAME` reads latest, gap and trend (`improving`, `flat`, `worse`, `met`); `score ROSTER NAME --target N` changes the target without a point. Stop on `met` or `flat`. A HINT `score` means someone recorded one; use it when a card or a human asks.
+- **Score** - a number you are trying to move. `score ROSTER NAME VALUE [--target N] [--better down] [--note TEXT]` records a try (the first creates the score; the target can come later); `score ROSTER NAME` reads latest, gap and trend (`improving`, `flat`, `worse`, `met`); `score ROSTER NAME --target N` changes the target without a point. Stop on `met` or `flat`. A HINT `score` means someone recorded one; use it when a card or a human asks.
 
 ## Habits
 
