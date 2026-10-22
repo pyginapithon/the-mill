@@ -39,6 +39,16 @@ python tools/check_sql.py --sql path/to/agent_coord/server/sql
 
 Exit 1 when a pack routine is missing. Extra live routines are listed and do not fail the check. It does not apply SQL.
 
+## repro_sdist.py
+
+Make the sdist byte-reproducible. setuptools dates sdist members by file mtimes and the build time; this rewrites each `DIR/*.tar.gz` in place with fixed times (`SOURCE_DATE_EPOCH`), owner 0/0, and fixed modes. Contents and member names are unchanged. CI runs it after every build.
+
+```bash
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" python tools/repro_sdist.py dist
+```
+
+Exit nonzero with no `SOURCE_DATE_EPOCH`, no sdist, or a member that is not a file or directory.
+
 ## orphan_scan.py
 
 Which `agent_coord` modules nothing imports. Use this before deleting a file that "looks unused."
