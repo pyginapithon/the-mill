@@ -3007,6 +3007,26 @@
     let _hereDomPick = "";
     let _floorBook = null;
     let _floorBookKey = "";
+    /* #718: CONNECTED (#here) belongs to one scope. On a roster switch it shows the
+       hourglass until the new roster's desks are read, instead of keeping the last
+       roster's desks under a glance that already speaks for the new one. */
+    function wallHereAgentsRead(d) {
+      /* The cut view always carries an agents array (cutFloor fills []), so ask the
+         scope's raw book whether the agents part was read; a slice says it in parts. */
+      if (_floorBook) return Array.isArray(_floorBook.agents);
+      if (!d || !Array.isArray(d.agents)) return false;
+      return !Array.isArray(d.parts) || d.parts.indexOf("agents") >= 0;
+    }
+    function wallHereHourglass() {
+      _hereDomPick = "";
+      const h = (typeof document !== "undefined") ? document.getElementById("here") : null;
+      if (h && !wallIsLoadingEl(h)) h.innerHTML = wallLoadingHtml("Loading desks...");
+    }
+    function wallHereNeedsPaint(pickKey, d) {
+      /* Another cut wrote #here (or the hourglass holds it) and this scope's desks are
+         read: paint, even when the new roster has no desks (that is the honest empty). */
+      return String(pickKey || "") !== _hereDomPick && wallHereAgentsRead(d);
+    }
     function resetFloorBook() {
       _floorBook = null;
       _floorBookKey = "";
@@ -3019,6 +3039,7 @@
          inherit the last scope's rows and parts (the strip counted them). Panes
          keep their DOM until the new paint lands. */
       window._floor = null;
+      try { wallHereHourglass(); } catch (eHereHg) {}
     }
     function bookIsProject(query) {
       return !!_floorBook && _floorBookKey === ("project:" + String(query || ""));
@@ -6018,6 +6039,12 @@
       try { paintHereScores(d); } catch (eScores) {}
       try { wireHereFront(); } catch (eHereWire) {}
       if (!h) return;
+      /* #718: desks not read for this scope yet (a TODO or MAIL poll): keep the hourglass,
+         never a false "No desks are here". */
+      if (!wallHereAgentsRead(d)) {
+        if (!wallIsLoadingEl(h) && !_hereDomPick) h.innerHTML = wallLoadingHtml("Loading desks...");
+        return;
+      }
       _hereDomPick = (railPick && railPick.kind) ? (railPick.kind + ":" + railPick.id) : "";
       if (!live.length) {
         const m = d.maintenance && d.maintenance.eta_at ? d.maintenance : null;
@@ -8791,7 +8818,7 @@
         safe(function () { wire(d); }, "wire");
         if (partPaint("mail")) safe(function () { mail(d); }, "mail");
         safe(function () { stations(d); }, "stations");
-        const hereStale = pickKey !== _hereDomPick && ((d.agents || []).length > 0);
+        const hereStale = wallHereNeedsPaint(pickKey, d);
         if (partPaint("agents") || partPaint("holds") || partPaint("events") || hereStale) {
           safe(function () { agents(d); }, "session");
           safe(function () { paintSessionWire(d); }, "session-wire");
