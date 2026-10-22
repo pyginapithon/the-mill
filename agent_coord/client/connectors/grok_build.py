@@ -4,7 +4,7 @@ Who it wakes: the Grok *session* bound to this mill desk (one UUID), not a
 subagent. One TUI with many mill desks needs mill connect --session per desk
 (or they all poke the same chat).
 
-Do not mill_wait. PING skipped.
+PING skipped.
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def _prompt(hint: dict[str, Any]) -> str:
     return (
         f"mill HINT {h} type={typ} id={nid}. "
         "mill inbox unread or mill todo one card then STOP. "
-        "Do not dump /api/floor. Do not mill_wait."
+        "Do not dump /api/floor."
     )
 
 

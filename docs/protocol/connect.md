@@ -72,7 +72,7 @@ flowchart LR
 
 Same Hub. Same `{type,id,hint,detail}`. `hint` stays `MAIL`/`TODO` (route key). **`detail`** is this desk's `watcher.hint` or the default ([hints.md](hints.md)).
 
-**Today:** background mill connect is the sibling process (route/spawn). **CLI foreground:** mill connect-wait blocks **that** mill process on /ws until **one** work HINT (skips PING) or a non-empty queue (an empty queue keeps waiting; so does one whose items a live connect of this desk already got, outcome `sent`), prints it as JSON, exits - no mill route spawn. Build shells it as this turn, then mill-fetch. Break-out = interrupt that mill CLI (Ctrl+C). Esc still does **not** cancel mill connect. `mill connect DESK --vendor grok-build --session UUID` starts a new headless turn in that session per HINT ([grok-foreground.md](grok-foreground.md)); injecting a HINT into an open TUI turn is **not** built. mill_wait is a short poll, not this.
+**Today:** background mill connect is the sibling process (route/spawn). **CLI foreground:** mill connect-wait blocks **that** mill process on /ws until **one** work HINT (skips PING) or a non-empty queue (an empty queue keeps waiting; so does one whose items a live connect of this desk already got, outcome `sent`), prints it as JSON, exits - no mill route spawn. Build shells it as this turn, then mill-fetch. Break-out = interrupt that mill CLI (Ctrl+C). Esc still does **not** cancel mill connect. `mill connect DESK --vendor grok-build --session UUID` starts a new headless turn in that session per HINT ([grok-foreground.md](grok-foreground.md)); injecting a HINT into an open TUI turn is **not** built.
 
 Regression row F28 (connect-wait-holds). Regression row F44 (connect-wait-sent).
 
