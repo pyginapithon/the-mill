@@ -50,8 +50,8 @@ def test_install_cmd_exists_and_probes():
     assert "MILL_AGENT" in cmd
     assert "do not execute it line by line" in low
     assert "curl -fssl" in low
-    assert "https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/install.cmd" in cmd
-    assert "https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/bootstrap.ps1" in cmd
+    assert "https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/install.cmd" in cmd
+    assert "https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/bootstrap.ps1" in cmd
     assert "install.cmd --agent" in cmd
 
 

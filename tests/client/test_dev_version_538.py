@@ -43,7 +43,7 @@ def test_install_from_a_git_url_names_the_commit(monkeypatch):
     _no_checkout(monkeypatch)
     sha = "d83656b2ae028e571acbf20e54b39c81434e10dc"
     monkeypatch.setattr(packver, "_dist", lambda: _Dist(
-        {"url": "https://github.com/pyginapithon/the-mill", "vcs_info": {"vcs": "git", "commit_id": sha}}))
+        {"url": "https://github.com/si4ai/the-mill", "vcs_info": {"vcs": "git", "commit_id": sha}}))
     assert packver.version_line() == packver.package_version() + "+gd83656b"
 
 

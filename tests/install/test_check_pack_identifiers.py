@@ -441,3 +441,59 @@ def test_copilot_trailer_does_not_hide_an_address(tmp_path, monkeypatch) -> None
     rev = _commit_as(repo, _COPILOT_AUTHOR, _j("Initial plan\n\nask ", addr, "\n\n", _COPILOT_TRAILER, "\n"))
     _mod_, fails = _scan_in(monkeypatch, repo)
     assert f"email outside placeholder domains in git commit {rev[:12]}" in fails, fails
+
+
+# #810 (F109): in the merge queue HEAD is the squash commit GitHub will land
+# on main. check_pack --head-message scans that one message with every
+# message rule, name token included, even in a shallow clone.
+def _head_in(monkeypatch, repo: Path, names: tuple[str, ...] = ()):
+    mod = _mod()
+    monkeypatch.setattr(mod, "mill_root", lambda: repo)
+    return mod, mod.scan_head_message(mod._home_user_regexes(names))
+
+
+def test_head_message_clean_passes(tmp_path, monkeypatch) -> None:
+    repo = _fresh_root(tmp_path / "r", "older commit", "#810 repo links name the org (#150)\n\nlinks and one-liners move too.")
+    _mod_, fails = _head_in(monkeypatch, repo)
+    assert fails == [], fails
+
+
+def test_head_message_name_token_fails(tmp_path, monkeypatch) -> None:
+    who = _j("W", "ibble")
+    repo = _fresh_root(tmp_path / "r", "older commit", _j("#810 fix (#150)\n\nThanks ", who, " for the report."))
+    _mod_, fails = _head_in(monkeypatch, repo)
+    tip = _git(repo, "rev-parse", "HEAD")
+    assert fails == [f"personal name token in the queued message {tip[:12]}"], fails
+
+
+def test_head_message_email_and_private_name_fail(tmp_path, monkeypatch) -> None:
+    secret = _j("zq", "fixture", "alias")
+    repo = _fresh_root(tmp_path / "r", _j("#810 fix\n\nmail ", "desk", "@", "mailhost.co", " on ", secret))
+    _mod_, fails = _head_in(monkeypatch, repo, (secret,))
+    tip = _git(repo, "rev-parse", "HEAD")[:12]
+    assert f"email outside placeholder domains in the queued message {tip}" in fails, fails
+    assert f"local home-user name in the queued message {tip}" in fails, fails
+
+
+def test_head_message_runs_in_a_shallow_clone(tmp_path, monkeypatch) -> None:
+    who = _j("W", "ibble")
+    src = _fresh_root(tmp_path / "src", "initial public import", _j("fix for ", who))
+    shallow = tmp_path / "shallow"
+    _git(tmp_path, "clone", "-q", "--depth", "1", src.as_uri(), str(shallow))
+    _mod_, fails = _head_in(monkeypatch, shallow)
+    assert len(fails) == 1 and "personal name token" in fails[0], fails
+
+
+def test_head_message_cli_exit_codes(tmp_path, monkeypatch, capsys) -> None:
+    who = _j("W", "ibble")
+    mod = _mod()
+    clean = _fresh_root(tmp_path / "c", "#810 clean message")
+    monkeypatch.setattr(mod, "mill_root", lambda: clean)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.delenv("GITLAB_CI", raising=False)
+    assert mod.main(["--head-message"]) == 0
+    dirty = _fresh_root(tmp_path / "d", _j("fix for ", who))
+    monkeypatch.setattr(mod, "mill_root", lambda: dirty)
+    assert mod.main(["--head-message"]) == 1
+    out = capsys.readouterr().out
+    assert who not in out

@@ -1,7 +1,7 @@
 @echo off
 REM mill Windows empty-machine front door. No Python required.
 REM Agents: run this file as one process. Do not execute it line by line.
-REM cmd /c "curl -fsSL https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/install.cmd -o install.cmd && install.cmd --agent && del install.cmd"
+REM cmd /c "curl -fsSL https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/install.cmd -o install.cmd && install.cmd --agent && del install.cmd"
 REM Human Admin window stays (pause + prompt). Agent: MILL_AGENT=1 or --agent (no pause).
 REM Unelevated: ONE Hidden elevate helper auto-exits. Do NOT hide this whole run.
 setlocal EnableExtensions
@@ -13,7 +13,7 @@ set "BOOT=%HERE%bootstrap.ps1"
 if exist "%BOOT%" goto haveboot
 echo mill install.cmd: fetching bootstrap.ps1 (one file, not line by line)
 set "BOOT=%TEMP%\mill-bootstrap.ps1"
-curl -fsSL "https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/bootstrap.ps1" -o "%BOOT%"
+curl -fsSL "https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/bootstrap.ps1" -o "%BOOT%"
 if errorlevel 1 (
   echo HUMAN: could not download bootstrap.ps1
   set "RC=1"
