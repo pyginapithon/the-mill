@@ -276,3 +276,29 @@ def test_permissions_are_minimal() -> None:
         if p.name != "release.yml":
             assert "id-token" not in text, p.name
     assert _code(WF / "release.yml").count("id-token: write") == 1
+
+
+def test_pack_rebuilds_byte_identical_in_ci_and_release() -> None:
+    """F78: CI and release verify rebuild the commit and compare sha256 with dist/."""
+    ci = _job((WF / "ci.yml").read_text(encoding="utf-8"), "build_pack")
+    assert ci.index("python -m build --no-isolation") < ci.index("python tools/check_repro.py dist"), ci
+    assert ci.index("python tools/check_repro.py dist") < ci.index("actions/upload-artifact@"), ci
+    verify = _job((WF / "release.yml").read_text(encoding="utf-8"), "verify")
+    for name, job in (("ci build_pack", ci), ("release verify", verify)):
+        assert "python tools/check_repro.py dist" in job, name
+    # verify rebuilds in the ci.txt env, so it must pin the build tools build.txt pins.
+    build = {e.split(" ")[0] for e in _lock_reqs(LOCK / "build.txt")}
+    ci_pins = {e.split(" ")[0] for e in _lock_reqs(LOCK / "ci.txt")}
+    assert build <= ci_pins, build - ci_pins
+
+
+def test_pack_uses_the_reproducible_backend_and_spdx_license() -> None:
+    """F78: the in-tree backend normalizes both archives; the license is SPDX."""
+    import tomllib
+
+    py = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert py["build-system"]["build-backend"] == "mill_build"
+    assert py["build-system"]["backend-path"] == ["build_backend"]
+    assert py["project"]["license"] == "MIT"
+    assert py["project"]["license-files"] == ["LICENSE"]
+    assert "include build_backend/mill_build.py" in (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
