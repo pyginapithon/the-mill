@@ -1821,7 +1821,9 @@ def build_scores(
 ) -> list[dict]:
     """Scores isolate: mill_score_select per project and Office; dedupe owner|kpi|aff."""
     kpis: list[dict] = []
-    score_ps = list(dict.fromkeys([*(mail_ps or []), CONST_OFFICE]))
+    from agent_coord.server.admin.guard import office_name
+
+    score_ps = list(dict.fromkeys([*(mail_ps or []), office_name(cn)]))  # #722: id 1's name
     seen_kpi: set[tuple] = set()
     for mp, mp_rows in _score_by_aff(cn, score_ps):
         for r in mp_rows:

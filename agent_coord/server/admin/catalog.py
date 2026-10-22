@@ -11,7 +11,12 @@ from agent_coord.const import CONST_ROSTER
 
 from agent_coord.helpers.errors import CoordError
 from agent_coord.server.records import name as rec_name
-from agent_coord.server.admin.guard import require_admin, require_admin_if_limited, reserved_roster_id
+from agent_coord.server.admin.guard import (
+    ADMIN_ROSTER_ID,
+    require_admin,
+    require_admin_if_limited,
+    reserved_roster_id,
+)
 
 
 def _stored(value: Any) -> str:
@@ -100,9 +105,9 @@ def rename(cn, desk: str, body: dict[str, Any]) -> list[dict]:
     confirm = str(body.get("confirm") or "").strip()
     _match(new, confirm, verb="rename")
     kind = _live_kind(cn, old, body, verb="rename")
-    if kind == CONST_ROSTER and reserved_roster_id(cn, old) is not None:
-        # #722: SQL refuses too; this makes the refusal a clean one.
-        raise CoordError(f"rename: {old!r} is a reserved roster (Office, Admin); it keeps its name")
+    if kind == CONST_ROSTER and reserved_roster_id(cn, old) == ADMIN_ROSTER_ID:
+        # #722: SQL refuses too; this makes the refusal a clean one. Office may be renamed.
+        raise CoordError(f"rename: {old!r} is the reserved Admin roster; it keeps its name")
     return rec_name.rename(cn, old, new, kind)
 
 
