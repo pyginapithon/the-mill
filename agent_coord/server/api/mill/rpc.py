@@ -6,6 +6,7 @@ Bearer or PRIVATE-TOKEN. mill-wall does not write ~/.mill/session for laptops.
 """
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import threading
@@ -27,6 +28,8 @@ from agent_coord.const import (
 from agent_coord.helpers.errors import CoordError
 from agent_coord.helpers.ident import desk as desk_stem
 from agent_coord.helpers.ident import desk_name, slug
+
+_log = logging.getLogger("mill.rpc")
 
 
 def _stored(value: Any) -> str:
@@ -236,7 +239,10 @@ def _issue_here(c: Book, body: dict[str, Any]) -> dict[str, Any]:
     project = _stored(project_raw)
     owner = _stored(owner_raw)
     role_raw = str(body.get("role") or "").strip()
-    if role_raw.lower() == "admin":
+    from agent_coord.server.admin.guard import is_admin_roster
+
+    cn = getattr(c, "_cn", None)
+    if role_raw and is_admin_roster(cn, role_raw):
         raise CoordError(
             f"{CONST_ROSTER} {CONST_ADMIN} is granted only by member-add on the office host"
         )
@@ -253,8 +259,17 @@ def _issue_here(c: Book, body: dict[str, Any]) -> dict[str, Any]:
     # mill connect with no roster sends Office on purpose and keeps it.
     if project == CONST_OFFICE and body.get("placeholder"):
         seated = _seat_roster(c._cn, owner)
-        if seated and seated != CONST_OFFICE:
+        # An Admin desk keeps Admin; its join row sits on Office (#674).
+        if seated and seated != CONST_OFFICE and not is_admin_roster(cn, seated):
             project = seated
+    # #674: join never adds a desk to the reserved Admin roster, in any spelling
+    # the book resolves to it. mill_join_upsert refuses the same in SQL.
+    if is_admin_roster(cn, project):
+        _log.warning("join refused: project resolves to the Admin roster (desk %s)", owner[:64])
+        raise CoordError(
+            f"join: {CONST_ROSTER} {CONST_ADMIN} is not a join roster; "
+            f"{CONST_ROSTER} {CONST_ADMIN} is granted only by member-add on the office host"
+        )
     token = str(body.get("token") or "").strip() or secrets.token_urlsafe(24)
     rows = rec_join.upsert(
         c._cn,
