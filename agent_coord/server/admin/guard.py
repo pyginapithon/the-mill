@@ -20,6 +20,42 @@ def _desk(value) -> str:
     return str(value or "").strip()
 
 
+# The reserved Admin roster is name id 2 (tables.sql seed; sp_name refuses to delete it).
+ADMIN_ROSTER_ID = 2
+
+
+def is_admin_roster(cn, name) -> bool:
+    """Does this roster name resolve to the reserved Admin roster? (#674, #675)
+
+    The name table is case- and accent-insensitive (utf8mb4_0900_ai_ci), so a
+    Python string compare against CONST_ADMIN is not enough: "admin" and other
+    spellings resolve to the same row. A casefold match is refused at once; any
+    other name is resolved the way the book resolves it and compared by id.
+    SQL refuses the same names on its own; this check makes the refusal clean.
+    """
+    from agent_coord.server.records.db import scalar_done
+
+    raw = _desk(name)
+    if not raw:
+        return False
+    if raw.casefold() == CONST_ADMIN.casefold():
+        return True
+    if cn is None:
+        return False
+    try:
+        got = scalar_done(
+            cn,
+            "SELECT id FROM name WHERE type = %s AND name = TRIM(%s) LIMIT 1",
+            (CONST_ROSTER, raw),
+        )
+    except Exception:
+        return False
+    try:
+        return got is not None and int(got) == ADMIN_ROSTER_ID
+    except (TypeError, ValueError):
+        return False
+
+
 def role_admin_any(cn) -> bool:
     return any(True for _ in rec_member.select(cn, CONST_ADMIN, "", CONST_ROSTER))
 
