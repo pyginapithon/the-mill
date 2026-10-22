@@ -80,6 +80,8 @@ api.strip({ parts: ['agents'], agents }); steps.push(chips());
 api.strip({ parts: ['agents', 'todos'], agents, needs: open(3) }); steps.push(chips());
 api.strip({ parts: ['agents'], agents }); steps.push(chips());
 api.strip({ parts: ['agents'], agents, between: [{}, {}, {}, {}, {}] }); steps.push(chips());
+const floorCls = (m) => ((els.strip.innerHTML.match(/class="([^"]*)" id="strip-floor"/) || [])[1] || '');
+const collabLoaded = floorCls();
 api.strip({ parts: ['agents'], agents }); steps.push(chips());
 api.wallResetStripReady();
 api.strip({ parts: ['agents'], agents }); steps.push(chips());
@@ -89,6 +91,9 @@ els['strip-todo'] = chipEl('strip-todo', '22', '22 moving');
 api.wallSyncStripTabLoading();
 const t = els['strip-todo'];
 steps.push({ todo_b: t.kids.b.textContent, cue: !!t.kids.cue, loading: t.attrs['data-wall-strip-loading'] });
+api.wallResetStripReady();
+api.strip({ parts: ['agents'], agents });
+steps.push({ loaded: collabLoaded, loading: floorCls() });
 process.stdout.write(JSON.stringify(steps));
 """
 
@@ -138,3 +143,18 @@ def test_scope_switch_forgets_counts():
 def test_sync_drops_last_scope_number():
     last = _run()[6]
     assert last == {"todo_b": "...", "cue": False, "loading": "1"}
+
+
+def test_read_collab_count_is_not_drawn_faded():
+    """A read COLLAB count is a real number: only the loading chip keeps the faded look."""
+    cls = _run()[7]
+    assert "kpi-loading" in cls["loading"].split()
+    assert "kpi-loading" not in cls["loaded"].split()
+    assert "strip-later" in cls["loaded"].split()
+    css = (BOOT.parent / "board.css").read_text(encoding="utf-8")
+    faded = css.index(".strip .kpi.strip-nav.strip-later {")
+    assert "opacity: .4" in css[faded:css.index("}", faded)]
+    rule = ".strip .kpi.strip-nav.strip-later:not(.kpi-loading) {"
+    assert rule in css and css.index(rule) > faded  # same specificity plus one class, later
+    body = css[css.index(rule):css.index("}", css.index(rule))]
+    assert "opacity: 1" in body
