@@ -2,7 +2,7 @@
 
 A clocked-in session has a disk root it may write. Other sessions do not share
 that root by default. File leases are (project_id, root_key, resource).
-gym.pt stays a leased station file (agent_lock), not a MySQL blob.
+A station file (for example weights.pt) stays leased (agent_lock), not a MySQL blob.
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ def base_moved(
     """True when a live file lease root is gone or not the session root.
 
     Abstract names (dump, mysql-solve) keep root_key '' and never fire.
-    gym.pt stays a station FILE. Not a STALE card state.
+    A station file (weights.pt) stays a FILE. Not a STALE card state.
     """
     if not (root_key or "").strip():
         return False

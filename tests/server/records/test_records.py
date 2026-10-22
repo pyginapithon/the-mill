@@ -141,13 +141,13 @@ def test_hold_unique(cn) -> None:
     from agent_coord.server.records.db import scalar
 
     seed_names(cn, ("unit", "roster"), ("other", "roster"), ("a", "desk"), ("b", "desk"))
-    a = hold.upsert(cn, "unit", "a", "gym.pt")
+    a = hold.upsert(cn, "unit", "a", "weights.pt")
     assert int(a[0]["ok"]) == 1
     hid = int(a[0]["id"])
-    again = hold.upsert(cn, "unit", "a", "gym.pt")
+    again = hold.upsert(cn, "unit", "a", "weights.pt")
     assert int(again[0]["ok"]) == 1
     assert int(again[0]["id"]) == hid
-    other = hold.upsert(cn, "other", "b", "gym.pt")
+    other = hold.upsert(cn, "other", "b", "weights.pt")
     assert int(other[0]["ok"]) == 0
     assert int(other[0]["id"]) == hid
     held = [r for r in hold.select(cn, "other") if int(r["id"]) == hid]
@@ -158,7 +158,7 @@ def test_hold_unique(cn) -> None:
     hold.delete(cn, hid, "a")
     assert scalar(cn, "SELECT id FROM hold WHERE id=%s", (hid,)) == hid
     assert scalar(cn, "SELECT desk_id FROM hold WHERE id=%s", (hid,)) is None
-    taken = hold.upsert(cn, "other", "b", "gym.pt")
+    taken = hold.upsert(cn, "other", "b", "weights.pt")
     assert int(taken[0]["ok"]) == 1
     assert int(taken[0]["id"]) == hid
 
