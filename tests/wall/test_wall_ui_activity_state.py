@@ -50,7 +50,8 @@ def test_state_rides_events_into_diary_and_wire():
     assert "state: r.state || null" in rows
     diary = src[src.index("function paintSessionWire("): src.index("function wire(d)")]
     assert "activityStatePill(p)" in diary
-    wire = src[src.index("function wire(d)"): src.index("function mailReadChips(")]
+    start = src.index("function wire(d)")
+    wire = src[start: src.index("\n    function ", start + 1)]
     assert "activityStatePill(p)" in wire
 
 
