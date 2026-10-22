@@ -2257,6 +2257,12 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     unit = str(body.get("unit") or "").strip() or None
     if unit is not None and len(unit) > 16:
         raise CoordError("score: --unit must be 1..16 characters; nothing stored")
+    note = str(body.get("note") or "")
+    if len(note) > ss.NOTE_MAX:
+        # #707: say the limit, not the book's column error.
+        raise CoordError(
+            f"score: --note is {len(note)} characters; the most is {ss.NOTE_MAX}, one line; nothing stored"
+        )
     if at and not has_value:
         raise CoordError("score: --at needs a VALUE; nothing stored")
     if at and not ss.at_ok(at):
@@ -2273,7 +2279,7 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                 name,
                 value,
                 target=target,
-                note=str(body.get("note") or ""),
+                note=note,
                 better=better,
                 unit=unit,
                 at=at,
