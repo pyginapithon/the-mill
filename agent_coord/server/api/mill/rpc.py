@@ -811,6 +811,8 @@ def _h_retire(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     from agent_coord.server.records import name as rec_name
     from agent_coord.server.admin import catalog as admin_cat
 
+    if str(body.get("name_type") or "").strip().lower() == "todo":
+        return _each_need(body.get("need"), lambda n: _todo_retire_one(c, n, project, owner, back=False))
     raw = str(body.get("slug") or owner or "").strip()
     if body.get("yes"):
         rows = admin_cat.retire(c._cn, owner or "", body)
@@ -838,8 +840,54 @@ def _h_label_name(c: Book, body: dict[str, Any], project: str, owner: str | None
 def _h_reclaim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.admin import catalog as admin_cat
 
+    if str(body.get("name_type") or "").strip().lower() == "todo":
+        return _each_need(body.get("need"), lambda n: _todo_retire_one(c, n, project, owner, back=True))
     rows = admin_cat.reclaim(c._cn, owner or "", body)
     return rows
+
+
+def _todo_retire_one(c: Book, raw_need: str, project: str, owner: str | None, *, back: bool) -> dict[str, Any]:
+    """#19: mill retire todo ROSTER NEED (soft delete) or mill reclaim todo ROSTER NEED
+    (undo). The asker or Admin. The card row, status, plan and history are kept."""
+    from agent_coord.server.admin.guard import is_role_admin
+    from agent_coord.server.records import todo as rec_todo
+
+    word = "reclaim" if back else "retire"
+    need = slug(str(raw_need or ""))
+    hit = rec_todo.find_retired(c._cn, project, need) if back else rec_todo.find(c._cn, project, need)
+    if hit is None:
+        if back and rec_todo.find(c._cn, project, need) is not None:
+            raise CoordError(f"{word} todo: {need} is not retired")
+        raise CoordError(f"no such need: {project}/{need}")
+    who = _stored(owner or "")
+    ask = _desk_slug(c._cn, hit, "asker", "creator")
+    if not who or (who != ask and not is_role_admin(c._cn, who)):
+        raise CoordError(
+            f"who-may: {word} todo is the asker ({ask}) or Admin"
+            if ask
+            else f"who-may: {word} todo is the asker or Admin; the card's asker does not resolve, so only Admin may"
+        )
+    try:
+        if back:
+            rec_todo.reclaim(c._cn, int(hit["id"]), who)
+        else:
+            rec_todo.retire(c._cn, int(hit["id"]), who)
+    except CoordError:
+        raise
+    except Exception as e:
+        msg = _sql_refusal(e)
+        if msg:
+            raise CoordError(msg) from e
+        raise
+    rec = {
+        "ok": True,
+        "need": need,
+        "id": int(hit["id"]),
+        "status": str(hit.get("status") or ""),
+        "op": "reclaimed" if back else "retired",
+    }
+    _poke(c, "todo", rec["id"], word, owner=owner)
+    return rec
 
 
 def _h_reset(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
@@ -1913,16 +1961,46 @@ def _h_yield(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     return rec
 
 
+def _each_need(raw: Any, one) -> Any:
+    """#19: NEED may be a comma list (a,b,c), the same as `mill add roster NAME d1,d2`.
+    One need runs as before (a refusal raises). A list runs every card and returns
+    one result row per card; a bad card does not stop the rest."""
+    text = str(raw or "")
+    if "," not in text:
+        return one(text)
+    rows: list[dict[str, Any]] = []
+    for part in [p.strip() for p in text.split(",")]:
+        if not part:
+            continue
+        try:
+            rec = dict(one(part))
+            rec["ok"] = True
+            rec["need"] = part
+            rows.append(rec)
+        except CoordError as e:
+            rows.append({"need": part, "ok": False, "error": str(e)})
+        except Exception as e:
+            rows.append({"need": part, "ok": False, "error": _sql_refusal(e) or f"{type(e).__name__}: refused"})
+    refused = sum(1 for r in rows if not r["ok"])
+    return {"ok": True, "results": rows, "refused": refused}
+
+
 def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """One named step (#615): ship (claimed -> shipped, the volunteer), done
-    (shipped -> done, the asker accepts) or back (done -> shipped -> claimed).
-    A step that does not fit the card's status is refused and changes nothing."""
-    from agent_coord.server.records import todo as rec_todo
-
-    need = slug(str(body.get("need") or ""))
+    (shipped -> done, the asker or Admin accepts) or back (done -> shipped -> claimed).
+    A step that does not fit the card's status is refused and changes nothing.
+    NEED may be a comma list (#19)."""
     step = str(body.get("step") or "ship").strip().lower()
     if step not in ("ship", "done", "back"):
         raise CoordError("pass: step is ship, done or back")
+    return _each_need(body.get("need"), lambda n: _pass_one(c, n, step, project, owner))
+
+
+def _pass_one(c: Book, raw_need: str, step: str, project: str, owner: str | None) -> dict[str, Any]:
+    from agent_coord.server.admin.guard import is_role_admin
+    from agent_coord.server.records import todo as rec_todo
+
+    need = slug(str(raw_need or ""))
     hit = rec_todo.find(c._cn, project, need)
     if hit is None:
         raise CoordError(f"no such need: {project}/{need}")
@@ -1951,12 +2029,13 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         if st != "shipped":
             raise CoordError(f"pass --done: {need} is {st}, not shipped; nothing changed")
         # #655: an asker that does not resolve is not a pass for everyone;
-        # only the volunteer may still finish the card.
-        if who and ask != who and vol != who:
+        # only the volunteer may still finish the card. #19: Admin closes a card
+        # whose asker is gone or idle; the refusal names the asker.
+        if who and ask != who and vol != who and not is_role_admin(c._cn, who):
             raise CoordError(
-                "who-may: pass shipped->done is the asker"
+                f"who-may: pass shipped->done is the asker ({ask}) or Admin"
                 if ask
-                else "who-may: pass shipped->done is the asker; the card's asker does not resolve, so only the volunteer may"
+                else "who-may: pass shipped->done is the asker; the card's asker does not resolve, so only the volunteer or Admin may"
             )
         nxt = "done"
     else:

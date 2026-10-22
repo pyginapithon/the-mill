@@ -5,6 +5,8 @@ DROP PROCEDURE IF EXISTS mill_todo_delete;
 DROP PROCEDURE IF EXISTS mill_todo_select;
 DROP PROCEDURE IF EXISTS mill_todo_page;
 DROP PROCEDURE IF EXISTS mill_todo_get;
+DROP PROCEDURE IF EXISTS mill_todo_retire;
+DROP PROCEDURE IF EXISTS mill_todo_reclaim;
 
 DELIMITER //
 
@@ -239,6 +241,74 @@ BEGIN
   SELECT p_id AS id, 'deleted' AS op;
 END //
 
+-- #19: retire is a soft delete that keeps the card row, its status, plan,
+-- labels and watchers. It stamps activity.deleted, so mill_todo_select and
+-- mill_todo_page skip the card. Reclaim clears the stamp; the card comes back
+-- with its old status. A card with no activity row gets one, stamped.
+CREATE PROCEDURE mill_todo_retire(
+  IN p_id   BIGINT UNSIGNED,
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  DECLARE v_ts DATETIME(6);
+  DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE v_proj BIGINT UNSIGNED;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+  START TRANSACTION;
+  SET v_ts = MILL_NOW();
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  SET v_proj = NULL;
+  SELECT roster_id INTO v_proj FROM todo WHERE id = p_id FOR UPDATE;
+  IF v_proj IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'retire todo: no such card';
+  END IF;
+  IF v_desk IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'retire todo: no such desk';
+  END IF;
+  IF EXISTS (SELECT 1 FROM activity WHERE type = 'todo' AND id = p_id AND deleted IS NOT NULL) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'retire todo: card is already retired';
+  END IF;
+  INSERT INTO activity (type, id, created, updated, deleted, desk_id, roster_id, weight, n, bytes)
+  VALUES ('todo', p_id, v_ts, v_ts, v_ts, v_desk, v_proj, MILL_WEIGHT('todo'), 1, NULL)
+  ON DUPLICATE KEY UPDATE deleted = v_ts, updated = v_ts;
+  UPDATE todo SET updated = v_ts, updated_id = v_desk WHERE id = p_id;
+  COMMIT;
+  SELECT p_id AS id, 'retired' AS op;
+END //
+
+CREATE PROCEDURE mill_todo_reclaim(
+  IN p_id   BIGINT UNSIGNED,
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  DECLARE v_ts DATETIME(6);
+  DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+  START TRANSACTION;
+  SET v_ts = MILL_NOW();
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  IF v_desk IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reclaim todo: no such desk';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM todo t
+                   JOIN activity a ON a.type = 'todo' AND a.id = t.id AND a.deleted IS NOT NULL
+                  WHERE t.id = p_id) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'reclaim todo: card is not retired';
+  END IF;
+  UPDATE activity SET deleted = NULL, updated = v_ts WHERE type = 'todo' AND id = p_id;
+  UPDATE todo SET updated = v_ts, updated_id = v_desk WHERE id = p_id;
+  COMMIT;
+  SELECT p_id AS id, 'reclaimed' AS op;
+END //
+
 CREATE PROCEDURE mill_todo_get(IN p_id BIGINT UNSIGNED)
 BEGIN
   SELECT t.type, t.id, t.created, t.updated, t.updated_id, t.roster_id, t.creator_id,
@@ -288,6 +358,8 @@ BEGIN
   LEFT JOIN name trn ON trn.id = tr.tree_id
   WHERE (v_proj IS NULL OR t.roster_id = v_proj)
     AND (p_status IS NULL OR p_status = '' OR t.status = p_status)
+    AND NOT EXISTS (SELECT 1 FROM activity ra
+                     WHERE ra.type = 'todo' AND ra.id = t.id AND ra.deleted IS NOT NULL)
   ORDER BY tr.tree_id IS NULL, tr.tree_id, t.id;
 END //
 
@@ -331,6 +403,8 @@ BEGIN
   LEFT JOIN name trn ON trn.id = tr.tree_id
   WHERE (v_proj IS NULL OR t.roster_id = v_proj)
     AND (p_status IS NULL OR p_status = '' OR t.status = p_status)
+    AND NOT EXISTS (SELECT 1 FROM activity ra
+                     WHERE ra.type = 'todo' AND ra.id = t.id AND ra.deleted IS NOT NULL)
     AND (IFNULL(p_hide_done, 0) = 0 OR t.status <> 'done')
     AND (IFNULL(p_id, 0) = 0 OR t.id = p_id)
   ORDER BY tr.tree_id IS NULL, tr.tree_id, t.id;
