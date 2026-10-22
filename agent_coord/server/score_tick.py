@@ -15,6 +15,7 @@ from typing import Any
 
 from agent_coord.const import CONST_ADMIN, CONST_OFFICE
 from agent_coord.config import mill_home
+from agent_coord.server.admin.guard import office_name
 
 KPI_TICKS = "mill-wall.ticks"
 KPI_IDLE = "mill-desk.idle_verbs"
@@ -555,7 +556,7 @@ def ensure_desk_scores(desk: str) -> dict[str, Any]:
     out: dict[str, Any] = {"ok": True, "desk": who, "rows": []}
     try:
         for kpi in DESK_KPIS:
-            rows = rec_score.upsert(cn, ROSTER, who, kpi, "", TARGET, notes[kpi])
+            rows = rec_score.upsert(cn, office_name(cn), who, kpi, "", TARGET, notes[kpi])
             out["rows"].append({"kpi": kpi, "sql": rows})
     except Exception as e:
         out["ok"] = False
@@ -684,7 +685,7 @@ def publish(counts: dict[str, Any]) -> dict[str, Any]:
                     val = str(int(kv.get(kpi) or 0))
                     try:
                         rows = rec_score.upsert(
-                            cn, ROSTER, who, kpi, val, TARGET, notes[kpi][:200]
+                            cn, office_name(cn), who, kpi, val, TARGET, notes[kpi][:200]
                         )
                     except Exception as e:
                         # A desk token from the logs that is not a desk now (retired,
@@ -737,13 +738,12 @@ def publish(counts: dict[str, Any]) -> dict[str, Any]:
 
 
 def _publish_sql(cn, counts: dict[str, Any]) -> None:
-    """Last resort: update the existing Office/Admin-roster rows by name, never by id."""
+    """Last resort: update the existing Office/Admin-roster rows (the reserved ids 1 and 2, #722)."""
     cur = cn.cursor()
     try:
         cur.execute(
-            "SELECT (SELECT id FROM name WHERE type='roster' AND name=%s AND deleted IS NULL LIMIT 1),"
-            " (SELECT id FROM name WHERE type='roster' AND name=%s AND deleted IS NULL LIMIT 1)",
-            (ROSTER, OWNER),
+            "SELECT (SELECT id FROM name WHERE type='roster' AND id=1 AND deleted IS NULL LIMIT 1),"
+            " (SELECT id FROM name WHERE type='roster' AND id=2 AND deleted IS NULL LIMIT 1)",
         )
         office, admin = cur.fetchone() or (None, None)
         if office is None or admin is None:
