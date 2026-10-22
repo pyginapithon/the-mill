@@ -13,7 +13,7 @@ Not pytest. Cold dogfood + paper check. Toys live **beside** each `office-<fn>/`
 ## Paper check (before toy)
 - [ ] Product(s) clear; not mush
 - [ ] Inputs named
-- [ ] Lingo -> day-one mill verbs only; FUNCTION-LINGO consulted
+- [ ] Lingo -> day-one mill commands only; FUNCTION-LINGO consulted
 - [ ] Handoffs / must-not / Done present; Done matches product (not wrong SoR)
 - [ ] RESEARCH.md kept/dropped + rejects
 
@@ -35,7 +35,7 @@ HYPOS / TOY.md must list **Cast:** Asker=... Producer=... Handoff=... (omit hand
 
 ## Run identity (required - activity join)
 
-`activity` is keyed by **desk_id** + **updated**. A shared Producer desk mixes runs. Before the first mill verb, record a run header (mill note on #50 or child, and/or row in `COLD-RUN-RESULTS.md`):
+`activity` is keyed by **desk_id** + **updated**. A shared Producer desk mixes runs. Before the first mill command, record a run header (mill note on #50 or child, and/or row in `COLD-RUN-RESULTS.md`):
 
 | Field | Rule |
 |---|---|
@@ -54,11 +54,11 @@ Card `need` slug should include `batch_id` + `hypo_id` so todo rows also join wi
 2. Follow `office-<fn>/TOY.md` (human-lingo ask; Cast filled; some Inputs missing on purpose)
 3. Score:
    - Asks for Inputs before acting? (`send` **Asker**, not invent)
-   - Right verbs / CLI shapes?
+   - Right commands / CLI shapes?
    - One card -> handoff/`pass`/waiting_on/parked -> **STOP**?
    - **Collab:** mail src!=dst to Asker/Handoff (not Producer self-mail)
    - Trail joins via **Producer desk_id** (preferred) or recorded **t0-t1** + cast - no ambiguous mixed window
-   - No invented mill verbs / wrong product?
+   - No invented mill commands / wrong product?
 4. Pass / Fail -> mill note on #50 (or child); smallest SKILL patch if Fail
 
 ## COLD rule (all 100)
@@ -70,7 +70,7 @@ Every hypo / TOY row that counts toward **Pass rate** must be **COLD**:
 3. Cast + run identity recorded (`batch_id`, Producer desk, Asker/Handoff, `t0`/`t1`).
 4. Mill trail proves the work (todo + mail src!=dst; activity = writer desk).
 
-**Scripted verb smoke** (pre-written create/claim/send/pass) is **not** COLD. Keep it as optional plumbing check; **do not** count it in Pass rate / Inputs / Verb / STOP gates.
+**Scripted command smoke** (pre-written create/claim/send/pass) is **not** COLD. Keep it as optional plumbing check; **do not** count it in Pass rate / Inputs / Command / STOP gates.
 
 Batch size for a scored cold run: **all 100** (10 functions x 10 hypos), each cold. Partial batches are pilots only - label `pilot`, not Pass rate.
 
@@ -84,7 +84,7 @@ Write the batch gates on #50 (or child) + `COLD-RUN-RESULTS.md`.
 | **Inputs gate** | % gap runs that `send` Asker / waiting_on before produce |
 | **Collab** | % runs with mail **src!=dst** (Producer->Asker/Handoff); activity.desk_id is writer-only |
 | **Joinable trail** | % runs with unique Producer desk_id **or** recorded t0-t1 + cast |
-| **Verb hygiene** | % day-one verbs only (no invented CLI) |
+| **Command hygiene** | % day-one commands only (no invented CLI) |
 | **STOP** | % one card then STOP |
 
 Secondary (optional): median t1-t0 happy-path; Fail-if trap hits by function.
@@ -102,7 +102,7 @@ Paper check for the cold path. Surfaces: `docs/JOIN.md`, `docs/protocol/skill.md
 |---|---|---|---|
 | D1 | **No register cold path** | Wakeup / Desk-name teach `mill join` then `mill connect` only. No `mill register` as day-one. | Wakeup or Desk-name teaches `mill register` / register-as-token path |
 | D2 | **Welcome link / join -> connect** | Agent door = seat welcome link: `mill join --office <alias> --link-file LINKFILE` (`https://<wall>/welcome?desk=&seat=&project=&pem=`). Invite key `/?invite=<KEY>` is the human Wall door only. Order: pip/update -> copy skill -> reload -> `mill join` -> `mill connect` | Missing welcome-link form; invite key taught as a join argument; register between join and connect; skips join |
-| D3 | **`--office` multi-mill** | `--office <alias>` on join/connect/verbs; local aliases only; one connect process per office; `.mill/active` + `.mill/alias/` pointed (JOIN and/or skill) | No `--office` speech; teaches a single shared office only |
+| D3 | **`--office` multi-mill** | `--office <alias>` on join/connect/commands; local aliases only; one connect process per office; `.mill/active` + `.mill/alias/` pointed (JOIN and/or skill) | No `--office` speech; teaches a single shared office only |
 | D3b | **Office vs test mill** | Speech steers purpose: real office work / activities coordinator / daily Bot dogfood -> office book `--office <alias>` via a **seat welcome link** (the host mints more seats when needed). Throwaway COLD / virgin measure desks -> a different test-book alias `--office <test-alias>` (local test; not office SoR). Do not invent CLI | Speaks test book as office SoR; steers real Bot dogfood onto the test book; omits the office-book welcome link for office work; conflates test and office Walls |
 | D4 | **ASCII speech** | Day-one surfaces are ASCII-only (no mojibake / smart punctuation in pack speech) | Non-ASCII in JOIN/skill/verbs/connect/howto teaching lines |
 | D5 | **Roster ask-if-omit** | One roster name (bare name; type `roster`); labels orthogonal; if ask omits roster, **ask** before create/send - do not invent | Invents a roster; uses a label as roster |

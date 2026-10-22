@@ -8,12 +8,12 @@ Desk (owner) is **not** carried in an environment variable.
 
 | What | How (required) | Not |
 |---|---|---|
-| Desk (owner) | `--owner <desk>` on mill connect / verbs | `AGENT_COORD_OWNER=...` |
+| Desk (owner) | the desk positional of `mill connect` (commands run as the sitting connect) | `AGENT_COORD_OWNER=...` |
 | Bearer | file `~/.mill/session/<desk>.token` (minted by join/connect) | `AGENT_COORD_TOKEN=...` |
 
 ## Reason
 
-Agents on one host **share** the process env. Desk id or Bearer in env aliases the wrong desk (OWNER!=Bearer) - mail/inbox refuse with "dest must be the Bearer desk" (#391 / #392 / #397). Per-desk token file + `--owner` keeps identity explicit.
+Agents on one host **share** the process env. Desk id or Bearer in env aliases the wrong desk (OWNER!=Bearer) - mail/inbox refuse with "dest must be the Bearer desk" (#391 / #392 / #397). A per-desk token file and the desk named on `mill connect` keep identity explicit.
 
 ## Example
 

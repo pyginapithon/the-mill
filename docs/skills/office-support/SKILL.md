@@ -50,7 +50,7 @@ ITSM/forge database into mill.
 | duplicate | `note` canonical + `pass` |
 | resolve / close | `pass` when user unblocked **or** fix owned elsewhere |
 | blocked (reporter/eng/vendor) | `waiting_on` + `send` / `note` |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 | SLA (and optional CSAT) | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | exclusive file lock | omit day-one (`hold`/`drop` only if office leases) |
 
@@ -68,7 +68,7 @@ ITSM/forge database into mill.
 - Replace forge/ITSM SoR - link Issues; do not clone the bug database.
 - `pass` without saying where the ball is (answer/workaround **or** eng/ops todo id).
 - Skip forge link in detail when the report came from GitLab/GitHub.
-- Invent mill verbs (`escalate`, `resolve`, `triage`, `priority` as CLI).
+- Invent mill commands (`escalate`, `resolve`, `triage`, `priority` as CLI).
 - Teach `open` / `yield` / bare `create` / teaching `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse `note` with `send`.
 - Teach `hold` day-one unless the office leases shared resources.

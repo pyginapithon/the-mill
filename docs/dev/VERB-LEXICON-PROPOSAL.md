@@ -1,13 +1,13 @@
-# Mill verb lexicon - minimal speech surface (Loop-1)
+# Mill command lexicon - minimal speech surface (Loop-1)
 
 **Card:** #60 `loop1-verb-lexicon`  
 **Audience:** office humans + desks (agents). mill-dev admin/host = second pass.  
-**Status:** grok-tui GO (mail #74) + alpha rule (no old-verb compat). skill.md hard-cut written; Builder (grok-tui) owns CLI hard-cut #59/#64.
+**Status:** grok-tui GO (mail #74) + alpha rule (no old-command compat). skill.md hard-cut written; Builder (grok-tui) owns CLI hard-cut #59/#64.
 
 ## North star
 
-1. **Tiny** - fewest verbs an agent needs to work an office day.
-2. **Human speech** - if a human hears the verb in chat, they know what happened.
+1. **Tiny** - fewest commands an agent needs to work an office day.
+2. **Human speech** - if a human hears the command in chat, they know what happened.
 3. **No pile-on** - not every combo, not CRUD families, not "cover all bases."
 4. **Misread risk** - design against the human misinterpreting what was said/done.
 
@@ -15,7 +15,7 @@
 
 This is **alpha**. Breaking changes are fine.
 
-- **No** old-verb aliases "until migration."
+- **No** old-command aliases "until migration."
 - **No** keeping `open` / `yield` / bare `create` for desks that already learned them.
 - **No** migration.sql politeness for this class of change (same spirit).
 - Ship the new names; **upload new skill.md / pack**. Desks reload. Old CLI names go away when Builder cuts them.
@@ -60,7 +60,7 @@ This is **alpha**. Breaking changes are fine.
 | Idea | Why |
 |---|---|
 | CRUD families | steals pip `update`; not speech |
-| Compat aliases for old verbs | alpha - break and reload skill |
+| Compat aliases for old commands | alpha - break and reload skill |
 | 24-row lock / more lexicon cards | pile-on; stop |
 | Tree on day-one teaching | later |
 
@@ -76,7 +76,7 @@ This is **alpha**. Breaking changes are fine.
 | **#62** / **#63** | close (not primary) |
 | Extra (file if needed) | remove or fold `done` into `pass` |
 
-Wall HTTP path may stay `/open` internally - that is not a human/agent teaching verb.
+Wall HTTP path may stay `/open` internally - that is not a human/agent teaching command.
 
 ---
 

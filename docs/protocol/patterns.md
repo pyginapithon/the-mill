@@ -8,7 +8,7 @@ SoT loops: [improve.md](improve.md).
 
 | Layer | What | Who |
 | :--- | :--- | :--- |
-| **mill-desk `skill.md`** | *Using* the mill - HINT -> mill verbs, then **STOP** | Any office / vendor desk |
+| **mill-desk `skill.md`** | *Using* the mill - HINT -> mill commands, then **STOP** | Any office / vendor desk |
 | **Project `skill.md`** | *Their* domain - one per project, tight context | That project's bots |
 | **the-mill dev skills** | *Developing* the mill product (maintainer/pack/Aegis, ...) | Mill maintainers only |
 
@@ -28,7 +28,7 @@ A scorecard is a row in the score table (`kpi`, `value`, `target`). A KPI is tha
 | **L2 mill-wall** | server/records / server/sql / mill-wall / CLI wall-only | mill-perf p95 (`api.floor`, heartbeat, fanout miss); mill-api **500**; mail_to health | SCORE Last vs Target (e.g. floor p95 **100**) | **one** wall/records/sql card |
 | **L3 Wall glance** | `wall_ui/**` | human SESSION / TODO / MAIL / SCORE without asking an agent | can a human see who/what/KPIs? | **one** `wall_ui` card |
 
-Template tree on the-mill: `#24 self-improve` -> L1/L2/L3 + HOWTO (`#25`-`#28`). New project: `mill create todo <proj> self-improve` and mirror the children.
+Template tree on the-mill: `#24 self-improve` -> L1/L2/L3 + HOWTO (`#25`-`#28`). New project: `mill create todo <roster> self-improve` and mirror the children.
 
 ## Cycle (every time)
 
@@ -46,7 +46,7 @@ Skill-only desk + **one card id**. Success is Wall Claims, not chat length.
 | Prefer `mill route` program for repeats (0 tokens next wake) | Invent cards when idle |
 | Use `watcher.hint` / frame `detail` when set | Expect full mail body on every push |
 | HINT none = **STOP** | Stay awake "just in case" |
-| Profile after: mill-api verb counts, floor dumps=0, token est | Debate without a number |
+| Profile after: mill-api command counts, floor dumps=0, token est | Debate without a number |
 
 ### Profile checklist (after a spawn run)
 
@@ -76,13 +76,13 @@ Each card: OS matrix + success one-liner + profile checklist above.
 
 ## HOWTO (new bot / new project)
 
-Mill ships **our** mill-desk map: pack `docs/protocol/skill.md` (HINT -> mill verbs). That is **not** every project's skill.
+Mill ships **our** mill-desk map: pack `docs/protocol/skill.md` (HINT -> mill commands). That is **not** every project's skill.
 
 Other offices / vendors keep **their own** `skill.md` (domain goals, tools, KPIs) - **one per project**, scoped tight to limit context (not one mega-skill across projects). They still use mill for HINT wake + book. Self-improve copies the **cycle** (measure -> judge -> one card), not necessarily mill's prompt text.
 
 1. `mill join` + `mill connect --vendor ...` (leave running).
 2. Mill desks: recopy pack `skill.md` -> mill-desk `SKILL.md` after `mill update`. Project desks: keep **their** skill beside it (or as their primary map).
-3. Open `self-improve` + L1/L2/L3 under **their** `project_id`.
+3. Open `self-improve` + L1/L2/L3 under **their** roster.
 4. Set `target` on **their** score rows (`kpi`, `value`, `target`).
 5. Each cycle: measure -> judge -> one card -> pass (L1 often tunes **their** skill/prompts).
 6. Spawn labs: skill-only + one card; profile; feed **their** L1.

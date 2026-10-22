@@ -53,8 +53,8 @@ Not inputs: vague "improve quality," implement-while-checking, Builder suite as 
 | re-test / confirmation | same card after eng fix (`claim` / `note` / `send`) |
 | regression | follow-on `create todo` + same spine |
 | blocked (Claims/env) | waiting_on + `send` / `note` |
-| park / defer | `create todo` `<project> <need> --status parked` |
-| exclusive evidence file | `hold` / `drop` `<project> <resource> <owner>` (rare) |
+| park / defer | `create todo` `<roster> <need> --status parked` |
+| exclusive evidence file | `hold` / `drop` `<resource>` (rare) |
 | close QA remasure card | `pass` (QA card only unless office says validator closes eng) |
 
 ## Handoffs
@@ -69,7 +69,7 @@ Not inputs: vague "improve quality," implement-while-checking, Builder suite as 
 - Bypass mill-desk HINT routing.
 - Implement product fixes; rubber-stamp without remasure; rely on Builder suite alone.
 - Replace CI/forge/test-runner SoR - link evidence paths.
-- Invent mill verbs for ISTQB slang (`remasure`, `sign-off`, `regress` as CLI).
+- Invent mill commands for ISTQB slang (`remasure`, `sign-off`, `regress` as CLI).
 - Confuse test Pass/Fail (mail verdict) with mill `pass` (card close).
 - `pass` eng cards unless office says validator closes.
 - Confuse `drop` (hold) with `unclaim`.

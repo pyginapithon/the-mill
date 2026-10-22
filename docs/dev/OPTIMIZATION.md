@@ -11,7 +11,7 @@ Contributors append to the log during every optimization loop.
 2. Fetch only the rows and columns the caller uses. Leave out bodies and JSON
    blobs from list reads; fetch a body only for the ids that are returned.
 3. One read per question per request. Do not read the same tree, roster or
-   catalog twice in one verb; read it once and pass it down.
+   catalog twice in one command; read it once and pass it down.
 4. No N+1. One query with `IN (...)`, a join or a grouped derived table, not a
    query per id and not an HTTP call per roster.
 5. Index the filter and the order together, for example `(desk_id, opened, id)`
@@ -132,7 +132,7 @@ Entry format:
   list rosters only to build the refusal text
 - Status: fixed in 0.7.4 (!82) for the rpc checks: one idx_type lookup on the
   happy path, rosters-only list for the refusal and `project`. Project check
-  1.3 -> 0.3 ms, `project` verb 2.2 -> 0.7 ms. The floor id-to-name maps still
+  1.3 -> 0.3 ms, `project` command 2.2 -> 0.7 ms. The floor id-to-name maps still
   load the catalog (open)
 
 ### 7. Fanout scans the 40 newest activity rows for one row
@@ -213,7 +213,7 @@ Entry format:
   it at start and every 12 hours (regression row F17)
 - Status: fixed in 0.7.4 (!74)
 
-### 15. Verb reply waited on the score write; callproc cost extra round trips
+### 15. Command reply waited on the score write; callproc cost extra round trips
 - Pattern: 3, 4
 - Where: `agent_coord/server/asgi.py`, `agent_coord/server/middleware.py`,
   `agent_coord/server/records/db.py` (at 6e6acda)

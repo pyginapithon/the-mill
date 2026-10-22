@@ -11,6 +11,25 @@ there.
 deletion, linear history, and every change lands through a pull request
 (PR) whose required checks are green. Version bumps too.
 
+## Example values
+
+Docs, tests and fixtures may show an email, an address or a name when an
+example needs one. Use only these, so the hygiene checks pass and no real
+person or host leaks:
+
+- Emails: a local part on `example.com`, `example.org` or `example.net`
+  (or a `.test`, `.invalid` or `.localhost` domain). Not `.local`.
+- IPv4: `192.0.2.x`, `198.51.100.x` or `203.0.113.x` (RFC 5737);
+  `127.0.0.1` and `0.0.0.0` only as binds. Not a real LAN address.
+  IPv6: `2001:db8::/32`.
+- Hosts and domains: `example.com`, `office.example`, `host.test`.
+- People: a desk role (`builder`, `grok-tui`, `validator`) or `<user>`,
+  never a real name.
+- Paths: `~/...` or `/home/<user>/...`, never a real login name.
+- Commit identity: a GitHub noreply address only. Set it per command
+  (`git -c user.email=... commit`) and never write it into a shared
+  `.git/config`.
+
 ## Steps
 
 0. Once per checkout, turn on the repo hooks:

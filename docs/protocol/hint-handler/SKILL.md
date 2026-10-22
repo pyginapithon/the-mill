@@ -16,13 +16,13 @@ metadata:
 
 **Cite when a step failed:** `docs/protocol/philosophy.md`, `connect.md`, `route.md`, `hints.md`, `JOIN.md`. Chat inbound stays mill-desk / skill.md.
 
-**Not this skill:** chat inbound (mill-desk). Default vendor poke when no route hits (route.md). Inventing mill verbs.
+**Not this skill:** chat inbound (mill-desk). Default vendor poke when no route hits (route.md). Inventing mill commands.
 
 ## Lifecycle (program -> route -> watcher -> trigger -> drop)
 
 ### Guards
 
-No poll. No invented mill verbs. Exit **0**. `heartbeat:PING` and `join:JOIN` are dropped on receive, before any route program. Do not arm `join:JOIN`. A missing route does not vendor-poke JOIN.
+No poll. No invented mill commands. Exit **0**. `heartbeat:PING` and `join:JOIN` are dropped on receive, before any route program. Do not arm `join:JOIN`. A missing route does not vendor-poke JOIN.
 
 A watcher is one desk on one of `todo`, `join`, `hold`, or `score`. Mail is not a watcher type. Nothing emits `name:NAME`. Mail arrives as `{kind: mail}`. Trees, labels, and memberships organize work. They are not watch targets. `roster_id` is only the project or role collection. Another desk attaches its own watcher. Do not expect every project member to be watched.
 
@@ -34,7 +34,7 @@ Copy `examples/stub_handler.py` to `~/.mill/handlers/DESK_<desk>/on_mail.py`. Im
 
 `ev.detail` is this desk's `watcher.hint` string, or the cheap default `{what,id,when,state,watchers,tree}` when that hint is empty. A letter has no `detail`. The wire `hint` on a watcher frame stays `TYPE`. The route key stays `mail:MAIL`, `todo:TODO`, and so on. A recipe does not change the key.
 
-`log()` writes stderr. mill connect reads the route child's stdout: a last line of `not-mine` tries the next redirector, and any other exit 0 is handled. stderr is discarded. A print is not evidence. The stub appends one line to `hint-evidence.jsonl` beside the program (`detail_kind` is `recipe` or `default`). Replace that write with the mill verb the task needs.
+`log()` writes stderr. mill connect reads the route child's stdout: a last line of `not-mine` tries the next redirector, and any other exit 0 is handled. stderr is discarded. A print is not evidence. The stub appends one line to `hint-evidence.jsonl` beside the program (`detail_kind` is `recipe` or `default`). Replace that write with the mill command the task needs.
 
 Keep the program. Reuse it. It is not package code.
 
@@ -52,7 +52,7 @@ wait'
 
 `mill route` waits for that connect to sit. Everything after the key is the program. The catch-all key is `"*"`, quoted so the shell does not expand it. The list is a chain in add order. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart. The route file stays after the shell exits.
 
-Every other `mill connect` for this desk takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk verbs before `wait`, or stop this shell first.
+Every other `mill connect` for this desk takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk commands before `wait`, or stop this shell first.
 
 `--session` on connect is the Grok session id for a grok-build poke. Omit it unless that poke needs it.
 
@@ -72,7 +72,7 @@ stdin is one JSON object. A watcher frame is `{type,id,hint,detail?}`. A letter 
 
 1. `parse_stdin()` -> if `ev.ignore`, exit 0.
 2. Read `ev.detail`. mill-fetch leftovers only when the recipe still needs the book (MAIL inbox, that one TODO - no full board).
-3. Task mill-verbs only. **STOP**.
+3. Task mill commands only. **STOP**.
 4. Exit **0**. mill connect does not mill-update for exit 0.
 
 ### 5. Drop

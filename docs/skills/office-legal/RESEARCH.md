@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-legal/` exists |
 | Stub | Thin `SKILL.md` present (Product = Clearance or hold; Lingo 6 rows; Must-not 2; Done 1; **no Inputs / Handoffs / Scope**; no `human_required`; no Contract SoR callout) |
 | FUNCTION-LINGO.md | Present - S **Legal / compliance** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked; reject `open` / `yield` / bare `create` / teaching `done` |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked; reject `open` / `yield` / bare `create` / teaching `done` |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-ops, office-qa, office-engineering, office-research, office-sales, office-finance, office-people read |
 
@@ -25,7 +25,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -75,9 +75,9 @@ Not inputs: "just approve this" with no artifact pointer, silent clear in chat w
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
-Also cite (not invent as CLI): **`human_required`** (gate pattern from README/people/finance - not a new mill verb).  
+Also cite (not invent as CLI): **`human_required`** (gate pattern from README/people/finance - not a new mill command).  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk).
 
 Sources for rows: **FUNCTION-LINGO.md S Legal / compliance** (required), mill-desk day-one, stub, README (Cleared / hold; hold rare legal docs; human_required legal clear; escalate = send), siblings (sales blocked legal -> waiting_on; research -> legal diligence handoff; finance human_required; eng hold on trees).
@@ -88,7 +88,7 @@ Sources for rows: **FUNCTION-LINGO.md S Legal / compliance** (required), mill-de
 
 Shared spine (one table for the function):
 
-| Their word | Source | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | contract | FL product; stub "not a CLM suite" | create todo, detail | **`create todo`** + pointer in **detail**/`note`; **CLM/Drive SoR** | reject inventing `contract` CLI; contract != mill product |
 | review / review request | FL collab + sketch "claim + hold on doc"; stub | create todo, claim, inbox | **`inbox`** / **`create todo`** -> **`claim`** / **`assign`** | reject bare `create` / `open` |
@@ -98,7 +98,7 @@ Shared spine (one table for the function):
 | clear / approve / clear ship | FL sketch "mail Pass-equivalent; unlock eng/sales"; stub; README human_required | send, pass, human_required | **`human_required`** then **`send`** clear verdict; unlock dependents; legal card **`pass`** | reject silent clear; reject teaching `done` |
 | opinion | FL product | note, send | **`note`** and/or **`send`** memo/link | deliverable under clearance card |
 | audit trail | FL sketch "mail + notes (SoR)"; stub | send, note | **`send`** + **`note`** crumbs; SoR stays CLM/Drive | not a product |
-| escalate to counsel | FL collab; stub | send | **`send`** counsel/specialist desk (+ optional `assign`) | never invent `escalate` verb |
+| escalate to counsel | FL collab; stub | send | **`send`** counsel/specialist desk (+ optional `assign`) | never invent `escalate` command |
 | take / give review | mill-desk; support/sales assign | claim, assign | **`claim` / `assign`** | - |
 | drop the claim | mill-desk | unclaim | **`unclaim`** | never confuse with `drop` (hold) |
 | progress / diary / redline summary | mill-desk note | note | **`note`** | note != mail |
@@ -134,7 +134,7 @@ Pattern: README "Escalate always = mill send"; sales already maps blocked(legal)
 - **Silent clear without mail** (stub).
 - **Unlock ship while waiting_on legal remains** (stub).
 - Replace domain **Contract / CLM / e-sign / Drive doc** SoR - **link** in detail/note/mail; don't clone the contract body into mill.
-- Invent mill verbs for legal slang (`clear`, `withhold`, `redline`, `escalate`, `counsel` as CLI).
+- Invent mill commands for legal slang (`clear`, `withhold`, `redline`, `escalate`, `counsel` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk alpha hard-cut).
 - Confuse mill **`drop`** (hold release) with **`unclaim`**.
 - Confuse legal speech **"hold"** (block ship -> waiting_on) with mill **`hold`** (doc lease).
@@ -174,7 +174,7 @@ Pattern: README "Escalate always = mill send"; sales already maps blocked(legal)
 | `docs/skills/README.md` | Catalog Cleared / hold; hold rare legal docs; human_required legal clear; escalate = send; waiting_on |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S Legal / compliance | **Required** product/collab words + mill sketch (review, hold/block, clear, audit trail) |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-legal/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-sales/SKILL.md` | blocked (legal/price) -> waiting_on + mail |
 | `docs/skills/office-finance/SKILL.md` | human_required approval pattern sibling |
@@ -182,7 +182,7 @@ Pattern: README "Escalate always = mill send"; sales already maps blocked(legal)
 | `docs/skills/office-research/RESEARCH.md` | Diligence -> legal handoff; hold rare |
 | `docs/skills/office-engineering/SKILL.md` | hold on shared files pattern; ship gate peer |
 | `docs/skills/office-ops/RESEARCH.md` | RESEARCH + TEMPLATE brief shape |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
 | `docs/protocol/verbs.md` | Confirm hold/drop/pass/score lifecycle; removed teaching CLI |
 
 ### Public industry practice (thin)
@@ -228,7 +228,7 @@ Pattern: README "Escalate always = mill send"; sales already maps blocked(legal)
 | Lingo -> mill | 6 rows; thin | Full FL Legal harvest; disambiguate hold vs waiting_on; assign/unclaim/note/pass/park/score |
 | clear mapping | "mail verdict" only | human_required -> `send` Pass-equivalent -> unlock -> legal `pass` |
 | hold / block ship | waiting_on only | Keep; stress != mill `hold` |
-| Must-not | Silent clear; unlock while waiting_on | Add: SoR outside; no invent verbs; HINT; drop!=unclaim; hold!=waiting_on; no skip human_required; no teaching done/open/yield |
+| Must-not | Silent clear; unlock while waiting_on | Add: SoR outside; no invent commands; HINT; drop!=unclaim; hold!=waiting_on; no skip human_required; no teaching done/open/yield |
 | Done | Clear/hold mailed; dependents | Add human_required; pass-on-decision paths; no silent open |
 | score / park / unclaim | Absent | Add per harvest (score optional) |
 
@@ -236,7 +236,7 @@ Pattern: README "Escalate always = mill send"; sales already maps blocked(legal)
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-legal/SKILL.md`. Pull mill-desk first. Do not invent verbs.
+Paste/adapt into `docs/skills/office-legal/SKILL.md`. Pull mill-desk first. Do not invent commands.
 
 ```markdown
 ---
@@ -308,7 +308,7 @@ body dumped into mill as SoR.
 - Bypass mill-desk HINT routing.
 - Silent clear without mail; unlock ship while waiting_on legal remains.
 - Replace Contract/CLM/e-sign/Drive SoR - link paths only.
-- Invent mill verbs for legal slang (`clear`, `withhold`, `redline`, `escalate` as CLI).
+- Invent mill commands for legal slang (`clear`, `withhold`, `redline`, `escalate` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse legal "hold" (block ship) with mill `hold`.
 - Skip `human_required` on clear when office requires it.

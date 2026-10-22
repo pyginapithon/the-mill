@@ -13,7 +13,7 @@ Voice: ops steward. Gap-fill for thin stub `SKILL.md`. Do **not** patch SKILL.md
 | Folder | `docs/skills/office-research/` exists |
 | Stub | Thin `SKILL.md` present (product mush; no Handoffs / Inputs / Scope) |
 | FUNCTION-LINGO.md | **Absent** on box (`docs/FUNCTION-LINGO.md` missing; README still links it) - lingo harvested from stub + siblings + mill-desk + public practice |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked |
 | Sibling handoff patterns | office-qa, office-support, office-engineering, office-ops read |
 
 **Function:** office-research  
@@ -23,7 +23,7 @@ Voice: ops steward. Gap-fill for thin stub `SKILL.md`. Do **not** patch SKILL.md
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -64,26 +64,26 @@ A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`, mail as needed.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`, mail as needed.  
 **Do not teach:** `open`, `yield`, bare `create`, `done` as speech.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). `unpark` exists on mill-desk but is not in the day-one teaching list above - mention only if human says unpark; do not invent.
 
 Shared spine (one table for the function):
 
-| Their word | Source | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | research ask / intake | stub; CI practice "set the decision first" | create todo, open | **`create todo`** | reject `open` (not day-one teach) |
-| park / file for later | mill-desk; stub "park" | create todo parked, plan upcoming | **`create todo` `{status:"parked"}`** | reject stub "plan upcoming / parked" - not a mill verb |
+| park / file for later | mill-desk; stub "park" | create todo parked, plan upcoming | **`create todo` `{status:"parked"}`** | reject stub "plan upcoming / parked" - not a mill command |
 | take / draft brief | stub | claim, assign | **`claim`** (+ `assign` if given) | - |
 | drop claim | mill-desk | unclaim | **`unclaim`** | never confuse with `drop` (hold) |
 | progress / path / diary | stub "note path"; mill-desk | note | **`note`** | note != mail |
-| synthesize / revise findings | stub | note, detail update | **`note`** (path + deltas) | no new verb |
+| synthesize / revise findings | stub | note, detail update | **`note`** (path + deltas) | no new command |
 | challenge / peer review | stub | send, claim steal | **`send`** | handoff != steal; reviewer claims own card or replies mail |
 | need eyes / escalate | README pattern | send | **`send`** | escalate always = send to specialized desk |
 | blocked on SME / source / access | README waiting_on | waiting_on + send | **`waiting_on` + `send`/`note`** | don't fake `pass` |
 | check mail / review ask landed | mill-desk; qa inbox pattern | inbox | **`inbox`** | - |
 | deliver brief / ready to decide | industry "ends in ask"; mill pass | pass, send | **`send`** asker + **`pass`** | stub conflated deliver with "decide" - split |
-| decide / record decision | stub | note, pass | **`note`** decision (asker or research if told) | research does not invent a decide verb; optional `pass` if card still open |
+| decide / record decision | stub | note, pass | **`note`** decision (asker or research if told) | research does not invent a decide command; optional `pass` if card still open |
 | exclusive edit of shared brief file | eng hold pattern | hold / drop | **`hold` / `drop`** | rare; only if office uses resource lease on brief path |
 | throughput / brief SLA | README score clusters | score | **`score`** optional | research not in README score row cluster - teach thin or omit day-one unless office sets KPI |
 | unpark / reopen | mill-desk | unpark | *(not day-one teach)* | if human says it, mill-desk covers; don't put in office map unless needed |
@@ -112,7 +112,7 @@ Pattern borrow: support "escalate = send + eng todo + waiting_on"; eng/qa Handof
 ## Must-not - SoR outside mill
 
 - Bypass mill-desk HINT routing.
-- Invent mill verbs for analyst slang (no `brief`, `synthesize`, `decide` CLI).
+- Invent mill commands for analyst slang (no `brief`, `synthesize`, `decide` CLI).
 - Replace domain SoR: source repos, Drive/wikis, CI databases, CRM, ticketing - **link in detail/note**, don't clone.
 - Confuse brief delivery with **eng ship** or **QA Pass**.
 - Endless research with no `pass` / `waiting_on` / `parked` path.
@@ -153,10 +153,10 @@ Pattern borrow: support "escalate = send + eng todo + waiting_on"; eng/qa Handof
 | `docs/skills/office-research/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-qa|support|engineering|ops/SKILL.md` | Handoff / inbox / waiting_on / must-not patterns |
 | `docs/skills/office-sales|marketing/SKILL.md` | waiting_on + score; "brief" noun collision (marketing) |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; park = create todo parked; note!=mail; drop!=unclaim |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; park = create todo parked; note!=mail; drop!=unclaim |
 | `docs/protocol/improve.md` | Decide -> one create todo; parked pile anti-pattern |
 | `/workspace/mill-docs/MILL-OFFICE-SKILL-SCOUT.md` | Scout loop: research book -> TEMPLATE brief -> gardener |
-| `/workspace/mill-docs/MILL-PROMPT-GARDENER.md` | Gardener owns SKILL patch; no invent verbs |
+| `/workspace/mill-docs/MILL-PROMPT-GARDENER.md` | Gardener owns SKILL patch; no invent commands |
 
 ### Public industry practice (thin)
 
@@ -203,7 +203,7 @@ Pattern borrow: support "escalate = send + eng todo + waiting_on"; eng/qa Handof
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-research/SKILL.md`. Pull mill-desk first. Do not invent verbs.
+Paste/adapt into `docs/skills/office-research/SKILL.md`. Pull mill-desk first. Do not invent commands.
 
 ```markdown
 ---
@@ -260,7 +260,7 @@ Competitive/market *asks* use this same product (mode in detail), not a second p
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Replace source/wiki/CRM/Drive SoR - link in detail/note.
-- Invent mill verbs for analyst slang.
+- Invent mill commands for analyst slang.
 - Confuse brief delivery with eng ship or QA Pass.
 - Endless research without `pass` / `waiting_on` / `parked`.
 - Confuse `drop` (hold) with `unclaim`.
@@ -289,8 +289,8 @@ Sketch map: brief->todo deliverable path; challenge->mail/second desk; decision-
 | **decision record** | Mapped decide->`note` (asker); not research Done | **Wording only** - name "decision record" in lingo as asker `note` (ADR-style if office uses it). Still not a research Product |
 | **challenge** / **review** | `send` | **None** - aligned (review = same collab intent) |
 | **synthesize** | `note` | **None** - FL lists collab word, no separate mill sketch; our fill stands |
-| **park** -> "plan upcoming / parked" | `create todo` `{status:parked}`; rejected "plan upcoming" as verb | **Keep our map** - FL sketch is looser; mill-desk day-one wins. Document reject of FL's "plan upcoming" phrasing as CLI |
-| **decide** | `note` (not a decide verb) | **None** |
+| **park** -> "plan upcoming / parked" | `create todo` `{status:parked}`; rejected "plan upcoming" as command | **Keep our map** - FL sketch is looser; mill-desk day-one wins. Document reject of FL's "plan upcoming" phrasing as CLI |
+| **decide** | `note` (not a decide command) | **None** |
 | waiting_on / inbox / unclaim / assign / hold / pass+send deliver | Harvested from mill-desk + siblings; **absent from FL research sketch** | **No retract** - FL is floor not ceiling. Keep expansions |
 | score | Optional / omit day-one | **None** - FL research section has no score row |
 
@@ -300,10 +300,10 @@ Would judgment change with FUNCTION-LINGO filter on? **Mostly no.**
 
 - **Products kept/dropped:** unchanged (Decision brief only).
 - **Done:** unchanged (brief path + mail + pass/waiting_on/parked; decision outcome optional).
-- **Verb spine:** unchanged; FL's "plan upcoming" must still be rejected against protocol/skill.md.
-- **Small additive only:** surface FL's product/collab nouns as explicit Lingo rows (findings, recommendation, decision record, review) so the skill eats the dogfood glossary - no new mill verbs, no second product.
+- **Command spine:** unchanged; FL's "plan upcoming" must still be rejected against protocol/skill.md.
+- **Small additive only:** surface FL's product/collab nouns as explicit Lingo rows (findings, recommendation, decision record, review) so the skill eats the dogfood glossary - no new mill commands, no second product.
 
-Sources for this gap: `docs/skills/FUNCTION-LINGO.md` S Research/knowledge; this RESEARCH.md lingo harvest + TEMPLATE brief; current `office-research/SKILL.md` (gardener 4bc7fa3-era patch); `docs/protocol/skill.md` day-one verbs.
+Sources for this gap: `docs/skills/FUNCTION-LINGO.md` S Research/knowledge; this RESEARCH.md lingo harvest + TEMPLATE brief; current `office-research/SKILL.md` (gardener 4bc7fa3-era patch); `docs/protocol/skill.md` day-one commands.
 
 ### Gardener patch (thin, optional)
 

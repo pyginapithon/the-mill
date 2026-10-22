@@ -8,7 +8,7 @@ Folder: the one that contains this file (repo checkout or installed pack). Progr
 
 Desk commands run only in the parent shell that started connect. The desk is that connect. A second call is refused with `no sitting mill connect`. The trap stops connect when the shell exits. Everything after the route key is the program. `mill route` waits for that connect to sit. Pass the absolute path of `on_mail.py`. A `~` in the route file is not expanded at start.
 
-This is the same parent shell `mill join` prints (`bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB'`). Replace `PATH_OF_ON_MAIL_PY` with the absolute path of `on_mail.py` before you run it. If one command exits non-zero, stop and hand back stderr.
+This is the same parent shell `mill join` prints (`bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill COMMAND'`). Replace `PATH_OF_ON_MAIL_PY` with the absolute path of `on_mail.py` before you run it. If one command exits non-zero, stop and hand back stderr.
 
 ```bash
 bash <<'EOF'

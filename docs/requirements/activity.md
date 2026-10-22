@@ -8,7 +8,7 @@ Primary key is `(type, id)`. Both columns stay filled. Mail 5 and todo 5 are two
 
 A desk's pulse on the seat is `join.updated`. **Bump** means `join.updated = now()`. The column is `ON UPDATE CURRENT_TIMESTAMP`, so any write to that `join` row bumps it. `mill_join_doing` sets it in the same statement as `doing`. Hub PING is a socket frame (`type=heartbeat`, `hint=PING`) and leaves the book unchanged. Session and the floor share one threshold: a desk is alive while that time is at most 15 minutes old. A missing time is stale. A later write makes the desk alive again.
 
-`join.doing` is a stack, newest on top, separated by ` | `. A `\` or `|` inside an entry is escaped (`\\`, `\|`), so that character is text and not the separator. The column is `VARCHAR(512)`. A push that does not fit drops the oldest entries. One entry that is still too long is cut so the escaped text fits. Only the desk writes it: an agent `doing` pushes that text, and drops an older copy of the same text and the join placeholders (`present`, `invited`). `todo`, `session`, `mail-thread`, `trail`, `member`, `trust`, `invite`, `move`, `prune`, `detach`, `label-remove`, `add`, and `remove` write nothing else, so each bumps the seat and leaves the text alone (#635); that bump also drops verb names an older wall pushed. Both writes bump `join.updated`. The same call also moves the join activity row (`activity.updated = now()`, `n` grows).
+`join.doing` is a stack, newest on top, separated by ` | `. A `\` or `|` inside an entry is escaped (`\\`, `\|`), so that character is text and not the separator. The column is `VARCHAR(512)`. A push that does not fit drops the oldest entries. One entry that is still too long is cut so the escaped text fits. Only the desk writes it: an agent `doing` pushes that text, and drops an older copy of the same text and the join placeholders (`present`, `invited`). `todo`, `session`, `mail-thread`, `trail`, `member`, `trust`, `invite`, `move`, `prune`, `detach`, `label-remove`, `add`, and `remove` write nothing else, so each bumps the seat and leaves the text alone (#635); that bump also drops command names an older wall pushed. Both writes bump `join.updated`. The same call also moves the join activity row (`activity.updated = now()`, `n` grows).
 
 ```mermaid
 stateDiagram-v2
@@ -27,13 +27,13 @@ No payload key guards the activity row (#216). Deleting it is refused while a tr
 
 Law: `agent_coord/server/sql/tables.sql` and the procedures. This chart is that book.
 
-The hour and day measure is a second record. `mill_score_event` counts the verb on that desk's current hour and rolls the same addition into today's midnight. Details are in the profiler under Product instrumentation. This chart stays the map of which activity row moves.
+The hour and day measure is a second record. `mill_score_event` counts the command on that desk's current hour and rolls the same addition into today's midnight. Details are in the profiler under Product instrumentation. This chart stays the map of which activity row moves.
 
-## Verbs
+## Commands
 
-Wall verbs and what each one writes. **Bump** means `join.updated = now()`. A doing-stack push does that. `mill connect` is not a verb. The socket open writes `time_connect`, so the seat bumps. `mill_join_connect` itself leaves the `join` row alone, so it does not bump. It does move the join activity row.
+Wall commands and what each one writes. **Bump** means `join.updated = now()`. A doing-stack push does that. `mill connect` is not a command. The socket open writes `time_connect`, so the seat bumps. `mill_join_connect` itself leaves the `join` row alone, so it does not bump. It does move the join activity row.
 
-| Verb | Detail | `join.updated` | Activity row |
+| Command | Detail | `join.updated` | Activity row |
 |---|---|---|---|
 | `todo` | list cards | bump. Push `todo` | join `n` grows |
 | `session` | list seats | bump. Push `session` | join `n` grows |
@@ -65,7 +65,7 @@ Wall verbs and what each one writes. **Bump** means `join.updated = now()`. A do
 | `group`, `role`, `label` | name created, or an existing name named again | stays | no activity row. No watcher row |
 | `rename`, `retire`, `reclaim` | same id; the name, `deleted`, or `deleted` cleared | stays | no activity row. Office and Admin stay on retire |
 
-Aliases arrive as the verb in the left column: `agents` is `session`, `thread` is `send`, `yield` is `unclaim`, `ask` is `open`, `here` / `presence` / `register` are `join`, `kpi` is `score`, `acquire` is `hold`, `release` is `drop`.
+Aliases arrive as the command in the left column: `agents` is `session`, `thread` is `send`, `yield` is `unclaim`, `ask` is `open`, `here` / `presence` / `register` are `join`, `kpi` is `score`, `acquire` is `hold`, `release` is `drop`.
 
 ## Writes
 
@@ -83,7 +83,7 @@ Aliases arrive as the verb in the left column: `agents` is `session`, `thread` i
 | join | seat again, same desk | token and doing replaced | bump. Activity `n` grows, roster = Office |
 | join | connect | `join` row unchanged (`time_connect` stays) | no bump. Activity `n` grows, roster = Office |
 | join | doing | agent text pushed on top of the doing stack | bump. Activity `n` grows, roster = Office |
-| join | todo, session, mail-thread, member, trust, invite, move, prune, detach, label-remove, watcher | other rows unchanged | bump. Verb name pushed on `join.doing`. Activity `n` grows |
+| join | todo, session, mail-thread, member, trust, invite, move, prune, detach, label-remove, watcher | other rows unchanged | bump. Command name pushed on `join.doing`. Activity `n` grows |
 | join | clock-out | `doing` cleared; row remains | bump. Activity `n` grows, roster = Office |
 | join | reset | `token_hash` cleared, `doing` cleared, `time_disconnect` stamped; row remains (never DELETE join or its activity, #96) | bump. Activity `n` grows, roster unchanged (NULL passed to `mill_activity_put`) |
 | join | socket open | `time_connect` set, `time_disconnect` cleared | bump. Activity `n` grows, roster = Office |
@@ -109,7 +109,7 @@ Aliases arrive as the verb in the left column: `agents` is `session`, `thread` i
 | plan | new plan | tree name; first card at lft 1, rgt 2 | that card's activity `n` grows (desk Office, Office). The plan name is not an activity. `join.updated` stays |
 | plan | add under a parent that is already on the plan | tree row | that card's activity stays |
 | plan | card is on two plans and no plan name is passed | nothing written | signal `which TREE_* (activity is on more than one plan)` |
-| plan | move, detach, prune | `tree` rows only | the node's own activity stays. The verb pushes its name on `join.doing` and bumps `join.updated` |
+| plan | move, detach, prune | `tree` rows only | the node's own activity stays. The command pushes its name on `join.doing` and bumps `join.updated` |
 | label | add | `label` row. The label is a name of type `label` | tagged activity stays. `join.updated` stays |
 | label | remove | `label` row removed | tagged activity stays. `label-remove` is pushed on `join.doing` and `join.updated = now()` |
 | add / remove | watch, unwatch, set hint; mail: recipients at a node | `watcher` row, or `mail_to` rows | target stays. `add` / `remove` is pushed on `join.doing` and `join.updated = now()` |

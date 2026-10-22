@@ -53,7 +53,7 @@ Not inputs: "grow reach," CMS upload as mill's job, analytics warehouse as mill'
 | handoff to sales/support | `send` + `assign` |
 | KPI (reach/conversion) | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | publish / launch | `pass` (+ optional Wall glance) |
-| park / later | `create todo` `<project> <need> --status parked` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 
 Teach `hold`/`drop` only when the office leases a shared creative station.
 Never teach `open` / `yield` / bare `create` / `done`.
@@ -73,7 +73,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Treat mill as DAM/CMS or as analytics SoR.
-- Invent mill verbs for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
+- Invent mill commands for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
 - Launch without the review gate the office requires.
 - Fake `pass` while embargoed or waiting brand/legal/finance - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.

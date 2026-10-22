@@ -27,18 +27,6 @@ def load_allow() -> list[str]:
     return parts
 
 
-def client_ip(peer: str, forwarded: str = "") -> str:
-    peer = (peer or "").strip() or "127.0.0.1"
-    fwd = (forwarded or "").split(",")[0].strip()
-    try:
-        pip = ipaddress.ip_address(peer.split("%")[0])
-    except ValueError:
-        pip = None
-    if fwd and pip is not None and (pip.is_loopback or pip.is_private):
-        return fwd
-    return peer
-
-
 _DEFAULT_PROXIES = ("127.0.0.0/8", "::1")
 
 
@@ -72,7 +60,10 @@ def _in_rules(ip: str, rules: list[str]) -> bool:
 
 
 def door_client(peer: str, forwarded: str = "") -> tuple[str, bool]:
-    """door=ip client address and whether it came from X-Forwarded-For.
+    """Client address and whether it came from X-Forwarded-For.
+
+    Every door that reads the header uses this: the door=ip gate, the human
+    Wall ACL, the glance keypad lockout and the glance station (#731).
 
     The header is read only when the TCP peer is a trusted proxy (#651). Then
     the hops are read right to left (the proxy appends the address it saw) and

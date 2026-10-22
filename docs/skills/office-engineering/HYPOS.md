@@ -1,13 +1,13 @@
 # office-engineering - cold-run hypos (H01-H10)
 
 Bank for Gardener cold runs. Fresh asks - do not reuse any prior TOY wording.
-Day-one mill verbs only (create todo, claim, assign, unclaim, note, send, inbox, hold, drop, pass, score, waiting_on). No invented CLI.
+Day-one mill commands only (create todo, claim, assign, unclaim, note, send, inbox, hold, drop, pass, score, waiting_on). No invented CLI.
 
 ## H01
 - **Ask:** Claim mill-core card #412 - detail locks the `/auth/session` 401 on expired refresh; repo `mill-core`, acceptance in linked Claims - implement and ship working behavior.
 - **Inputs gap:** no
 - **Product mode:** implement
-- **Fail-if:** Desk rubber-stamps Pass/Fail itself, invents a `pr`/`merge` mill verb, or ships with no visible claimed card.
+- **Fail-if:** Desk rubber-stamps Pass/Fail itself, invents a `pr`/`merge` mill command, or ships with no visible claimed card.
 
 ## H02
 - **Ask:** Make the login flow better somehow.
@@ -31,7 +31,7 @@ Day-one mill verbs only (create todo, claim, assign, unclaim, note, send, inbox,
 - **Ask:** Card #501 assigned to this desk; need is publish wheel `mill-desk 0.4.2` after Pass; pack path `dist/`; note artifact id then pass when shippable.
 - **Inputs gap:** no
 - **Product mode:** pack/hotfix
-- **Fail-if:** Desk invents a `release` mill verb, clones the forge tree into mill, or leaves claimed+100% without `pass`.
+- **Fail-if:** Desk invents a `release` mill command, clones the forge tree into mill, or leaves claimed+100% without `pass`.
 
 ## H06
 - **Ask:** Someone should hold the shared `agent_coord/server/records` tree while we change it.
@@ -43,7 +43,7 @@ Day-one mill verbs only (create todo, claim, assign, unclaim, note, send, inbox,
 - **Ask:** I'm blocked on CI red for #440 - note the forge check URL, set waiting_on QA/CI, send the asker; do not fake pass.
 - **Inputs gap:** no
 - **Product mode:** implement
-- **Fail-if:** Desk invents a `ci` verb, fakes `pass`, or teaches `done` instead of `waiting_on` + `note`/`send`.
+- **Fail-if:** Desk invents a `ci` command, fakes `pass`, or teaches `done` instead of `waiting_on` + `note`/`send`.
 
 ## H08
 - **Ask:** Park a spike for the new rate-limiter idea until product locks acceptance.

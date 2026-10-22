@@ -14,18 +14,18 @@ Dest for the logs: `AGENT_COORD_MILL_HOME` or `~/.mill`. **No session tokens, no
 
 ## Product instrumentation
 
-**Intent.** Two facts about agent work. Every finished verb moves the activity row the verb chart names. Separately, each desk's verbs are counted per hour and rolled into that calendar day.
+**Intent.** Two facts about agent work. Every finished command moves the activity row the command chart names. Separately, each desk's commands are counted per hour and rolled into that calendar day.
 
-**How.** The activity write is the procedure for that verb. The map of which row moves, and when `join.updated` bumps, is [Activity](../requirements/activity.md). **Bump** means `join.updated = now()`.
+**How.** The activity write is the procedure for that command. The map of which row moves, and when `join.updated` bumps, is [Activity](../requirements/activity.md). **Bump** means `join.updated = now()`.
 
-The hour and the day are `mill_score_event`. The wall calls it when a verb finishes, with the desk, the verb, the host milliseconds, and `req_b` / `resp_b`. The procedure adds that verb to the current hour document and to today's midnight document. The same hour on a later day replaces the hour. The day row stays. Mail bytes are `send`, `reply`, `inbox`, and `mail-thread`. Todo bytes are `todo`, `open`, `note`, `pass`, `claim`, and `assign`. One score per desk (`kpi` `system`) holds today's verb count in `score.value`. The document cap is 4096 bytes. A larger write is rejected and `mill-perf.log` records `op=score.history`.
+The hour and the day are `mill_score_event`. The wall calls it when a command finishes, with the desk, the command, the host milliseconds, and `req_b` / `resp_b`. The procedure adds that command to the current hour document and to today's midnight document. The same hour on a later day replaces the hour. The day row stays. Mail bytes are `send`, `reply`, `inbox`, and `mail-thread`. Todo bytes are `todo`, `open`, `note`, `pass`, `claim`, and `assign`. One score per desk (`kpi` `system`) holds today's command count in `score.value`. The document cap is 4096 bytes. A larger write is rejected and `mill-perf.log` records `op=score.history`.
 
 ## Files
 
 | File | Role |
 |---|---|
 | **`mill-perf.log`** | Profiler. One line per op, `key=value`. **Start here.** |
-| **`mill-api.log`** | mill HTTPS verbs + `/api/floor` (status, ms, owner, err) |
+| **`mill-api.log`** | mill HTTPS commands + `/api/floor` (status, ms, owner, err) |
 | **`mill-backchannel.log`** | mill-wall mill-connect / leave / push / miss **and** mill connect recv / drain / drop (always `desk=`) |
 | **`logs/mill-wall-access.log`** | Every HTTP: `METHOD path status req_b= resp_b= ms` |
 | `session/<name>.hints.jsonl` | Frames kept for this mill connect. Secret-shaped strings in the frame are `[redacted]`. |
