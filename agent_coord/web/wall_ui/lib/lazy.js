@@ -72,7 +72,8 @@
     score: {
       js: "/score/score.js?v=wow182",
       css: "/score/score.css?v=wow238",
-      marker: "WALL_UI_DEFAULT_SCORE"
+      marker: "WALL_UI_DEFAULT_SCORE",
+      modules: ["scorePaint"]
     },
     todo: {
       js: "/todo/todo.js?v=wow182",
@@ -112,6 +113,11 @@
       js: "/mail/mail-paint.js?v=wow292",
       marker: "WALL_UI_DEFAULT_MAIL_PAINT",
       domain: "mail"
+    },
+    scorePaint: {
+      js: "/score/score-paint.js?v=wow294",
+      marker: "WALL_UI_DEFAULT_SCORE_PAINT",
+      domain: "score"
     }
   };
 
