@@ -53,7 +53,7 @@ replacing ERP payment runs inside mill.
 | budget / forecast KPI | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | paid / closed | `note` payment pointer + `pass` |
 | withhold / reject | `note` reason + `send` asker; `pass` or waiting_on revision |
-| park / later | `create todo` `<project> <need> --status parked` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 | accrual / period-close step | `note` / optional todo on same spine (ledger SoR) |
 
 Do **not** teach `hold`/`drop` day-one unless the office leases a shared invoice/PO doc.

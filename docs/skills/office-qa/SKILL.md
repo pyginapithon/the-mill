@@ -53,8 +53,8 @@ Not inputs: vague "improve quality," implement-while-checking, Builder suite as 
 | re-test / confirmation | same card after eng fix (`claim` / `note` / `send`) |
 | regression | follow-on `create todo` + same spine |
 | blocked (Claims/env) | waiting_on + `send` / `note` |
-| park / defer | `create todo` `<project> <need> --status parked` |
-| exclusive evidence file | `hold` / `drop` `<project> <resource> <owner>` (rare) |
+| park / defer | `create todo` `<roster> <need> --status parked` |
+| exclusive evidence file | `hold` / `drop` `<resource>` (rare) |
 | close QA remasure card | `pass` (QA card only unless office says validator closes eng) |
 
 ## Handoffs

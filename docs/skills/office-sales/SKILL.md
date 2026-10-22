@@ -50,7 +50,7 @@ Not inputs: "grow the pipeline," CRM data entry as mill's job, fan-out assign.
 | forecast / KPI | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | close-won | `pass` + `send` CS/delivery (+ optional onboarding `create todo` / `assign`) |
 | close-lost | `pass` + `note` why |
-| park / later | `create todo` `<project> <need> --status parked` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 | renewal | same spine: `create todo` renew opp **or** `send` CS |
 
 Do **not** teach `hold`/`drop` day-one unless the office leases a shared proposal doc.

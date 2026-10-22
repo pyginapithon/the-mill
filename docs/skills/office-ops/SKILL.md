@@ -56,7 +56,7 @@ office requires one, reconnect spam as a plan.
 | SLO / uptime KPI | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | exclusive config/runbook file | `hold` / `drop` (rare) |
 | close incident / stable | `pass` after mitigate + note/comms |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 
 ## Handoffs
 | To | When |

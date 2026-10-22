@@ -63,7 +63,7 @@ replace ATS/HRIS, invent recruiting CLI verbs.
 | hiring KPI (optional) | a row in the score table (`kpi`, `value`, `target`) |
 | filled req / hired | `note` outcome + parent `pass`; `send` onboarding kickoff |
 | checklist complete / onboarded | children + parent `pass` |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 | find people mail | `inbox` |
 
 ## Handoffs
