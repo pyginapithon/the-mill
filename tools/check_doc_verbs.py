@@ -36,8 +36,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# The docs a desk or a mill developer reads for verbs. Proposals for verbs
-# that do not exist yet live elsewhere and are not checked.
+# The docs a desk or a mill developer reads for verbs. Design docs that
+# propose verbs or flags not built yet (NOT_CHECKED) are not checked.
 DOC_GLOBS = (
     "README.md",
     "docs/*.md",
@@ -50,7 +50,7 @@ DOC_GLOBS = (
     "docs/requirements/*.md",
     "docs/skills/*/SKILL.md",
 )
-NOT_CHECKED = {"docs/dev/VERB-LEXICON-PROPOSAL.md"}
+NOT_CHECKED = {"docs/dev/VERB-LEXICON-PROPOSAL.md", "docs/dev/DETERMINISTIC-OFFICE.md"}
 
 # Flags read before the parser runs (main / _run_parsed), valid on any verb.
 ANY_VERB_FLAGS = {"--office", "--yes", "-h", "--help"}

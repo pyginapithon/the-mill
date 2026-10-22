@@ -48,7 +48,17 @@ python tools/check_doc_verbs.py          # exit 0 clean, 1 on any mismatch
 python tools/check_doc_verbs.py --list   # every verb, its positional count and flags
 ```
 
-CI runs it in the `mill_cli_smoke` job (F78).
+CI runs it in the `mill_cli_smoke` job (F83).
+
+## repro_sdist.py
+
+Make the sdist byte-reproducible. setuptools dates sdist members by file mtimes and the build time; this rewrites each `DIR/*.tar.gz` in place with fixed times (`SOURCE_DATE_EPOCH`), owner 0/0, and fixed modes. Contents and member names are unchanged. CI runs it after every build.
+
+```bash
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" python tools/repro_sdist.py dist
+```
+
+Exit nonzero with no `SOURCE_DATE_EPOCH`, no sdist, or a member that is not a file or directory.
 
 ## orphan_scan.py
 

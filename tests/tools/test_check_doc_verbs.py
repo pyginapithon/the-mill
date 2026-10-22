@@ -1,4 +1,4 @@
-"""F78 (doc-verbs): tools/check_doc_verbs.py holds every doc's mill verbs and flags to the CLI parser.
+"""F83 (doc-verbs): tools/check_doc_verbs.py holds every doc's mill verbs and flags to the CLI parser.
 
 The repo docs pass clean; each kind of drift (a verb that is gone, a flag a verb
 does not take, a missing positional, a retired word, a stale placeholder, a
