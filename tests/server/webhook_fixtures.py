@@ -19,6 +19,10 @@ def arm(monkeypatch, *, armed: dict[str, tuple[str, str]] | None = None) -> None
     monkeypatch.setenv("AGENT_COORD_WAKE_HOSTS", f"{HOOK_HOST}/automations/webhook/")
     monkeypatch.setattr(wake, "public_host", lambda host: True)
     monkeypatch.setattr(wake, "_GATE", {})
+    # #669: no real window-end timer thread in a unit test; a test that checks the
+    # trailing POST captures _schedule itself.
+    monkeypatch.setattr(wake, "_TRAIL", {})
+    monkeypatch.setattr(wake, "_schedule", lambda delay, fn, *args: None)
     table = armed
 
     def target(cn, desk):
