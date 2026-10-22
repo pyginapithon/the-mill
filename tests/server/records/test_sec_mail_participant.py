@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Security: mail participant authz for add mail:ID and reply (#sec S-3).
+"""Security: who may join a letter and who may change who else is on it (#sec S-3).
 
-Behavior under test: a desk that cannot already read a letter cannot read it by
-joining itself to it. `add mail:ID` (including adding oneself) and `reply`
-both require the caller to already be the sender, a recipient, or a participant
-of the letter's room. Only a named room (send --room) stays open-join by reply
-(the documented room model); a room opened by replying to a private letter stays
-private.
+Collaboration by default (#672): every desk in the office reads every letter, so
+any desk may join any letter itself, by `reply` or by `add mail:ID` (itself).
+Changing ANOTHER desk's place on a letter (`add`/`remove mail:ID OTHER`) still
+needs the caller to be the sender, a recipient, a participant of its room, or
+Admin.
 """
 from __future__ import annotations
 
@@ -48,38 +47,35 @@ def _desks(cn, mid):
     return {str(r.get("desk") or "") for r in rec_mail.to_list(cn, int(mid))}
 
 
-# --- the core repro: an outsider cannot read a private letter by joining it ---
+# --- #672: any desk may join any letter itself ---
 
-def test_outsider_cannot_add_self_to_private_letter(cn):
+def test_outsider_can_add_self_to_direct_letter(cn):
     _seed(cn)
     book = _Book(cn)
     sent = rpc._h_send(
-        book, {"src": "sa_sender", "dst": "sa_recip", "body": "secret"}, "unit", "sa_sender"
+        book, {"src": "sa_sender", "dst": "sa_recip", "body": "direct"}, "unit", "sa_sender"
     )
     mid = int(sent["id"])
-    with pytest.raises(CoordError) as ei:
-        rpc._h_add_remove(
-            book,
-            {"verb": "add", "type": "mail", "id": mid, "who": "sa_outsider"},
-            "unit",
-            "sa_outsider",
-        )
-    assert "not allowed" in str(ei.value).lower()
-    assert "sa_outsider" not in _desks(cn, mid)
+    out = rpc._h_add_remove(
+        book, {"verb": "add", "type": "mail", "id": mid}, "unit", "sa_outsider"
+    )
+    assert out["ok"] is True
+    assert "sa_outsider" in _desks(cn, mid)
 
 
-def test_outsider_cannot_reply_to_private_letter(cn):
+def test_outsider_can_reply_to_direct_letter(cn):
     _seed(cn)
     book = _Book(cn)
     sent = rpc._h_send(
-        book, {"src": "sa_sender", "dst": "sa_recip", "body": "secret2"}, "unit", "sa_sender"
+        book, {"src": "sa_sender", "dst": "sa_recip", "body": "direct2"}, "unit", "sa_sender"
     )
     mid = int(sent["id"])
-    with pytest.raises(CoordError) as ei:
-        rpc._h_reply(book, {"mail_id": mid, "body": "me too"}, "unit", "sa_outsider")
-    assert "private" in str(ei.value).lower()
-    # no room was opened from the private letter
-    assert not rec_tree.on_tree(cn, "mail", mid)
+    rep = rpc._h_reply(book, {"mail_id": mid, "body": "me too"}, "unit", "sa_outsider")
+    assert int(rep["id"]) > mid
+    # the reply joins visibly: it is a letter from the replying desk
+    letter = rec_mail.letter_row(cn, int(rep["id"]))
+    assert str(letter.get("desk") or "") == "sa_outsider"
+    assert "sa_outsider" in rec_mail.room_participants(cn, mid)
 
 
 # --- edge/regression: legitimate participants keep working ---
@@ -125,8 +121,6 @@ def test_recipient_can_reply_to_private_letter_opening_room(cn):
 
 
 def test_nonmember_reply_into_existing_room_still_joins(cn):
-    # A named room is open-join by reply (documented). The gate only guards the
-    # off-tree private case, so this must still work.
     _seed(cn)
     book = _Book(cn)
     root = rpc._h_send(
@@ -141,7 +135,9 @@ def test_nonmember_reply_into_existing_room_still_joins(cn):
     assert int(rep["id"]) > rid
 
 
-def test_nonmember_cannot_add_to_room_they_are_not_in(cn):
+def test_nonmember_adds_self_to_room_but_not_another(cn):
+    # #672: a desk joins a room visibly without posting; it still cannot put
+    # another desk on a room it is not in.
     _seed(cn)
     book = _Book(cn)
     root = rpc._h_send(
@@ -159,9 +155,15 @@ def test_nonmember_cannot_add_to_room_they_are_not_in(cn):
             "sa_outsider",
         )
     assert "not allowed" in str(ei.value).lower()
+    assert "sa_third" not in rec_mail.room_participants(cn, rid)
+    out = rpc._h_add_remove(
+        book, {"verb": "add", "type": "mail", "id": rid}, "unit", "sa_outsider"
+    )
+    assert out["ok"] is True
+    assert "sa_outsider" in rec_mail.room_participants(cn, rid)
 
 
-def test_outsider_cannot_reply_into_room_opened_from_private_letter(cn):
+def test_outsider_reads_then_replies_into_room_opened_from_direct_letter(cn):
     _seed(cn)
     book = _Book(cn)
     sent = rpc._h_send(
@@ -170,15 +172,12 @@ def test_outsider_cannot_reply_into_room_opened_from_private_letter(cn):
     mid = int(sent["id"])
     rep = rpc._h_reply(book, {"mail_id": mid, "body": "answer"}, "unit", "sa_recip")
     assert rec_tree.on_tree(cn, "mail", mid)
-    for target in (mid, int(rep["id"])):
-        with pytest.raises(CoordError) as ei:
-            rpc._h_reply(book, {"mail_id": target, "body": "me too"}, "unit", "sa_outsider")
-        assert "private" in str(ei.value).lower()
+    got = rpc._h_mail_thread(book, {"mail_id": mid, "scope": "room"}, "unit", "sa_outsider")
+    assert {int(m["id"]) for m in got["chain"]} == {mid, int(rep["id"])}
+    # reading did not join
     assert "sa_outsider" not in rec_mail.room_participants(cn, mid)
-    with pytest.raises(CoordError) as ei:
-        rpc._h_mail_thread(book, {"mail_id": mid}, "unit", "sa_outsider")
-    msg = str(ei.value)
-    assert "private" in msg and "mill reply" not in msg
+    rpc._h_reply(book, {"mail_id": int(rep["id"]), "body": "me too"}, "unit", "sa_outsider")
+    assert "sa_outsider" in rec_mail.room_participants(cn, mid)
 
 
 def test_added_desk_can_then_reply(cn):

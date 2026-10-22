@@ -234,7 +234,7 @@ def test_a2_fetch_rejects_non_pem(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
             return False
 
     monkeypatch.setattr(
-        "urllib.request.urlopen",
+        "agent_coord.client.http._open",
         lambda *a, **k: Resp(),
     )
     dest = tmp_path / "ssl" / "ca.crt"
@@ -255,7 +255,7 @@ def test_a2_fetch_rejects_fingerprint_mismatch(tmp_path: Path, monkeypatch: pyte
         def __exit__(self, *a):
             return False
 
-    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: Resp())
+    monkeypatch.setattr("agent_coord.client.http._open", lambda *a, **k: Resp())
     dest = tmp_path / "ssl" / "ca.crt"
     assert (
         fetch_mill_ca(
@@ -281,7 +281,7 @@ def test_a2_fetch_accepts_matching_fingerprint(tmp_path: Path, monkeypatch: pyte
         def __exit__(self, *a):
             return False
 
-    monkeypatch.setattr("urllib.request.urlopen", lambda *a, **k: Resp())
+    monkeypatch.setattr("agent_coord.client.http._open", lambda *a, **k: Resp())
     dest = tmp_path / "ssl" / "ca.crt"
     got = fetch_mill_ca(
         f"https://wall.example/?invite=tok&ca={_FP}",
