@@ -4748,6 +4748,25 @@
       if (noun) return noun;
       return n;
     }
+    /* #717: a plan row's face. Most plans carry only a 10-hex name, so the head was
+       "unnamed plan" on every row. With no plan name the root card's title is the head and
+       the line under it says the root's status and who has it; a named plan keeps its name
+       as the head and the root title as the line. */
+    function millPlanRowFace(label, rootPayload, root) {
+      const p = rootPayload || {};
+      const title = String(p.title || "").replace(/\s+/g, " ").trim();
+      const name = String(label || "").trim();
+      if (name) return { head: name, line: title, full: name };
+      if (title) {
+        const bits = [String(p.status || "").trim(), String(p.who || "").trim()].filter(Boolean);
+        /* The plans column is narrow: keep the head to about two lines. */
+        const head = title.length > 64 ? (title.slice(0, 63).replace(/\s+\S*$/, "") + "\u2026") : title;
+        return { head: head, line: bits.join(" | "), full: title };
+      }
+      const id = root && root.id != null && String(root.id) !== "" ? String(root.id) : "";
+      const head = id ? ("card " + id) : "plan";
+      return { head: head, line: String(p.status || "").trim(), full: head };
+    }
     /* #33: one nested-set pass per nodes array. Parent map + depth memo (a parent's
        depth is set before its kids in lft order), O(n log n) once, O(1) per lookup.
        Overlap, ties, inverted rows, or a repeated row mark the index bad and callers
@@ -5170,7 +5189,7 @@
         if (!todos.length) return;
         if (q && !todos.some(n => todoTreeMatch(d, n, q))) return;
         const planId = String((t && (t.name || t.id)) || ("t" + ti));
-        forests.push({ planId: planId, label: millTreePlanLabel(t) || "unnamed plan", todos: todos });
+        forests.push({ planId: planId, label: millTreePlanLabel(t), todos: todos });
       });
       let hitN = 0;
       if (q) forests.forEach(f => { f.todos.forEach(n => { if (todoTreeMatch(d, n, q)) hitN += 1; }); });
@@ -5203,12 +5222,12 @@
       const roots = forest ? millTodoRootsOf(forest.todos).filter(n => todoTreeOnSpine(forest.todos, n, d, q)) : [];
       const forestRows = forests.map(f => {
         const root = millTodoRootsOf(f.todos)[0];
-        const line = root ? millTreePayload(d, root).title : "";
+        const face = millPlanRowFace(f.label, root ? millTreePayload(d, root) : null, root);
         const on = forest && f.planId === forest.planId ? " on" : "";
         return { key: f.planId, html: `<button type="button" class="todo-tree-row${on}" data-plan="${esc(f.planId)}">` +
-          `<b>${esc(f.label)}</b>` +
+          `<b title="${esc(face.full)}">${esc(face.head)}</b>` +
           `<span class="todo-tree-n">${f.todos.length}</span>` +
-          `<span class="todo-tree-line">${esc(line)}</span>` +
+          `<span class="todo-tree-line">${esc(face.line)}</span>` +
           `</button>` };
       });
       const forestHtml = forestRows.map(r => r.html).join("");
