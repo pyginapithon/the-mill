@@ -766,6 +766,34 @@ def log_startup() -> None:
         pass
 
 
+def uvicorn_config(app, host: str, port: int, *, certs: dict | None = None):
+    """The mill-wall uvicorn.Config.
+
+    proxy_headers is hard-set off (#791): uvicorn keeps the raw TCP peer in
+    scope["client"] and never reads X-Forwarded-For, so FORWARDED_ALLOW_IPS or
+    --forwarded-allow-ips cannot widen proxy trust. The header is read only by
+    allow.door_client, from the proxies in AGENT_COORD_TRUSTED_PROXIES
+    (default this host's loopback, the installed nginx edge).
+    """
+    import uvicorn
+
+    kw = dict(
+        app=app,
+        host=host,
+        port=port,
+        log_level="info",
+        access_log=False,
+        use_colors=False,
+        log_config=None,
+        proxy_headers=False,
+        forwarded_allow_ips="",
+    )
+    if certs:
+        kw["ssl_certfile"] = certs["cert"]
+        kw["ssl_keyfile"] = certs["key"]
+    return uvicorn.Config(**kw)
+
+
 def run_uvicorn(
     host: str,
     port: int,
@@ -813,23 +841,11 @@ def run_uvicorn(
     _no_console_stdio()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     app = make_asgi_app(roots, api_only=api_only, host=host, port=port)
-    kw = dict(
-        app=app,
-        host=host,
-        port=port,
-        log_level="info",
-        access_log=False,
-        use_colors=False,
-        log_config=None,
-    )
-    if tls:
-        kw["ssl_certfile"] = certs["cert"]
-        kw["ssl_keyfile"] = certs["key"]
     if sys.platform == "win32":
         import asyncio
 
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    config = uvicorn.Config(**kw)
+    config = uvicorn_config(app, host, port, certs=certs if tls else None)
     server = uvicorn.Server(config)
     # Windows SERVICE: signals only work on the process main thread
     # https://github.com/encode/uvicorn/issues/526
