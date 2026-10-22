@@ -9,7 +9,7 @@ import threading
 import time
 from typing import Any
 
-from agent_coord.const import CONST_ADMIN, CONST_OFFICE, CONST_ROSTER
+from agent_coord.const import CONST_ADMIN, CONST_ROSTER
 from agent_coord.server.redact import redact_format, redact_secrets
 
 _log = logging.getLogger("mill.push")
@@ -377,7 +377,9 @@ def mill_admin_alert(cn, text: str, *, verb: str = "") -> None:
         from agent_coord.server.redact import redact_text
 
         body = redact_text(text or "mill-wall")[0][:4000]
-        ins = rec_mail.insert(cn, CONST_OFFICE, src, CONST_ADMIN, body, 0, dst_kind=CONST_ROSTER)
+        from agent_coord.server.admin.guard import office_name
+
+        ins = rec_mail.insert(cn, office_name(cn), src, CONST_ADMIN, body, 0, dst_kind=CONST_ROSTER)
         mid = int((ins[0] or {}).get("id") or 0) if ins else 0
         if mid:
             from agent_coord.server.mail_push import push_mail

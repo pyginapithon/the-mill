@@ -1,7 +1,7 @@
 """Admin membership on the book. Not ~/.mill/admins."""
 from __future__ import annotations
 
-from agent_coord.const import CONST_ADMIN, CONST_ROSTER
+from agent_coord.const import CONST_ADMIN, CONST_OFFICE, CONST_ROSTER
 from agent_coord.helpers.errors import CoordError
 from agent_coord.server.records import member as rec_member
 
@@ -20,8 +20,9 @@ def _desk(value) -> str:
     return str(value or "").strip()
 
 
-# The reserved rosters: Office is name id 1, Admin is name id 2 (tables.sql seed;
-# sp_name refuses to delete or rename either, #722).
+# The reserved rosters: Office is name id 1, Admin is name id 2 (tables.sql seed).
+# sp_name never deletes either and never renames Admin; an Admin may rename
+# Office, so code reaches it by id 1 and treats the name Office as its alias (#722).
 OFFICE_ROSTER_ID = 1
 ADMIN_ROSTER_ID = 2
 RESERVED_ROSTER_IDS = frozenset({OFFICE_ROSTER_ID, ADMIN_ROSTER_ID})
@@ -47,6 +48,42 @@ def reserved_roster_id(cn, name) -> int | None:
     except Exception:
         return None
     return nid if nid in RESERVED_ROSTER_IDS else None
+
+
+def office_name(cn) -> str:
+    """The stored name of the Office roster (id 1), which an Admin may rename (#722).
+
+    Falls back to the seed name when the book cannot be read.
+    """
+    from agent_coord.server.records.db import scalar_done
+
+    if cn is None:
+        return CONST_OFFICE
+    try:
+        got = scalar_done(
+            cn,
+            "SELECT name FROM name WHERE id = %s AND type = %s LIMIT 1",
+            (OFFICE_ROSTER_ID, CONST_ROSTER),
+        )
+    except Exception:
+        return CONST_OFFICE
+    if isinstance(got, (bytes, bytearray)):
+        got = got.decode("utf-8")
+    # Only a real stored name counts (a stub cursor in tests returns other objects).
+    return got.strip() if isinstance(got, str) and got.strip() else CONST_OFFICE
+
+
+def is_office_roster(cn, name) -> bool:
+    """Does this roster name mean the Office roster (id 1)? (#722)
+
+    True for the alias Office in any spelling and for the current name of id 1.
+    """
+    raw = _desk(name)
+    if not raw:
+        return False
+    if raw.casefold() == CONST_OFFICE.casefold():
+        return True
+    return reserved_roster_id(cn, raw) == OFFICE_ROSTER_ID
 
 
 def is_admin_roster(cn, name) -> bool:
