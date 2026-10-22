@@ -2,7 +2,7 @@
 
 
 class CoordError(Exception):
-    """Mill error. sync is the push report that rode with a failed verb.
+    """Mill error. sync is the push report that rode with a failed command.
 
     envelope, when set, is the full host failure reply (ok/mill/id/result/error/sync)
     so the CLI can print the same object the wire carried.

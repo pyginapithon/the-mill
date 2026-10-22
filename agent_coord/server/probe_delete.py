@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """probe-delete: test-only soft delete of a desk's own fixture rows (#160).
 
-Not a skill.md verb and not a mill subcommand. tools/probe_deleted_rows.py
+Not a skill.md command and not a mill subcommand. tools/probe_deleted_rows.py
 calls it over the sitting connect so a checker can make a deleted todo or
 score row live and confirm state=deleted end to end (/api/v1/events,
 mill_activity_select, mill_between, the Wall pill).
@@ -21,7 +21,7 @@ from agent_coord.const import CONST_ROSTER
 from agent_coord.helpers.errors import CoordError
 from agent_coord.lib.observe import is_fixture_project
 
-VERB = "probe-delete"
+COMMAND = "probe-delete"
 TYPES = ("todo", "score")
 
 

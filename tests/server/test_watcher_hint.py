@@ -73,10 +73,10 @@ def test_fanout_uses_watcher_hint_per_desk():
 
 def test_outbound_add_remove_in_wall():
     """#265: mill add|remove replace mill watcher."""
-    from agent_coord.client.outbound import WALL, VERBS, body_from_args
+    from agent_coord.client.outbound import WALL, COMMANDS, body_from_args
 
-    assert "watcher" not in WALL and "watcher" not in VERBS
-    assert {"add", "remove"} <= set(WALL) and {"add", "remove"} <= set(VERBS)
+    assert "watcher" not in WALL and "watcher" not in COMMANDS
+    assert {"add", "remove"} <= set(WALL) and {"add", "remove"} <= set(COMMANDS)
 
     class A:
         cmd = "add"

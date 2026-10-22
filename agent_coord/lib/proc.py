@@ -209,7 +209,7 @@ def _win_pid_running(pid: int) -> bool | None:
 
 
 # agent-ux 1214: console-script launchers (pip writes mill.exe etc. on
-# Windows). Each `mill <verb>` runs launcher.exe -> python.exe, so python's
+# Windows). Each `mill <command>` runs launcher.exe -> python.exe, so python's
 # parent is a fresh launcher per call, never the shell that ran
 # `mill connect`. The connect bridge matches on the shell, so walk past them.
 CONSOLE_LAUNCHERS = frozenset(
@@ -291,7 +291,7 @@ def shell_parent_pid(
 
     Linux/Mac: console scripts exec python in place, so this is os.getppid().
     Windows: walk up past mill.exe-style launchers (and a venv python
-    redirector) so `mill connect` and `mill <verb>` started from the same
+    redirector) so `mill connect` and `mill <command>` started from the same
     shell agree on the shell pid, whichever launcher each used.
     """
     start = int(os.getppid() if ppid is None else ppid)

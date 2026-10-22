@@ -1,6 +1,6 @@
-"""mill CLI language (0.7.x): `mill <action> <type> <name>` words -> wall RPC verbs.
+"""mill CLI language (0.7.x): `mill <action> <type> <name>` words -> wall RPC commands.
 
-The wall keeps its RPC verbs (roster, label, member-add, label-add, add, remove, ...).
+The wall keeps its RPC commands (roster, label, member-add, label-add, add, remove, ...).
 This module maps the CLI words onto them, asks before create and destructive
 actions, and makes rename/retire retype the name. --yes skips every prompt.
 """
@@ -12,7 +12,7 @@ from typing import Any, Callable
 from agent_coord.helpers.errors import CoordError
 
 GAP_ROOM = (
-    "{verb} room: not yet by name. To put a desk on a room: mill add mail:<root_id> DESK; "
+    "{command} room: not yet by name. To put a desk on a room: mill add mail:<root_id> DESK; "
     "to join one yourself, reply to any letter in it"
 )
 
@@ -50,19 +50,19 @@ def retype(name: str, what: str, *, yes: bool, ask: Callable[[str], str] | None 
         raise CoordError(f"{what}: names did not match; nothing changed")
 
 
-def _type_id(raw: str, verb: str) -> tuple[str, int | str]:
+def _type_id(raw: str, command: str) -> tuple[str, int | str]:
     from agent_coord.const import ACTIVITY_TYPES
 
     kind, _, num = str(raw or "").strip().partition(":")
     kind = kind.strip().lower()
     hint = (
-        f"{verb}: TARGET is type:id (for example todo:256, todo:cold-test/fix-login or mail:1866), type one of "
+        f"{command}: TARGET is type:id (for example todo:256, todo:cold-test/fix-login or mail:1866), type one of "
         + "|".join(sorted(ACTIVITY_TYPES))
     )
     if kind not in ACTIVITY_TYPES:
         raise CoordError(hint)
     try:
-        return kind, card_ref(num, kind, verb)
+        return kind, card_ref(num, kind, command)
     except CoordError:
         raise CoordError(hint) from None
 
@@ -71,7 +71,7 @@ def _desks(raw: str) -> list[str]:
     return [d.strip() for d in str(raw or "").split(",") if d.strip()]
 
 
-# #706: (type arg, id arg, ref body key) per tree verb; a ROSTER/NEED id rides as the ref key.
+# #706: (type arg, id arg, ref body key) per tree command; a ROSTER/NEED id rides as the ref key.
 _TREE_IDS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "attach": (("type_a", "id_a", "ref_a"), ("type_b", "id_b", "ref_b")),
     "move": (("type", "id", "ref"), ("parent_type", "parent_id", "parent_ref")),
@@ -80,7 +80,7 @@ _TREE_IDS: dict[str, tuple[tuple[str, str, str], ...]] = {
 }
 
 
-def card_ref(raw: str, typ: str, verb: str) -> int | str:
+def card_ref(raw: str, typ: str, command: str) -> int | str:
     """An activity id (a number above 0), a todo as ROSTER/NEED (#274), or a hold by name (#327).
 
     Returns the int id, or the "roster/need" or hold name string for the server to resolve.
@@ -98,18 +98,18 @@ def card_ref(raw: str, typ: str, verb: str) -> int | str:
             return f"{roster}/{need}"
     if typ == "todo":
         raise CoordError(
-            f"{verb} todo: give the todo id (a number above 0) or ROSTER/NEED (for example cold-test/fix-login)"
+            f"{command} todo: give the todo id (a number above 0) or ROSTER/NEED (for example cold-test/fix-login)"
         )
     # #327: a hold by its resource name; the server resolves it to the hold id.
     if typ == "hold" and text and not text.isdigit():
         from agent_coord.helpers.bounds import resource_name
 
         return resource_name(text)
-    raise CoordError(f"{verb} {typ}: give the {typ} id (a number above 0)")
+    raise CoordError(f"{command} {typ}: give the {typ} id (a number above 0)")
 
 
 def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
-    """Rewrite args in place for the new CLI words; other verbs pass through."""
+    """Rewrite args in place for the new CLI words; other commands pass through."""
     cmd = str(getattr(args, "cmd", "") or "")
     yes = bool(getattr(args, "yes", False))
 
@@ -137,7 +137,7 @@ def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
             args.yes = False
             return args
         if kind == "room":
-            raise CoordError(GAP_ROOM.format(verb=cmd))
+            raise CoordError(GAP_ROOM.format(command=cmd))
         if kind != "roster":
             raise CoordError(f"{cmd}: TYPE is roster (mill {cmd} roster NAME [d1,d2]) or TYPE:ID (mill {cmd} todo:256)")
         if not str(getattr(args, "group", "") or "").strip():
@@ -178,20 +178,20 @@ def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
         return args
 
     if cmd == "connected":
-        # The wall RPC verb stays session (like member-add); the CLI word is connected (#274).
+        # The wall RPC command stays session (like member-add); the CLI word is connected (#274).
         args.cmd = "session"
         return args
 
     if cmd in ("watch", "unwatch"):
         if args.type == "room":
-            raise CoordError(GAP_ROOM.format(verb=cmd))
+            raise CoordError(GAP_ROOM.format(command=cmd))
         ref = card_ref(args.target, args.type, cmd)
         # Rides the #265 add/remove RPC for this desk (server unwatch is #265's remove).
         args.target = (args.type, ref)
         args.who = ""
         args.cmd = "add" if cmd == "watch" else "remove"
-        # The reply names the verb the desk typed, not the RPC it rides (ux12).
-        args.said_verb = cmd
+        # The reply names the command the desk typed, not the RPC it rides (ux12).
+        args.said_command = cmd
         if cmd == "unwatch":
             args.hint = ""
         return args

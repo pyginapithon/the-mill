@@ -1,4 +1,4 @@
-"""A non-JSON wall frame fails a waiting verb now (#141)."""
+"""A non-JSON wall frame fails a waiting command now (#141)."""
 from __future__ import annotations
 
 import asyncio

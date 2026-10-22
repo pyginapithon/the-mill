@@ -2,7 +2,7 @@
 
 Seen live: a desk retired itself, yet its seat token still passed connect and
 the desk sat as ready. Reset then refused (name retired) and reclaim refused
-(seat live), so an Admin had no verb that revoked the seat.
+(seat live), so an Admin had no command that revoked the seat.
 """
 from __future__ import annotations
 

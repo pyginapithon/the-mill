@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Human-readonly service glance. Six cached reads. One mill-perf tail for the slowest verb this hour. No writes.
+"""Human-readonly service glance. Six cached reads. One mill-perf tail for the slowest command this hour. No writes.
 
 GET /api/v1/glance and GET /api/v1/glance/{alerts,office,platform,logs,book,door}.
 One 30s body serves every browser. timings=1 skips that map.
@@ -7,7 +7,7 @@ One 30s body serves every browser. timings=1 skips that map.
 Secrets are removed before the JSON is sent: tokens, bearers, invites, passwords,
 client secrets, cookies, PRIVATE-TOKEN, CA keys, and mail or todo text. Counts
 only. A book error string is not returned. The one error text kept is the
-slowest verb's err= from mill-perf.log, trimmed to 160 and secret-redacted.
+slowest command's err= from mill-perf.log, trimmed to 160 and secret-redacted.
 """
 from __future__ import annotations
 
@@ -94,12 +94,12 @@ _KEPT_OFF = (
     "mill-desk.idle_verbs",
 )
 _LOG_LINES = (
-    ("mill-wall.api_n", "mill-api.log", "mill verbs in the last hour"),
-    ("mill-wall.api_ms", "mill-perf.log", "p95 milliseconds of those verbs"),
-    ("mill-wall.api_bytes", "mill-api.log", "request plus response bytes of those verbs"),
+    ("mill-wall.api_n", "mill-api.log", "mill commands in the last hour"),
+    ("mill-wall.api_ms", "mill-perf.log", "p95 milliseconds of those commands"),
+    ("mill-wall.api_bytes", "mill-api.log", "request plus response bytes of those commands"),
     ("mill-wall.ws_push", "mill-backchannel.log", "hub pushes that landed"),
     ("mill-wall.ws_miss", "mill-backchannel.log", "hub fanout misses"),
-    ("mill-wall.err_n", "mill-api.log and mill-wall-svc.log", "verb 500s and service crashes"),
+    ("mill-wall.err_n", "mill-api.log and mill-wall-svc.log", "command 500s and service crashes"),
     ("mill-wall.ticks", "mill-perf.log", "tick lines in the last hour"),
     ("mill-desk.hint_drop", "mill-perf.log", "sit drops in the last hour"),
 )
@@ -130,24 +130,24 @@ _TRUST_CHART = {
 _TYPES = (CONST_MAIL, CONST_TODO, CONST_JOIN, CONST_HOLD, CONST_SCORE)
 
 
-_VERB_LINE = re.compile(r"(?:^|\s)op=(?:verb|api\.mill\.([^\s]+))(?:\s|$)")
-_VERB_MS = re.compile(r"(?:^|\s)ms=([0-9.]+)(?:\s|$)")
-_VERB_NAME = re.compile(r"(?:^|\s)verb=([^\s]+)")
-_VERB_DESK = re.compile(r"(?:^|\s)(?:desk|owner)=([^\s]+)")
-_VERB_OK = re.compile(r"(?:^|\s)ok=([01])(?:\s|$)")
-_VERB_STATUS = re.compile(r"(?:^|\s)status=(\d{3})(?:\s|$)")
-_VERB_ERR = re.compile(r"(?:^|\s)err=(.*)$")
+_COMMAND_LINE = re.compile(r"(?:^|\s)op=(?:verb|api\.mill\.([^\s]+))(?:\s|$)")
+_COMMAND_MS = re.compile(r"(?:^|\s)ms=([0-9.]+)(?:\s|$)")
+_COMMAND_NAME = re.compile(r"(?:^|\s)verb=([^\s]+)")
+_COMMAND_DESK = re.compile(r"(?:^|\s)(?:desk|owner)=([^\s]+)")
+_COMMAND_OK = re.compile(r"(?:^|\s)ok=([01])(?:\s|$)")
+_COMMAND_STATUS = re.compile(r"(?:^|\s)status=(\d{3})(?:\s|$)")
+_COMMAND_ERR = re.compile(r"(?:^|\s)err=(.*)$")
 _ERR_MAX = 160
 _KEEP_ERR_UNDER = "slowest_verb"
-_VERB_TS = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
+_COMMAND_TS = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 _PERF_TAIL = 16 * 1024 * 1024
 
 
-def slowest_verb_text(text: str, since: datetime) -> dict[str, Any] | None:
-    """Max-ms verb line at or after since. None when the hour has no verb line.
+def slowest_command_text(text: str, since: datetime) -> dict[str, Any] | None:
+    """Max-ms command line at or after since. None when the hour has no command line.
 
     Reads both transports: op=verb (websocket, verb= and desk=) and
-    op=api.mill.<verb> (HTTP, owner=). Each call is logged once, on one
+    op=api.mill.<command> (HTTP, owner=). Each call is logged once, on one
     transport, so no line is counted twice. ok is 1 or 0 (ws ok=, HTTP
     status 2xx). err is the line's err= text, trimmed to 160, only when the
     line has it. err= is the last field perf_log writes, so it runs to end of line.
@@ -155,10 +155,10 @@ def slowest_verb_text(text: str, since: datetime) -> dict[str, Any] | None:
     best_ms = -1.0
     best: dict[str, Any] | None = None
     for line in (text or "").splitlines():
-        op_m = _VERB_LINE.search(line)
+        op_m = _COMMAND_LINE.search(line)
         if op_m is None:
             continue
-        ts_m = _VERB_TS.match(line)
+        ts_m = _COMMAND_TS.match(line)
         if ts_m is None:
             continue
         try:
@@ -167,10 +167,10 @@ def slowest_verb_text(text: str, since: datetime) -> dict[str, Any] | None:
             continue
         if ts < since:
             continue
-        ms_m = _VERB_MS.search(line)
-        http_verb = op_m.group(1)
-        name_m = None if http_verb else _VERB_NAME.search(line)
-        name = http_verb or (name_m.group(1) if name_m else None)
+        ms_m = _COMMAND_MS.search(line)
+        http_command = op_m.group(1)
+        name_m = None if http_command else _COMMAND_NAME.search(line)
+        name = http_command or (name_m.group(1) if name_m else None)
         if ms_m is None or not name:
             continue
         try:
@@ -180,9 +180,9 @@ def slowest_verb_text(text: str, since: datetime) -> dict[str, Any] | None:
         if ms <= best_ms:
             continue
         best_ms = ms
-        desk_m = _VERB_DESK.search(line)
-        ok_m = _VERB_OK.search(line)
-        st_m = _VERB_STATUS.search(line)
+        desk_m = _COMMAND_DESK.search(line)
+        ok_m = _COMMAND_OK.search(line)
+        st_m = _COMMAND_STATUS.search(line)
         ok = int(ok_m.group(1)) if ok_m else (int(st_m.group(1)) < 400 if st_m else None)
         best = {
             "verb": name[:64],
@@ -191,14 +191,14 @@ def slowest_verb_text(text: str, since: datetime) -> dict[str, Any] | None:
         }
         if ok is not None:
             best["ok"] = int(ok)
-        err_m = _VERB_ERR.search(line)
+        err_m = _COMMAND_ERR.search(line)
         err = err_m.group(1).strip() if err_m else ""
         if err:
             best["err"] = err[:_ERR_MAX]
     return best
 
 
-def slowest_verb(now: datetime | None = None) -> dict[str, Any] | None:
+def slowest_command(now: datetime | None = None) -> dict[str, Any] | None:
     """Last hour of mill-perf.log, last 16MB only. Not a score row."""
     from agent_coord.config import mill_home
 
@@ -215,7 +215,7 @@ def slowest_verb(now: datetime | None = None) -> dict[str, Any] | None:
     if size > _PERF_TAIL:
         raw = raw.split("\n", 1)[-1]
     now = now or datetime.now(timezone.utc)
-    return slowest_verb_text(raw, now - timedelta(hours=1))
+    return slowest_command_text(raw, now - timedelta(hours=1))
 
 
 def seal(value: Any) -> Any:
@@ -503,7 +503,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
         f"WHERE s.kpi = 'system' AND a.id = {OFFICE_ROSTER_ID} "
         "/* glance:system-scores */",
     )
-    verbs = 0
+    commands = 0
     with_score: set[str] = set()
     if system_rows is not None:
         for name, value in system_rows:
@@ -513,7 +513,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
             with_score.add(desk)
             n = _num(value)
             if n is not None:
-                verbs += n
+                commands += n
     join_rows = _q(
         cn,
         "SELECT d.name FROM `join` j "
@@ -711,7 +711,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
         "platform": {
             "secrets": "redacted",
             "desks_with_score": len(with_score) if system_rows is not None else None,
-            "verbs_today": verbs if system_rows is not None else None,
+            "verbs_today": commands if system_rows is not None else None,
             "desks_here_without": len(here) if join_rows is not None else None,
             "desks_here_without_names": here[:50],
             "ticks": _cell(scores, "mill-wall.ticks"),
@@ -726,7 +726,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
             "every_s": EVERY_S,
             "lines": lines,
             "unstored": list(_UNSTORED),
-            "slowest_verb": slowest_verb(),
+            "slowest_verb": slowest_command(),
         },
         "book": {
             "secrets": "redacted",

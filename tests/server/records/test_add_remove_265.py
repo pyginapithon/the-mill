@@ -33,8 +33,8 @@ def _rows(cn, sql, args=()):
         cur.close()
 
 
-def _go(cn, verb, typ, nid, who="", owner="ar_a", hint=None):
-    body = {"verb": verb, "type": typ, "id": nid}
+def _go(cn, command, typ, nid, who="", owner="ar_a", hint=None):
+    body = {"verb": command, "type": typ, "id": nid}
     if who:
         body["who"] = who
     if hint is not None:

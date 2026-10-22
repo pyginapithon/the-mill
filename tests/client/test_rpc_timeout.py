@@ -1,4 +1,4 @@
-"""A timed-out verb names itself and reuses its id on the next try (#137)."""
+"""A timed-out command names itself and reuses its id on the next try (#137)."""
 from __future__ import annotations
 
 import threading
@@ -7,7 +7,7 @@ from agent_coord.client import ws as ws_cli
 from agent_coord.server.api.mill import rpc
 
 
-def test_timeout_message_names_the_verb_and_id():
+def test_timeout_message_names_the_command_and_id():
     text = ws_cli.rpc_timeout_error("send", "abc-1")
     assert text == (
         "ws rpc: no reply in 30s for send (id abc-1); "

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Card session stamp: claim -> done verb count (A6 verbs-to-done).
+"""Card session stamp: claim -> done command count (A6 commands-to-done).
 
-In-process per-card clock from successful claim/assign. Count mill verbs that
-target the card until pass reaches done. Note verbs are stamped separately
+In-process per-card clock from successful claim/assign. Count mill commands that
+target the card until pass reaches done. Note commands are stamped separately
 (notes=) and excluded from verbs= (note spam). score_tick scrapes p50 into
 opt-in book KPI (no Wall chrome, no always-on Server-Timing).
 """
@@ -14,24 +14,24 @@ from typing import Any
 
 from agent_coord.helpers.ident import slug
 
-# Day-one card-targeting verbs (skill.md todo spine).
-CARD_VERBS = frozenset({"claim", "assign", "note", "pass", "unclaim"})
+# Day-one card-targeting commands (skill.md todo spine).
+CARD_COMMANDS = frozenset({"claim", "assign", "note", "pass", "unclaim"})
 
 # Start (or reset) a claim window.
-_START_VERBS = frozenset({"claim", "assign"})
+_START_COMMANDS = frozenset({"claim", "assign"})
 
 # Note spam: count in notes=, not verbs=.
-_NOTE_VERB = "note"
+_NOTE_COMMAND = "note"
 
-KPI_VERBS_TO_DONE = "mill-office.verbs_to_done"
+KPI_COMMANDS_TO_DONE = "mill-office.verbs_to_done"
 BOOK_PERF: dict[str, str] = {
-    KPI_VERBS_TO_DONE: (
-        "p50 mill verbs on a card claim->done excl. notes (book); informational"
+    KPI_COMMANDS_TO_DONE: (
+        "p50 mill commands on a card claim->done excl. notes (book); informational"
     ),
 }
 
 _lock = threading.Lock()
-# need_slug -> {t0, verbs, notes, card_id, desk, stamped}
+# need_slug -> {t0, commands, notes, card_id, desk, stamped}
 _sessions: dict[str, dict[str, Any]] = {}
 
 
@@ -61,23 +61,23 @@ def _card_id_of(result: Any) -> int:
 
 def note_card(
     desk: str | None,
-    verb: str,
+    command: str,
     result: Any,
     *,
     body: dict[str, Any] | None = None,
 ) -> None:
-    """Track ok card verbs; on pass->done emit card.verbs_to_done once.
+    """Track ok card commands; on pass->done emit card.verbs_to_done once.
 
     Formula:
     - claim/assign ok starts (resets) the window; counts as verbs=1
-    - subsequent ok card verbs increment verbs= (note increments notes= only)
+    - subsequent ok card commands increment verbs= (note increments notes= only)
     - unclaim clears without stamp
-    - pass -> shipped keeps counting (pass included in verbs)
+    - pass -> shipped keeps counting (pass included in commands)
     - pass -> done stamps verbs= (excl notes) + notes= and closes
     """
     who = _who(desk or "")
-    v = (verb or "").strip().lower()
-    if v not in CARD_VERBS:
+    v = (command or "").strip().lower()
+    if v not in CARD_COMMANDS:
         return
     if not isinstance(result, dict):
         return
@@ -90,7 +90,7 @@ def note_card(
     card_id = _card_id_of(result)
     stamp: dict[str, Any] | None = None
     with _lock:
-        if v in _START_VERBS:
+        if v in _START_COMMANDS:
             # assign volunteer is the working desk when present.
             start_desk = who
             if v == "assign":
@@ -114,22 +114,22 @@ def note_card(
         if v == "unclaim":
             _sessions.pop(need, None)
             return
-        if v == _NOTE_VERB:
+        if v == _NOTE_COMMAND:
             sess["notes"] = int(sess.get("notes") or 0) + 1
             return
-        # pass / other non-note card verbs
+        # pass / other non-note card commands
         sess["verbs"] = int(sess.get("verbs") or 0) + 1
         if v == "pass" and str(result.get("status") or "") == "done":
             t0 = float(sess.get("t0") or time.perf_counter())
             ms = max(0.0, (time.perf_counter() - t0) * 1000.0)
-            verbs_n = int(sess.get("verbs") or 0)
+            commands_n = int(sess.get("verbs") or 0)
             notes_n = int(sess.get("notes") or 0)
             cid = int(sess.get("card_id") or card_id or 0)
             desk_s = str(sess.get("desk") or who or "")
             sess["stamped"] = True
             stamp = {
                 "ms": ms,
-                "verbs": verbs_n,
+                "verbs": commands_n,
                 "notes": notes_n,
                 "card": cid,
                 "need": need,

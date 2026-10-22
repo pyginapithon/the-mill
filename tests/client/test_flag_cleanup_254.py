@@ -99,10 +99,10 @@ def test_254_hold_without_resource_is_the_list() -> None:
     outbound._guard_args("hold", "hold", _hold_args(resource="a.md"))
 
 
-def test_254_status_is_not_a_verb() -> None:
+def test_254_status_is_not_a_command() -> None:
     from agent_coord.server.api.mill.rpc import HANDLERS
 
-    assert "status" not in outbound.VERBS
+    assert "status" not in outbound.COMMANDS
     assert "status" not in outbound.WALL
     assert "status" not in HANDLERS
     assert "status" not in outbound._PROJECT_GUARD

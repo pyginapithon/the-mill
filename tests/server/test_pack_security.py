@@ -455,7 +455,7 @@ def test_pack_security_flags_the_six_shapes() -> None:
     version = 'if path == "/mill/v1/version":\n    return\n'
     assert scan_text("m.py", version) == []
 
-    secret = 'perf_log("verb", ms, token=tok)\napi_log("bad token desk=%s" % who)\n'
+    secret = 'perf_log("command", ms, token=tok)\napi_log("bad token desk=%s" % who)\n'
     secrets = [row for row in scan_text("a.py", secret) if row[1] == "secret-exposure"]
     assert len(secrets) == 1
 

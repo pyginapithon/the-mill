@@ -32,13 +32,13 @@ def test_unknown_retired_empty_and_valid(cn) -> None:
     book = _Book(cn)
     before = _count(cn)
 
-    for verb, fn in (("hold", rpc._h_hold),):
+    for command, fn in (("hold", rpc._h_hold),):
         # 0.7.x: an empty roster on hold means Office (holds take no roster).
         for project in ("c237-missing", "c237-gone"):
             with pytest.raises(CoordError) as ei:
                 fn(book, {"resource": "c237-lock"}, project, "c237-desk")
             text = str(ei.value)
-            assert text.startswith(verb + ": no such project")
+            assert text.startswith(command + ": no such project")
             assert "projects:" in text
             listed = text.split("projects: ", 1)[1]
             parts = [p.strip() for p in listed.split(",")]
@@ -55,7 +55,7 @@ def test_unknown_retired_empty_and_valid(cn) -> None:
     assert _count(cn) == before + 1
 
 
-def test_project_verb_for_connect(cn) -> None:
+def test_project_command_for_connect(cn) -> None:
     seed_names(cn, ("c237b", "roster"), ("c237b-gone", "roster"))
     rec_name.retire(cn, "c237b-gone", "roster")
     book = _Book(cn)

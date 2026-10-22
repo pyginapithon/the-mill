@@ -19,9 +19,9 @@ class _Book:
 
 
 
-def _node(book, verb: str, mid: int, who: str, owner: str) -> dict:
+def _node(book, command: str, mid: int, who: str, owner: str) -> dict:
     """mill add|remove mail:MID WHO (#265), replacing reply --add-to/--remove-to."""
-    return rpc._h_add_remove(book, {"verb": verb, "type": "mail", "id": int(mid), "who": who}, "unit", owner)
+    return rpc._h_add_remove(book, {"verb": command, "type": "mail", "id": int(mid), "who": who}, "unit", owner)
 
 
 def _desks(cn, mid: int) -> set[str]:
@@ -166,7 +166,7 @@ def test_reply_opens_room_when_parent_off_tree(cn) -> None:
     assert {t["deskId"] for t in (rep.get("mail_tos") or [])} == {"a"}
 
 
-def test_reply_refuses_add_to_and_the_node_verbs_replace_it(cn) -> None:
+def test_reply_refuses_add_to_and_the_node_commands_replace_it(cn) -> None:
     seed_names(cn, ("unit", "roster"), ("a", "desk"), ("b", "desk"), ("c", "desk"), ("d", "desk"))
     book = _Book(cn)
     root = rpc._h_send(

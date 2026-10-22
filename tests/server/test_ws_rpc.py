@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""JSON RPC over live /ws: verb succeeds; kicked socket cannot complete; HTTP refused."""
+"""JSON RPC over live /ws: command succeeds; kicked socket cannot complete; HTTP refused."""
 from __future__ import annotations
 
 import asyncio
@@ -201,7 +201,7 @@ def test_http_desk_acting_refused_without_live_ws() -> None:
 
 
 def test_mill_ws_call_without_bridge_refuses(monkeypatch, tmp_path) -> None:
-    """CLI verbs require sitting mill connect bridge (no second /ws open)."""
+    """CLI commands require sitting mill connect bridge (no second /ws open)."""
     from agent_coord.client import ws as ws_cli
     from agent_coord.client.session_errors import SESSION_WS_BRIDGE_REQUIRED
 

@@ -45,7 +45,7 @@ def _need_of(card: dict[str, Any], body: dict[str, Any] | None) -> str:
 
 def note_nest(
     desk: str | None,
-    verb: str,
+    command: str,
     result: Any,
     *,
     body: dict[str, Any] | None = None,
@@ -53,12 +53,12 @@ def note_nest(
     """Stamp nest.hit when mill todo peeks one TREE-backed card.
 
     Formula:
-    - verb must be todo
+    - command must be todo
     - body must carry a need/need_id (single-card ask; board list skipped)
     - result is a one-element list (or dict) with nest truthy / nest=1
     - first (desk, todo_id) -> reask=0; later -> reask=1
     """
-    v = (verb or "").strip().lower()
+    v = (command or "").strip().lower()
     if v != "todo":
         return
     body = body or {}

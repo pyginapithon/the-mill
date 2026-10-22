@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Default system SCORE, written when a verb finishes.
+"""Default system SCORE, written when a command finishes.
 
-One score per desk on Office (kpi system). score.value is today's verb count.
+One score per desk on Office (kpi system). score.value is today's command count.
 mill_score_event holds one JSON document for the hour and one for the day:
-verb counts, host milliseconds, and mail and todo bytes. At most 4096 bytes.
+command counts, host milliseconds, and mail and todo bytes. At most 4096 bytes.
 A larger document is rejected by mill_score_event and recorded on mill-perf.log.
-A missing procedure leaves the verb alone.
+A missing procedure leaves the command alone.
 """
 from __future__ import annotations
 
@@ -24,9 +24,9 @@ KEEP_BYTES = 4096
 SPILL = "score history exceeds 4096 bytes"
 
 
-def note_verb(
+def note_command(
     desk: str,
-    verb: str,
+    command: str,
     *,
     req_b: int = 0,
     resp_b: int = 0,
@@ -34,7 +34,7 @@ def note_verb(
     cn=None,
     now: datetime | None = None,
 ) -> None:
-    """Record one finished verb. Swallows book errors so the reply still goes out."""
+    """Record one finished command. Swallows book errors so the reply still goes out."""
     own = False
     try:
         if cn is None:
@@ -42,11 +42,11 @@ def note_verb(
 
             cn = connect()
             own = True
-        _note(cn, desk, verb, req_b=req_b, resp_b=resp_b, ms=ms, now=now)
+        _note(cn, desk, command, req_b=req_b, resp_b=resp_b, ms=ms, now=now)
     except Exception as e:
         text = str(e)
         if SPILL in text:
-            _log_spill(desk, verb, text)
+            _log_spill(desk, command, text)
             return
         if getattr(e, "errno", None) in (1146, 1305) or "mill_score_event" in text or "score_evidence" in text:
             return
@@ -64,7 +64,7 @@ def note_verb(
                 pass
 
 
-def _log_spill(desk: str, verb: str, text: str) -> None:
+def _log_spill(desk: str, command: str, text: str) -> None:
     try:
         from agent_coord.server.push import perf_log
 
@@ -73,7 +73,7 @@ def _log_spill(desk: str, verb: str, text: str) -> None:
             0,
             ok=0,
             desk=desk,
-            verb=verb,
+            verb=command,
             err=text[:160],
         )
     except Exception:
@@ -89,7 +89,7 @@ def _n(value) -> int:
 
 
 def wall_route(path: str) -> str:
-    """Wall /api path, without a query and without a row id. Empty for verbs and pages."""
+    """Wall /api path, without a query and without a row id. Empty for commands and pages."""
     raw = (path or "").split("?", 1)[0].strip()
     if not raw.startswith("/api/") or raw.startswith("/api/mill"):
         return ""
@@ -121,31 +121,31 @@ def enqueue_wall(route: str, ms: float = 0.0) -> None:
         _ensure_flusher()
 
 
-_verb_q: list[tuple[str, str, int, int, float]] = []
-_VERB_Q_MAX = 5000
+_command_q: list[tuple[str, str, int, int, float]] = []
+_COMMAND_Q_MAX = 5000
 
 
-def enqueue_verb(desk: str, verb: str, *, req_b: int = 0, resp_b: int = 0, ms: float = 0.0) -> None:
-    """Park one finished verb for the flusher, so the reply goes out first (F24).
+def enqueue_command(desk: str, command: str, *, req_b: int = 0, resp_b: int = 0, ms: float = 0.0) -> None:
+    """Park one finished command for the flusher, so the reply goes out first (F24).
 
     The score lands within about a second, on one connection per batch. Under
     pytest (no flusher) the write happens here, as before.
     """
     if os.environ.get("PYTEST_CURRENT_TEST"):
-        note_verb(desk, verb, req_b=req_b, resp_b=resp_b, ms=ms)
+        note_command(desk, command, req_b=req_b, resp_b=resp_b, ms=ms)
         return
     with _wall_lock:
-        if len(_verb_q) >= _VERB_Q_MAX:
-            del _verb_q[0]
-        _verb_q.append((str(desk or ""), str(verb or ""), int(req_b or 0), int(resp_b or 0), float(ms or 0.0)))
+        if len(_command_q) >= _COMMAND_Q_MAX:
+            del _command_q[0]
+        _command_q.append((str(desk or ""), str(command or ""), int(req_b or 0), int(resp_b or 0), float(ms or 0.0)))
         _ensure_flusher()
 
 
-def flush_verbs() -> int:
-    """Write parked verbs on one connection. Returns how many were attempted."""
+def flush_commands() -> int:
+    """Write parked commands on one connection. Returns how many were attempted."""
     with _wall_lock:
-        batch = list(_verb_q)
-        _verb_q.clear()
+        batch = list(_command_q)
+        _command_q.clear()
     if not batch:
         return 0
     cn = None
@@ -153,8 +153,8 @@ def flush_verbs() -> int:
         from agent_coord.server.records.db import connect
 
         cn = connect()
-        for desk, verb, req_b, resp_b, ms in batch:
-            note_verb(desk, verb, req_b=req_b, resp_b=resp_b, ms=ms, cn=cn)
+        for desk, command, req_b, resp_b, ms in batch:
+            note_command(desk, command, req_b=req_b, resp_b=resp_b, ms=ms, cn=cn)
     except Exception:
         return 0
     finally:
@@ -182,7 +182,7 @@ def _ensure_flusher() -> None:
 
 def _flush_at_exit() -> None:
     """A clean stop writes what is parked; a crash loses at most about a second."""
-    for fn in (flush_wall, flush_verbs):
+    for fn in (flush_wall, flush_commands):
         try:
             fn()
         except Exception:
@@ -197,7 +197,7 @@ def _flush_loop() -> None:
         except Exception:
             pass
         try:
-            flush_verbs()
+            flush_commands()
         except Exception:
             pass
 
@@ -281,19 +281,19 @@ def _wall(cn, route: str, *, ms: float, now: datetime | None) -> None:
             pass
 
 
-def _note(cn, desk: str, verb: str, *, req_b: int, resp_b: int, ms: float, now: datetime | None) -> None:
-    from agent_coord.client.outbound import canonical_verb
+def _note(cn, desk: str, command: str, *, req_b: int, resp_b: int, ms: float, now: datetime | None) -> None:
+    from agent_coord.client.outbound import canonical_command
     from agent_coord.server.records.name import bare
 
-    verb = canonical_verb(verb)
+    command = canonical_command(command)
     who = bare((desk or "").strip(), CONST_DESK)
-    if not verb or not who:
+    if not command or not who:
         return
     from agent_coord.server.records.db import _run_proc, finish_cursor
 
     cur = cn.cursor()
     try:
-        _run_proc(cur, "mill_score_event", [who, verb, _n(ms), _n(req_b), _n(resp_b), now])
+        _run_proc(cur, "mill_score_event", [who, command, _n(ms), _n(req_b), _n(resp_b), now])
     except Exception:
         try:
             cn.rollback()

@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 
-def project_refusal(verb: str, project: str, names: list[str]) -> str | None:
+def project_refusal(command: str, project: str, names: list[str]) -> str | None:
     """None when project is a live name. Otherwise the refusal sentence.
 
-    The sentence is `verb: no such project X; projects: a, b`.
+    The sentence is `command: no such project X; projects: a, b`.
     A blank project omits X. names are the live projects, already ordered.
     """
     who = str(project or "").strip()
@@ -21,5 +21,5 @@ def project_refusal(verb: str, project: str, names: list[str]) -> str | None:
         return None
     shown = ", ".join(live) if live else "(none)"
     if who:
-        return "%s: no such project %s; projects: %s" % (verb, who, shown)
-    return "%s: no such project; projects: %s" % (verb, shown)
+        return "%s: no such project %s; projects: %s" % (command, who, shown)
+    return "%s: no such project; projects: %s" % (command, shown)

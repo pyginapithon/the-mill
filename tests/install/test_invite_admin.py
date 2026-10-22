@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Invite mint is a wall verb. The client does not open the book."""
+"""Invite mint is a wall command. The client does not open the book."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -31,7 +31,7 @@ def _args(**kw):
     return SimpleNamespace(**base)
 
 
-def test_invite_cli_posts_the_verb(monkeypatch, capsys) -> None:
+def test_invite_cli_posts_the_command(monkeypatch, capsys) -> None:
     seen: dict = {}
 
     def call(body):
@@ -82,7 +82,7 @@ def _link_text(out: str) -> str:
     return Path(os.path.expanduser(where)).read_text(encoding="utf-8").strip()
 
 
-def test_invite_verb_refuses_non_admin(monkeypatch) -> None:
+def test_invite_command_refuses_non_admin(monkeypatch) -> None:
     from agent_coord.server.api.mill.rpc import _h_invite
 
     class Book:

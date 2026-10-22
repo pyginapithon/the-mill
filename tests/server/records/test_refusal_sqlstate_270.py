@@ -22,8 +22,8 @@ pytestmark = pytest.mark.sql
 R = "rf270"
 
 
-def _go(cn, verb, typ, nid, who="", owner="rf_a"):
-    body = {"verb": verb, "type": typ, "id": nid}
+def _go(cn, command, typ, nid, who="", owner="rf_a"):
+    body = {"verb": command, "type": typ, "id": nid}
     if who:
         body["who"] = who
     return _h_add_remove(SimpleNamespace(_cn=cn), body, R, owner)

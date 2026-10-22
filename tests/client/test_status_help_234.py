@@ -1,4 +1,4 @@
-"""mill -h lists only wall verbs the server handles (#234)."""
+"""mill -h lists only wall commands the server handles (#234)."""
 from __future__ import annotations
 
 import io
@@ -6,10 +6,10 @@ import re
 import sys
 
 from agent_coord.__main__ import main
-from agent_coord.client.outbound import WALL, canonical_verb
+from agent_coord.client.outbound import WALL, canonical_command
 from agent_coord.server.api.mill.rpc import HANDLERS
 
-# Host commands. They are printed in help and are not mill-wall verbs.
+# Host commands. They are printed in help and are not mill-wall commands.
 _LOCAL = frozenset(
     {
         "briefing",
@@ -32,7 +32,7 @@ _LOCAL = frozenset(
 _NAME = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
-def _help_verbs() -> list[str]:
+def _help_commands() -> list[str]:
     buf = io.StringIO()
     old = sys.stdout
     sys.stdout = buf
@@ -53,8 +53,8 @@ def _help_verbs() -> list[str]:
     return names
 
 
-def test_help_wall_verbs_are_handlers() -> None:
-    names = _help_verbs()
+def test_help_wall_commands_are_handlers() -> None:
+    names = _help_commands()
     # #254: status folded into hold --peek.
     assert "status" not in names
     assert "hold" in names
@@ -62,29 +62,29 @@ def test_help_wall_verbs_are_handlers() -> None:
     for name in names:
         if name in _LOCAL:
             continue
-        # 0.7.x CLI words that translate onto a wall verb (agent_coord/client/language.py).
+        # 0.7.x CLI words that translate onto a wall command (agent_coord/client/language.py).
         cli = {"unlabel": "label-remove", "watch": "add", "unwatch": "remove", "connect-wait": "connect", "connected": "session"}
         if name == "connect-wait":
             continue
-        canon = "open" if name == "create" else canonical_verb(cli.get(name, name))
+        canon = "open" if name == "create" else canonical_command(cli.get(name, name))
         if canon not in HANDLERS or canon not in WALL:
             missing.append("%s -> %s" % (name, canon))
     assert missing == []
 
 
-def test_help_has_no_mcp_verbs_666() -> None:
+def test_help_has_no_mcp_commands_666() -> None:
     """#666: the mill is a shell CLI; `mill mcp` and `mill mcp-config` are gone."""
-    names = _help_verbs()
+    names = _help_commands()
     assert "hold" in names
     assert "mcp" not in names
     assert "mcp-config" not in names
-    for verb in ("mcp", "mcp-config"):
+    for command in ("mcp", "mcp-config"):
         try:
-            main([verb])
+            main([command])
         except SystemExit as exc:
             assert exc.code == 2
         else:
-            raise AssertionError("mill %s still parses" % verb)
+            raise AssertionError("mill %s still parses" % command)
 
 
 def test_no_mill_mcp_console_script_666() -> None:

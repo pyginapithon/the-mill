@@ -76,7 +76,7 @@ REDIRECT_REFUSED = (
 
 
 def _open(req, *, context: ssl.SSLContext, timeout: float):
-    """Verb call and CA fetch: one request, never a redirect (#654)."""
+    """Command call and CA fetch: one request, never a redirect (#654)."""
     from agent_coord.helpers.nofollow import open_no_redirect
 
     return open_no_redirect(req, timeout=timeout, context=context)
@@ -86,7 +86,7 @@ def mill_api_key(owner: str = "") -> str:
     """Bearer for the sitting desk only. Never AGENT_COORD_TOKEN (shared env).
 
     The sitting desk is the connect bridge that shares this process parent pid.
-    A hint for any other desk is refused so a verb cannot load that token.
+    A hint for any other desk is refused so a command cannot load that token.
     The secret is never in env.
     """
     from agent_coord.helpers.ident import desk as desk_stem
@@ -107,9 +107,9 @@ def mill_http_call(body: dict[str, Any]) -> Any:
     url = mill_url()
     if not url:
         raise CoordError("mill_url unset; mill join https://wall/")
-    verb = slug(str(body.get("verb") or body.get("cmd") or ""))
-    if not verb:
-        raise CoordError("mill verb required")
+    command = slug(str(body.get("verb") or body.get("cmd") or ""))
+    if not command:
+        raise CoordError("mill command required")
     owner = str(body.get("owner") or "")
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     from agent_coord.client.offices import read_office_invite
@@ -118,10 +118,10 @@ def mill_http_call(body: dict[str, Any]) -> Any:
     if saved_invite:
         headers["X-Mill-Invite"] = saved_invite
     payload = dict(body)
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
 
-    verb_s = canonical_verb(str(payload.get("verb") or payload.get("cmd") or verb))
-    if verb_s == "join":
+    command_s = canonical_command(str(payload.get("verb") or payload.get("cmd") or command))
+    if command_s == "join":
         # Reconnect only with THIS owner's session file. Never inject AGENT_COORD_TOKEN
         # from another desk into join (Scout #391).
         own = ""
@@ -169,14 +169,14 @@ def mill_http_call(body: dict[str, Any]) -> Any:
     if key:
         headers["Authorization"] = "Bearer " + key
     data = json.dumps(payload).encode("utf-8")
-    from agent_coord.client.outbound import verb_path
+    from agent_coord.client.outbound import command_path
 
-    path = verb_path(verb)
+    path = command_path(command)
     try:
         from agent_coord.config import mill_debug
 
         if mill_debug():
-            print({"DEBUG": "http", "path": path, "verb": verb_s}, flush=True)
+            print({"DEBUG": "http", "path": path, "verb": command_s}, flush=True)
     except Exception:
         pass
     req = urllib.request.Request(
@@ -188,7 +188,7 @@ def mill_http_call(body: dict[str, Any]) -> Any:
     try:
         with _open(req, context=mill_ssl_context(), timeout=5) as resp:
             raw = resp.read().decode("utf-8")
-            if verb_s == "join":
+            if command_s == "join":
                 hdrs = getattr(resp, "headers", None)
                 warn_wall_version(hdrs.get("X-Mill-Version") if hdrs else "")
             try:
@@ -219,7 +219,7 @@ def mill_http_call(body: dict[str, Any]) -> Any:
         row = json.loads(raw)
     except json.JSONDecodeError as e:
         raise CoordError("mill-wall bad json") from e
-    if canonical_verb(verb) == "join" and isinstance(row, dict):
+    if canonical_command(command) == "join" and isinstance(row, dict):
         tok = str(row.get("token") or "")
         who = slug(str(row.get("owner") or owner))
         if tok and who:
@@ -547,9 +547,9 @@ def _refused_hold(args: Any, row: dict[str, Any]) -> bool:
 
     A peek is a read. Free or held, it exits 0 (#223).
     """
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
 
-    if canonical_verb(str(getattr(args, "cmd", "") or "")) != "hold":
+    if canonical_command(str(getattr(args, "cmd", "") or "")) != "hold":
         return False
     if bool(getattr(args, "peek", False)):
         return False
@@ -572,9 +572,9 @@ def _hold_refusal(row: dict[str, Any]) -> dict[str, Any]:
 
 def _refused_drop(args: Any, row: dict[str, Any]) -> bool:
     """A drop that released nothing exits 1. Top-level ok is false (#227)."""
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
 
-    if canonical_verb(str(getattr(args, "cmd", "") or "")) != "drop":
+    if canonical_command(str(getattr(args, "cmd", "") or "")) != "drop":
         return False
     res = row.get("result") if "result" in row else row
     return isinstance(res, dict) and res.get("released") is False
@@ -711,8 +711,8 @@ def _todo_find(row: Any, text: str) -> Any:
     return out
 
 
-def _said_verb(row: Any, said: str) -> Any:
-    """watch/unwatch ride add/remove; the reply and refusal name the typed verb (ux12)."""
+def _said_command(row: Any, said: str) -> Any:
+    """watch/unwatch ride add/remove; the reply and refusal name the typed command (ux12)."""
     if said not in ("watch", "unwatch") or not isinstance(row, dict):
         return row
     rpc = "add" if said == "watch" else "remove"
@@ -763,7 +763,7 @@ def mill_http_from_args(args: Any) -> int:
     if short_rows and isinstance(row, dict) and row.get("ok") is True and isinstance(row.get("result"), list):
         part, page_block = todo_rows.cut(row["result"], int(getattr(args, "page", 0) or 0))
         row = dict(row, result=part)
-    row = _said_verb(row, str(getattr(args, "said_verb", "") or ""))
+    row = _said_command(row, str(getattr(args, "said_command", "") or ""))
     if bool(getattr(args, "raw", False)):
         row = _unwrap_cli_raw(row)
     elif (
@@ -939,7 +939,7 @@ def check_project_on_socket(who: str, project: str, stop: Any, outcome: dict) ->
         release_sync_lines()
         return
     err = str(reply.get("error") or "project check failed")
-    if err.startswith("unknown mill verb"):
+    if err.startswith("unknown mill command"):
         print(
             "connect: this office does not check projects yet; project %s not checked" % (project or "(empty)"),
             file=sys.stderr,

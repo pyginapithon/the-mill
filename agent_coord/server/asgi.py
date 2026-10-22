@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """FastAPI/uvicorn mill-wall. Same Handler as middleware.
 
-Wall /api and mill-verb HTTP contracts stay. Request log (status + duration_ms)
+Wall /api and mill-command HTTP contracts stay. Request log (status + duration_ms)
 plus nginx combined access/error logs at the TLS edge.
 """
 from __future__ import annotations
@@ -38,9 +38,9 @@ _ms_max = 0.0
 BODY_MAX_BYTES = 256 * 1024
 
 
-def hold_envelope_ok(verb: str, result: Any) -> bool:
+def hold_envelope_ok(command: str, result: Any) -> bool:
     """Top-level ok matches a refused hold or a refused drop (#207, #227)."""
-    if verb in ("hold", "drop") and isinstance(result, dict) and result.get("ok") is False:
+    if command in ("hold", "drop") and isinstance(result, dict) and result.get("ok") is False:
         return False
     return True
 
@@ -210,23 +210,23 @@ async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[st
         return None
 
     has_id = "id" in msg
-    has_verb = "verb" in msg or "cmd" in msg
+    has_command = "verb" in msg or "cmd" in msg
     # Existing server pushes use type/hint; never treat as client RPC.
-    if str(msg.get("hint") or "") and not has_verb:
+    if str(msg.get("hint") or "") and not has_command:
         return None
-    if str(msg.get("type") or "") in ("heartbeat", "session") and not has_verb:
+    if str(msg.get("type") or "") in ("heartbeat", "session") and not has_command:
         return None
     # Non-RPC client text: ignore.
-    if not has_id and not has_verb:
+    if not has_id and not has_command:
         return None
     # Looks like RPC but bad shape.
     req_id = msg.get("id")
-    verb = str(msg.get("verb") or msg.get("cmd") or "").strip()
+    command = str(msg.get("verb") or msg.get("cmd") or "").strip()
     args = msg.get("args", {})
     if not has_id or req_id is None or req_id == "":
         return await _fail(req_id if has_id else None, "ws rpc: id required")
-    if not verb:
-        return await _fail(req_id, "ws rpc: verb required")
+    if not command:
+        return await _fail(req_id, "ws rpc: command required")
     if args is None:
         args = {}
     if not isinstance(args, dict):
@@ -256,7 +256,7 @@ async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[st
     def _run() -> Any:
         with Book() as c:
             return dispatch_ws(
-                c, who, verb, args, req_id=str(req_id), peer=ws_peer, forwarded=ws_forwarded
+                c, who, command, args, req_id=str(req_id), peer=ws_peer, forwarded=ws_forwarded
             )
 
     def _sync() -> list:
@@ -271,13 +271,13 @@ async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[st
         ms = (time.perf_counter() - t0) * 1000.0
         err = " ".join(str(e).split())[:160]
 
-        def _verb_err() -> None:
+        def _command_err() -> None:
             from agent_coord.server.push import perf_log
 
-            perf_log("verb", ms, desk=who or desk, verb=verb, ok=0, err=err)
+            perf_log("verb", ms, desk=who or desk, verb=command, ok=0, err=err)
 
         try:
-            await asyncio.get_running_loop().run_in_executor(None, _verb_err)
+            await asyncio.get_running_loop().run_in_executor(None, _command_err)
         except Exception:
             pass
         sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
@@ -292,7 +292,7 @@ async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[st
         return stamp_mill({"id": req_id, "ok": False, "error": SESSION_WS_REQUIRED, "sync": sync})
     sync = await asyncio.get_running_loop().run_in_executor(None, _sync)
     # A refused hold or drop keeps result.ok false. The envelope ok must match (#207, #227).
-    env_ok = hold_envelope_ok(verb, result)
+    env_ok = hold_envelope_ok(command, result)
     reply = stamp_mill({"id": req_id, "ok": env_ok, "result": result, "sync": sync})
     ms = (time.perf_counter() - t0) * 1000.0
     resp_b = 0
@@ -309,15 +309,15 @@ async def _ws_handle_client_text(desk: str, websocket: Any, raw: str) -> dict[st
             try:
                 from agent_coord.server.push import perf_log
 
-                perf_log("verb", ms, desk=who or desk, verb=verb, ok=1 if env_ok else 0)
+                perf_log("verb", ms, desk=who or desk, verb=command, ok=1 if env_ok else 0)
             except Exception:
                 pass
 
         # The score write goes to the flusher and the log line to a worker; the
         # reply does not wait for either (F24). It used to await mill_score_event.
-        from agent_coord.server.score_system import enqueue_verb
+        from agent_coord.server.score_system import enqueue_command
 
-        enqueue_verb(who or desk, verb, req_b=req_b, resp_b=resp_b, ms=ms)
+        enqueue_command(who or desk, command, req_b=req_b, resp_b=resp_b, ms=ms)
         asyncio.get_running_loop().run_in_executor(None, _note)
     except Exception:
         pass
@@ -356,7 +356,7 @@ def make_asgi_app(
 
                 api_log(f"{request.method} {path} 500 dispatch err={e}")
                 with _office() as c:
-                    mill_admin_alert(c._cn, f"asgi {request.method} {path}: {e}", verb="asgi")
+                    mill_admin_alert(c._cn, f"asgi {request.method} {path}: {e}", command="asgi")
             except Exception:
                 pass
             from agent_coord.server.mill_json import dumps_mill_bytes
@@ -408,7 +408,7 @@ def make_asgi_app(
 
     async def _dispatch_inner(request: Request, t0: float) -> Response:
         path = request.url.path
-        from .allow import allowed, door_client, is_mill_verb
+        from .allow import allowed, door_client, is_mill_command
 
         peer = request.client.host if request.client else "127.0.0.1"
         fwd = request.headers.get("x-forwarded-for") or ""
@@ -424,7 +424,7 @@ def make_asgi_app(
                     status_code=403,
                     media_type="text/plain; charset=utf-8",
                 )
-        elif not is_mill_verb(path):
+        elif not is_mill_command(path):
             # Same trusted-proxy read as door=ip (#731).
             ip, via_proxy = door_client(peer, fwd)
             if not allowed(ip, forwarded=via_proxy):

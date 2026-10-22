@@ -5,7 +5,7 @@ import importlib.util
 import json
 from pathlib import Path
 
-from agent_coord.client.outbound import PROBE, VERBS, WALL
+from agent_coord.client.outbound import PROBE, COMMANDS, WALL
 from agent_coord.server.api.mill.rpc import HANDLERS
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -18,10 +18,10 @@ def _tool():
     return mod
 
 
-def test_probe_is_wall_rpc_not_a_skill_verb() -> None:
+def test_probe_is_wall_rpc_not_a_skill_command() -> None:
     assert "probe-delete" in PROBE
     assert "probe-delete" in WALL and "probe-delete" in HANDLERS
-    assert "probe-delete" not in VERBS
+    assert "probe-delete" not in COMMANDS
 
 
 def test_probe_is_not_a_mill_subcommand() -> None:
@@ -56,8 +56,8 @@ def test_run_makes_and_deletes_fixture_rows(capsys) -> None:
     out = json.loads(capsys.readouterr().out)
     assert out["ok"] is True and out["project"] == "t-0a1b2c3d"
     assert out["todo"]["id"] == 41 and out["score"]["id"] == 42
-    verbs = [b["verb"] for b in fake.sent]
-    assert verbs == ["open", "score", "probe-delete", "probe-delete", "trail"]
+    commands = [b["verb"] for b in fake.sent]
+    assert commands == ["open", "score", "probe-delete", "probe-delete", "trail"]
     assert all(b.get("project") == "t-0a1b2c3d" for b in fake.sent if b["verb"] in ("open", "score"))
 
 
@@ -108,8 +108,8 @@ def test_default_run_makes_its_roster_and_retires_it(capsys) -> None:
     assert mod.main(["run"], call=fake) == 0
     out = json.loads(capsys.readouterr().out)
     proj = out["project"]
-    verbs = [b["verb"] for b in fake.sent]
-    assert verbs == ["roster", "open", "score", "probe-delete", "probe-delete", "trail", "retire"]
+    commands = [b["verb"] for b in fake.sent]
+    assert commands == ["roster", "open", "score", "probe-delete", "probe-delete", "trail", "retire"]
     made, gone = fake.sent[0], fake.sent[-1]
     assert made == {"verb": "roster", "slug": proj, "confirm": proj, "yes": True}
     assert gone == {"verb": "retire", "slug": proj, "confirm": proj, "yes": True, "name_type": "roster"}

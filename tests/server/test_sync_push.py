@@ -174,7 +174,7 @@ def test_open_pushes_a_receipt_only_when_flagged(monkeypatch):
     assert calls[0]["sender"] == "DESK_sender"
 
 
-def test_failed_verb_keeps_sync_on_the_error():
+def test_failed_command_keeps_sync_on_the_error():
     from agent_coord.__main__ import _format_error
     from agent_coord.helpers.errors import CoordError
 

@@ -359,9 +359,9 @@ def _cheap_detail(cn, type: str, id: int, watchers: list[dict], *, when: str = "
 
 
 
-def mill_admin_alert(cn, text: str, *, verb: str = "") -> None:
+def mill_admin_alert(cn, text: str, *, command: str = "") -> None:
     """Backchannel/API host faults -> MAIL dest Admin (W3). Not CoordError 400s."""
-    v = (verb or "").strip().lower()
+    v = (command or "").strip().lower()
     if v in ("heartbeat", "session"):
         return
     try:
@@ -507,7 +507,7 @@ def fanout(
             pass
         _bc_log(f"fanout fail type={type} id={id} hint={hint} err={e}")
         try:
-            mill_admin_alert(cn, f"fanout {type} {id}: {e}", verb="fanout")
+            mill_admin_alert(cn, f"fanout {type} {id}: {e}", command="fanout")
         except Exception:
             pass
         return []

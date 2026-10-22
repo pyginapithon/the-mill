@@ -1,4 +1,4 @@
-"""assign is the hand-off verb; help and the desk skill name it and its limits (#331). Regression row F47 (assign-handoff)."""
+"""assign is the hand-off command; help and the desk skill name it and its limits (#331). Regression row F47 (assign-handoff)."""
 from __future__ import annotations
 
 import pathlib

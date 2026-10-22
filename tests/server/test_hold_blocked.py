@@ -95,7 +95,7 @@ def test_repeated_deny_keeps_t0(monkeypatch) -> None:
     assert lines == []
 
 
-def test_non_hold_verb_ignored(monkeypatch) -> None:
+def test_non_hold_command_ignored(monkeypatch) -> None:
     lines: list[tuple] = []
     monkeypatch.setattr(
         "agent_coord.server.push.perf_log",

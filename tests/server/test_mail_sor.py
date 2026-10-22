@@ -83,7 +83,7 @@ def test_tree_crumb_without_thread_flag_stamps(monkeypatch) -> None:
     assert "reask=0" in lines[0]
 
 
-def test_inbox_and_other_verbs_skipped(monkeypatch) -> None:
+def test_inbox_and_other_commands_skipped(monkeypatch) -> None:
     lines: list[tuple] = []
     monkeypatch.setattr(
         "agent_coord.server.push.perf_log",

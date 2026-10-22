@@ -35,7 +35,7 @@ def test_count_perf_heartbeat_and_idle() -> None:
     assert idle == 1
 
 
-def test_count_api_verbs() -> None:
+def test_count_api_commands() -> None:
     text = "\n".join(
         [
             "2026-09-17T10:00:00Z POST /api/mill/heartbeat 200 ms=63",
@@ -124,7 +124,7 @@ def test_measure_host_surfaces(tmp_path) -> None:
     assert row[KPI_WS_MISS] == 1
 
 
-def test_api_ms_p95_includes_ws_verb(tmp_path) -> None:
+def test_api_ms_p95_includes_ws_command(tmp_path) -> None:
     (tmp_path / "mill-perf.log").write_text(
         "\n".join(
             [

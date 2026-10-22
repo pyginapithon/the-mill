@@ -39,9 +39,9 @@ LOG_PH = "[redacted]"
 
 ALL_CLASSES = frozenset(PH)
 
-# Every verb that stores text a reader will see (0.7.5: reply, doing, join,
+# Every command that stores text a reader will see (0.7.5: reply, doing, join,
 # claim, unclaim, pass, hold and assign joined send, note, open and score).
-WRITE_VERBS = frozenset({
+WRITE_COMMANDS = frozenset({
     "send", "reply", "note", "create", "open", "update", "score", "patch", "set",
     "doing", "join", "claim", "unclaim", "pass", "hold", "assign",
 })

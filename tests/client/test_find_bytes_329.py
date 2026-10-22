@@ -30,7 +30,7 @@ def wall(monkeypatch):
 
 
 def _run(capsys, **kw):
-    base = dict(cmd="todo", project="cold-test", need="", find="", group_by="", raw=False, said_verb="")
+    base = dict(cmd="todo", project="cold-test", need="", find="", group_by="", raw=False, said_command="")
     base.update(kw)
     assert http.mill_http_from_args(SimpleNamespace(**base)) == 0
     line = capsys.readouterr().out.strip().splitlines()[-1]

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Verb sender is the parent connect bridge, not the sticky active file."""
+"""Command sender is the parent connect bridge, not the sticky active file."""
 from __future__ import annotations
 
 import io
@@ -20,7 +20,7 @@ def _sit(desk: str) -> None:
     ws_cli.write_rpc_bridge(desk, port=9, secret="sitting", pid=os.getpid())
 
 
-def test_active_file_is_not_the_verb_sender(tmp_path, monkeypatch):
+def test_active_file_is_not_the_command_sender(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENT_COORD_MILL_HOME", str(tmp_path))
     monkeypatch.delenv("AGENT_COORD_OWNER", raising=False)
     path = tokmod.write_active_desk("builder")
@@ -78,7 +78,7 @@ def test_mill_http_from_args_uses_parent_bridge_not_active_or_argv(tmp_path, mon
         return {"ok": True}
 
     def boom(*_a, **_k):
-        raise AssertionError("verb path read active")
+        raise AssertionError("command path read active")
 
     monkeypatch.setattr(mill_client, "mill_http_call", fake_call)
     monkeypatch.setattr(tokmod, "read_active_desk", boom)
@@ -102,7 +102,7 @@ def test_body_uses_parent_bridge_not_active(tmp_path, monkeypatch):
     _sit("builder")
 
     def boom(*_a, **_k):
-        raise AssertionError("verb path read active")
+        raise AssertionError("command path read active")
 
     monkeypatch.setattr(tokmod, "read_active_desk", boom)
     got = body_from_args(
@@ -114,7 +114,7 @@ def test_body_uses_parent_bridge_not_active(tmp_path, monkeypatch):
 def test_day_one_parsers_have_no_owner_flag(monkeypatch):
     import agent_coord.__main__ as m
 
-    verbs = (
+    commands = (
         ["todo", "--help"],
         ["inbox", "--help"],
         ["send", "--help"],
@@ -129,7 +129,7 @@ def test_day_one_parsers_have_no_owner_flag(monkeypatch):
         ["create", "todo", "--help"],
         ["connect", "--help"],
     )
-    for argv in verbs:
+    for argv in commands:
         buf = io.StringIO()
         old_out, old_err, old_argv = sys.stdout, sys.stderr, sys.argv
         try:

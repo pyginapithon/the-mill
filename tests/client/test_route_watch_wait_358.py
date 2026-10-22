@@ -3,7 +3,7 @@
 
 `bash -c 'mill connect DESK & c=$!; trap "kill $c" EXIT; mill route add ...'` used to
 fail with "mill connect DESK first" because route read the sitting desk once and never
-waited. The RPC verbs (watch rides add) already wait in wait_for_sitting_desk.
+waited. The RPC commands (watch rides add) already wait in wait_for_sitting_desk.
 """
 from __future__ import annotations
 

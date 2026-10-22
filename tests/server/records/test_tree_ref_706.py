@@ -1,4 +1,4 @@
-"""#706: the tree verbs resolve a todo named ROSTER/NEED to its id on the wall (as #274)."""
+"""#706: the tree commands resolve a todo named ROSTER/NEED to its id on the wall (as #274)."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -34,7 +34,7 @@ def test_tree_id_resolves_ref(cn, board):
     assert _tree_id(_c(cn), "todo", board["parent"], None, "attach") == board["parent"]
 
 
-def test_tree_id_unknown_card_names_the_verb(cn, board):
+def test_tree_id_unknown_card_names_the_command(cn, board):
     with pytest.raises(CoordError) as ei:
         _tree_id(_c(cn), "todo", None, f"{R}/nope", "attach")
     assert str(ei.value).startswith(f"attach: no card nope in {R}")

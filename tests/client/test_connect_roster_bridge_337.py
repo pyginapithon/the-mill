@@ -17,9 +17,9 @@ def _home(tmp_path, monkeypatch):
     monkeypatch.setitem(ws_cli.READY_ROSTER, "roster", "the-mill")
 
 
-@pytest.mark.parametrize("verb", ["send", "reply"])
-def test_send_and_reply_get_the_connect_roster(verb):
-    assert ws_cli.with_connect_roster(verb, {"body": "x"}) == {"body": "x", "connect_roster": "the-mill"}
+@pytest.mark.parametrize("command", ["send", "reply"])
+def test_send_and_reply_get_the_connect_roster(command):
+    assert ws_cli.with_connect_roster(command, {"body": "x"}) == {"body": "x", "connect_roster": "the-mill"}
 
 
 @pytest.mark.parametrize("roster", ["grok-tui", " grok-tui "])
@@ -28,9 +28,9 @@ def test_explicit_roster_is_left_alone(roster):
     assert ws_cli.with_connect_roster("send", args) == args
 
 
-@pytest.mark.parametrize("verb", ["inbox", "todo", "note", "mark", "hold"])
-def test_other_verbs_are_left_alone(verb):
-    assert ws_cli.with_connect_roster(verb, {"project": "x"}) == {"project": "x"}
+@pytest.mark.parametrize("command", ["inbox", "todo", "note", "mark", "hold"])
+def test_other_commands_are_left_alone(command):
+    assert ws_cli.with_connect_roster(command, {"project": "x"}) == {"project": "x"}
 
 
 @pytest.mark.parametrize("named", ["", None])

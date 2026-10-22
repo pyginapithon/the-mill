@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""One-seat agent invite mint: trust gate + URL shape + CLI verb."""
+"""One-seat agent invite mint: trust gate + URL shape + CLI command."""
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -107,7 +107,7 @@ def test_h_invite_seat_mints(monkeypatch) -> None:
     # Patch live-project check used by the handler (#252).
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_project",
-        lambda cn, name, verb: name,
+        lambda cn, name, command: name,
     )
     row = _h_invite_seat(
         Book(), {"desk": "bot1", "project": "the-mill"}, "Office", "DESK_admin"
@@ -168,7 +168,7 @@ def test_post_invites_mint_seat_human_high(monkeypatch) -> None:
     assert row["seat"] == "S2"
 
 
-def test_cli_invite_seat_posts_invite_seat_verb(monkeypatch, capsys) -> None:
+def test_cli_invite_seat_posts_invite_seat_command(monkeypatch, capsys) -> None:
     from agent_coord.__main__ import _invite_cmd
 
     seen: dict = {}
@@ -509,7 +509,7 @@ def test_h_invite_seat_defaults_to_desk_membership(monkeypatch) -> None:
     )
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_project",
-        lambda cn, name, verb: name,
+        lambda cn, name, command: name,
     )
     import agent_coord.server.admin.seats as seats_mod
 

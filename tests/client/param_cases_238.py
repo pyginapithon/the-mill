@@ -1,6 +1,6 @@
-"""Bad-value cases for every book verb and argument (#238).
+"""Bad-value cases for every book command and argument (#238).
 
-Each (verb, dest) has a kind. The kind picks the cases: missing, empty,
+Each (command, dest) has a kind. The kind picks the cases: missing, empty,
 unknown name, bad enum, bad format, over length. Empty is only a case for a
 required argument: on an optional one it means the default. The SQL runner
 (tests/server/records/test_param_matrix_sql_238.py) runs each case against a
@@ -16,7 +16,7 @@ LONG_NAME = "n" * 600
 LONG_TEXT = "t" * 100_000
 UNKNOWN = "zz238-nope"
 
-# Base argv per book verb. The runner fills placeholders per case:
+# Base argv per book command. The runner fills placeholders per case:
 #   {P} project  {N} open need  {N_CLAIMED} need this desk claimed
 #   {N_PARKED} parked need  {NEWN} unused need name  {RES} unused resource
 #   {HELD} resource this desk holds  {MAIL} letter to this desk
@@ -125,9 +125,9 @@ def bad_value(kind: str, case: str) -> str:
     return ""
 
 
-def actions(parser: argparse.ArgumentParser, verb: str) -> list[argparse.Action]:
+def actions(parser: argparse.ArgumentParser, command: str) -> list[argparse.Action]:
     sub = parser
-    for word in verb.split():
+    for word in command.split():
         sp = [a for a in sub._actions if isinstance(a, argparse._SubParsersAction)][0]
         sub = sp.choices[word]
     return [a for a in sub._actions if not isinstance(a, argparse._SubParsersAction) and a.dest != "help"]
@@ -137,14 +137,14 @@ _SWITCH = (argparse._StoreTrueAction, argparse._StoreFalseAction, argparse._Stor
 
 
 def unclassified(parser: argparse.ArgumentParser) -> list[str]:
-    """Book-verb arguments with no kind. Must stay empty."""
+    """Book-command arguments with no kind. Must stay empty."""
     out = []
-    for verb in BOOK:
-        for act in actions(parser, verb):
+    for command in BOOK:
+        for act in actions(parser, command):
             if act.dest == "office" or isinstance(act, _SWITCH):
                 continue
-            if (verb, act.dest) not in KIND:
-                out.append("%s %s" % (verb, act.dest))
+            if (command, act.dest) not in KIND:
+                out.append("%s %s" % (command, act.dest))
     return out
 
 
@@ -172,14 +172,14 @@ def _strip_flag(base: list[str], flags: list[str]) -> list[str]:
 
 
 def build_cases(parser: argparse.ArgumentParser) -> list[tuple[str, str, str, list[str]]]:
-    """(verb, dest, case, argv template)."""
+    """(command, dest, case, argv template)."""
     out: list[tuple[str, str, str, list[str]]] = []
-    for verb, base in BOOK.items():
-        acts = actions(parser, verb)
+    for command, base in BOOK.items():
+        acts = actions(parser, command)
         pos = [a for a in acts if not a.option_strings]
         seen: set[tuple[str, str]] = set()
         for act in acts:
-            kind = KIND.get((verb, act.dest))
+            kind = KIND.get((command, act.dest))
             if act.dest == "office" or kind is None or isinstance(act, _SWITCH):
                 continue
             for case in CASES[kind]:
@@ -206,9 +206,9 @@ def build_cases(parser: argparse.ArgumentParser) -> list[tuple[str, str, str, li
                         filled[idx] = bad_value(kind, case)
                         argv = filled + rest
                 seen.add((act.dest, case))
-                out.append((verb, act.dest, case, argv))
+                out.append((command, act.dest, case, argv))
     return out
 
 
-def case_id(verb: str, dest: str, case: str) -> str:
-    return "%s %s %s" % (verb, dest, case)
+def case_id(command: str, dest: str, case: str) -> str:
+    return "%s %s %s" % (command, dest, case)

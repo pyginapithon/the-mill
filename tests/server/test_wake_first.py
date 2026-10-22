@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""A1 wake -> first day-one verb: stamp formula + score_tick scrape."""
+"""A1 wake -> first day-one command: stamp formula + score_tick scrape."""
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -18,11 +18,11 @@ def setup_function() -> None:
     wf.reset_for_tests()
 
 
-def test_day_one_ok_verbs_cover_skill_spine() -> None:
+def test_day_one_ok_commands_cover_skill_spine() -> None:
     need = {"todo", "open", "claim", "send", "reply", "hold", "inbox", "mail-thread", "note", "pass", "drop"}
-    assert need <= wf.DAY_ONE_OK_VERBS
-    assert "wake" not in wf.DAY_ONE_OK_VERBS
-    assert "heartbeat" not in wf.DAY_ONE_OK_VERBS
+    assert need <= wf.DAY_ONE_OK_COMMANDS
+    assert "wake" not in wf.DAY_ONE_OK_COMMANDS
+    assert "heartbeat" not in wf.DAY_ONE_OK_COMMANDS
 
 
 def test_wake_first_stamp_once_counts_rpc(monkeypatch, tmp_path: Path) -> None:

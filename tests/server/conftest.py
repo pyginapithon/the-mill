@@ -11,5 +11,5 @@ def _live_project_noop_without_sql(request, monkeypatch):
         return
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_project",
-        lambda cn, project, verb: str(project or "").strip(),
+        lambda cn, project, command: str(project or "").strip(),
     )

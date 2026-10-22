@@ -50,7 +50,7 @@ async def ws_close(ws: Any) -> None:
 async def ws_rpc_rtt(
     ws: Any,
     *,
-    verb: str = "session",
+    command: str = "session",
     args: dict[str, Any] | None = None,
     timeout_s: float = 8.0,
 ) -> tuple[float, dict[str, Any]]:
@@ -61,7 +61,7 @@ async def ws_rpc_rtt(
     import uuid
 
     req_id = "v-" + uuid.uuid4().hex[:12]
-    body = {"id": req_id, "verb": verb, "args": args if args is not None else {}}
+    body = {"id": req_id, "verb": command, "args": args if args is not None else {}}
     t0 = time.perf_counter()
     await ws.send(json.dumps(body))
     while True:

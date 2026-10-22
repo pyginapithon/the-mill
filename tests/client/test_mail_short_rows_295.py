@@ -37,7 +37,7 @@ def room(n, body=None):
             "thread": 1, "latest_id": chain[-1]["id"], "scope": "room", "room_letters": n}
 
 
-def _wall(monkeypatch, result, verb):
+def _wall(monkeypatch, result, command):
     from agent_coord.server.mill_json import with_bytes
 
     def fake(args, body):
@@ -45,11 +45,11 @@ def _wall(monkeypatch, result, verb):
         return dict(reply)
 
     monkeypatch.setattr(http, "_todo_call", fake)
-    monkeypatch.setattr("agent_coord.client.outbound.body_from_args", lambda args: {"verb": verb})
+    monkeypatch.setattr("agent_coord.client.outbound.body_from_args", lambda args: {"verb": command})
 
 
 def _run(capsys, cmd, **kw):
-    base = dict(cmd=cmd, project="", need="", find="", group_by="", raw=False, said_verb="",
+    base = dict(cmd=cmd, project="", need="", find="", group_by="", raw=False, said_command="",
                 full=False, page=0, scope="", after=0)
     base.update(kw)
     rc = http.mill_http_from_args(SimpleNamespace(**base))
@@ -254,10 +254,10 @@ def test_bad_pairs_exit_2(argv):
     assert e.value.code == 2
 
 
-@pytest.mark.parametrize("verb,flags", [("inbox", ("--full", "--page")),
+@pytest.mark.parametrize("command,flags", [("inbox", ("--full", "--page")),
                                         ("mail-thread", ("--full", "--page")), ("note", ("--full",))])
-def test_help_names_the_flags(capsys, verb, flags):
+def test_help_names_the_flags(capsys, command, flags):
     with pytest.raises(SystemExit):
-        main([verb, "--help"])
+        main([command, "--help"])
     out = capsys.readouterr().out
     assert all(f in out for f in flags)

@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 
 from agent_coord.__main__ import _build_parser
-from agent_coord.client.http import _said_verb, _todo_find
+from agent_coord.client.http import _said_command, _todo_find
 from agent_coord.client.language import translate
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -24,32 +24,32 @@ def test_regression_row_f25_documented():
     assert "Regression row F25 (ux12-polish)" in doc
 
 
-def test_watch_and_unwatch_remember_the_typed_verb(monkeypatch):
+def test_watch_and_unwatch_remember_the_typed_command(monkeypatch):
     import agent_coord.client.tokens as tokens
 
     monkeypatch.setattr(tokens, "resolve_desk_owner", lambda x="": "me")
     p = _build_parser()
     a = translate(p.parse_args(["watch", "todo", "5"]))
-    assert a.cmd == "add" and a.said_verb == "watch"
+    assert a.cmd == "add" and a.said_command == "watch"
     b = translate(p.parse_args(["unwatch", "todo", "5"]))
-    assert b.cmd == "remove" and b.said_verb == "unwatch"
+    assert b.cmd == "remove" and b.said_command == "unwatch"
 
 
 def test_watch_reply_names_watch():
     row = {"ok": True, "result": {"ok": True, "verb": "add", "type": "todo", "id": 5}}
-    assert _said_verb(row, "watch")["result"]["verb"] == "watch"
+    assert _said_command(row, "watch")["result"]["verb"] == "watch"
     row = {"ok": True, "result": {"ok": True, "verb": "remove", "type": "todo", "id": 5}}
-    assert _said_verb(row, "unwatch")["result"]["verb"] == "unwatch"
+    assert _said_command(row, "unwatch")["result"]["verb"] == "unwatch"
 
 
 def test_unwatch_refusal_names_unwatch():
     row = {"ok": False, "error": "remove: me is not watching todo:5"}
-    assert _said_verb(row, "unwatch")["error"] == "unwatch: me is not watching todo:5"
+    assert _said_command(row, "unwatch")["error"] == "unwatch: me is not watching todo:5"
 
 
 def test_plain_add_reply_is_untouched():
     row = {"ok": True, "result": {"ok": True, "verb": "add", "type": "todo", "id": 5}}
-    assert _said_verb(row, "") is row
+    assert _said_command(row, "") is row
 
 
 def test_find_ranks_title_and_need_before_body_hits():

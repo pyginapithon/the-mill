@@ -19,7 +19,7 @@ class _FakeBook:
     _tokens: dict = {}
     _cn = object()
 
-    def resolve_bearer(self, token):  # join never calls this (open verb)
+    def resolve_bearer(self, token):  # join never calls this (open command)
         return ""
 
     def _guard_owner(self, *a, **k):

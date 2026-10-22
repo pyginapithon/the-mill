@@ -417,7 +417,7 @@
         </header>
         <div class="help-body">
           <ul>
-            <li><b>Platform</b> is the verb score the office writes, one per desk. Pick a desk, then a verb. Activity, Hour, and Day are charts: the last 15 minutes, the 24 hour slots, and the last 30 midnights.</li>
+            <li><b>Platform</b> is the command score the office writes, one per desk. Pick a desk, then a command. Activity, Hour, and Day are charts: the last 15 minutes, the 24 hour slots, and the last 30 midnights.</li>
             <li><b>Filed</b> scores are what an agent or a person files. Last against target. A blank Last or a blank target stays quiet. They are the list under the charts.</li>
             <li>The boxes next to the rail hide a group. The ticker shows a filed score that has left its target. Platform stays off that ticker.</li>
           </ul>
@@ -433,9 +433,9 @@
       <div class="score-core" id="score-core">
         <div class="score-human score-desk-table" id="score-human" aria-label="Filed scores"></div>
         <div class="score-product" id="score-product">
-          <div class="score-pane" id="score-graphs" aria-label="Rollups"><div class="idle">Pick a verb.</div></div>
+          <div class="score-pane" id="score-graphs" aria-label="Rollups"><div class="idle">Pick a command.</div></div>
           <div class="score-desk-table" id="score-desk-table" aria-label="Desks"><div class="wall-loading" role="status" aria-live="polite" data-wall-loading="1"><span class="wall-loading-spin" aria-hidden="true"></span><span class="wall-loading-ico" aria-hidden="true">&#x231B;</span><span class="wall-loading-lbl">Loading scores...</span></div></div>
-          <div class="score-pane score-desk-table" id="score-verbs" aria-label="Verbs"><div class="idle">Pick a desk.</div></div>
+          <div class="score-pane score-desk-table" id="score-verbs" aria-label="Commands"><div class="idle">Pick a desk.</div></div>
         </div>
       </div>
       <div class="score-spend-view" id="score-spend-view" hidden></div>
@@ -658,7 +658,7 @@
 <script defer src="/lib/graph.js"></script>
 <script defer src="/lib/keys.js"></script>
 <script defer src="/gutter.js"></script>
-  <script defer src="/lib/lazy.js?v=wow316"></script>
+  <script defer src="/lib/lazy.js?v=wow317"></script>
   <!-- WALL_UI_DEFAULT_DOMAINS: floor eager; MAIL/TODO/SCORE lazy on first tab (Wave 2 / #40).
        Inert template keeps src= strings for pack seams; wallEnsureDomain injects live scripts+CSS. -->
   <template id="wall-lazy-domains">
@@ -742,6 +742,6 @@
     </div>
   </form>
 </div>
-<script defer src="/boot.js?v=wow315"></script>
+<script defer src="/boot.js?v=wow317"></script>
 </body>
 </html>

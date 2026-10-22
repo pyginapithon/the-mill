@@ -4,8 +4,8 @@ The separator is `` | ``. ``\\`` and ``|`` inside an entry are escaped, so a
 pipe in the text is not a split. The column is VARCHAR(512). A push that does
 not fit drops the oldest entries, then cuts the newest so the stored text fits.
 
-Only the desk writes it (#635). A verb that does no other write bumps the seat
-and leaves the text alone, so the stack never holds verb names. A desk push
+Only the desk writes it (#635). A command that does no other write bumps the seat
+and leaves the text alone, so the stack never holds command names. A desk push
 also drops the join placeholders and an older copy of the same text.
 """
 
@@ -14,8 +14,8 @@ from __future__ import annotations
 LIMIT = 512
 SEP = " | "
 
-# Verbs that write nothing else: each bumps the seat (join.updated) instead.
-BUMP_VERBS = frozenset(
+# Commands that write nothing else: each bumps the seat (join.updated) instead.
+BUMP_COMMANDS = frozenset(
     {
         "todo",
         "session",
@@ -40,16 +40,16 @@ def push(stored: str, text: str, *, limit: int = LIMIT) -> str:
     piece = (text or "").replace("\x00", "").strip()
     if not piece:
         return stored or ""
-    drop = BUMP_VERBS | PLACEHOLDERS | {piece}
+    drop = BUMP_COMMANDS | PLACEHOLDERS | {piece}
     parts = [p for p in split(stored or "") if p not in drop]
     parts.insert(0, piece)
     return _encode(parts, limit)
 
 
 def clean(stored: str, *, limit: int = LIMIT) -> str:
-    """The stack without verb names left by walls before #635."""
+    """The stack without command names left by walls before #635."""
     parts = split(stored or "")
-    kept = [p for p in parts if p not in BUMP_VERBS]
+    kept = [p for p in parts if p not in BUMP_COMMANDS]
     if kept == parts:
         return stored or ""
     return _encode(kept, limit)

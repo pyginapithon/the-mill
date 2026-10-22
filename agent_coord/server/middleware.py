@@ -1,12 +1,12 @@
 """Mill HTTP protocol (middleware). The only process that opens the book.
 
 Sits on TLS/HTTP. Agents and humans speak this API. HTML pages are a visual
-client of the same verbs. Does not acquire product-line locks. Does not clock
+client of the same commands. Does not acquire product-line locks. Does not clock
 in as a mill session. Coding agents do not serve_forever in a chat.
 
 Security: door (private bind / LAN / VPN + HTTPS) for who can open a socket.
 Look (GET standup) is the door. Writes: human badge+device, or mill session
-token when mill verbs are on HTTP. Never mill token in a browser. 3306 stays
+token when mill commands are on HTTP. Never mill token in a browser. 3306 stays
 on this host.
 """
 
@@ -987,11 +987,11 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                     return seat_known(token)
                 if cmd == "POST":
                     from agent_coord.client.outbound import (
-                        is_mill_verb_path,
+                        is_mill_command_path,
                         parse_path,
                     )
 
-                    if is_mill_verb_path(path_only) and (parse_path(path_only) or "") == "join":
+                    if is_mill_command_path(path_only) and (parse_path(path_only) or "") == "join":
                         return seat_known(token)
                 return False
 
@@ -1526,7 +1526,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         perf_log(f"api.v1.{kind}_one", ms, status=500, err=str(e)[:160])
                         with _office() as c2:
                             mill_admin_alert(
-                                c2._cn, f"GET /api/v1/{kind}/{iid}: {e}", verb="floor"
+                                c2._cn, f"GET /api/v1/{kind}/{iid}: {e}", command="floor"
                             )
                     except Exception:
                         pass
@@ -1772,7 +1772,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         api_log(f"GET /api/v1/{v1_name} 500 ms={ms:.0f} err={e}")
                         perf_log(f"api.v1.{v1_name.replace('-', '_')}", ms, status=500, err=str(e)[:160])
                         with _office() as c2:
-                            mill_admin_alert(c2._cn, f"GET /api/v1/{v1_name}: {e}", verb="floor")
+                            mill_admin_alert(c2._cn, f"GET /api/v1/{v1_name}: {e}", command="floor")
                     except Exception:
                         pass
                     self._send(500, _json({"error": err_text(e)}), "application/json; charset=utf-8")
@@ -2027,9 +2027,9 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
             if path == "/api/glance/tap":
                 self._glance_tap()
                 return
-            from agent_coord.client.outbound import canonical_verb, is_mill_verb_path, parse_path
+            from agent_coord.client.outbound import canonical_command, is_mill_command_path, parse_path
 
-            if is_mill_verb_path(path):
+            if is_mill_command_path(path):
                 n = int(self.headers.get("Content-Length") or "0")
                 raw = self.rfile.read(n) if n else b"{}"
                 try:
@@ -2039,10 +2039,10 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                     return
                 if not isinstance(data, dict):
                     data = {}
-                verb = parse_path(path) or canonical_verb(
+                command = parse_path(path) or canonical_command(
                     str(data.get("verb") or data.get("cmd") or "")
                 )
-                data["verb"] = verb
+                data["verb"] = command
                 auth = (self.headers.get("Authorization") or "").strip()
                 token = ""
                 if auth.lower().startswith("bearer "):
@@ -2065,7 +2065,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         mark_host(data, peer, forwarded=bool(fwd))
                         row = dispatch(c, data, token=token)
                         acting = str(getattr(c, "acting_desk", "") or "")
-                        if verb == "join" and isinstance(row, dict):
+                        if command == "join" and isinstance(row, dict):
                             from agent_coord.server.records import join as rec_join
                             from agent_coord.server.allow import workstation_ip
 
@@ -2076,13 +2076,13 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         from agent_coord.server.push import api_log
 
                         ms = (time.perf_counter() - t0) * 1000.0
-                        api_log(f"POST /api/mill/{verb} 200 ms={ms:.0f} owner={owner_log}")
+                        api_log(f"POST /api/mill/{command} 200 ms={ms:.0f} owner={owner_log}")
                         from agent_coord.server.push import perf_log
 
                         body_b = len(str(data.get("body") or data.get("need") or data.get("note") or "").encode("utf-8"))
                         resp_b = len(_json(row))
                         perf_log(
-                            f"api.mill.{verb}",
+                            f"api.mill.{command}",
                             ms,
                             status=200,
                             owner=owner_log,
@@ -2090,11 +2090,11 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                             body_b=body_b,
                             resp_b=resp_b,
                         )
-                        from agent_coord.server.score_system import enqueue_verb
+                        from agent_coord.server.score_system import enqueue_command
 
-                        enqueue_verb(
+                        enqueue_command(
                             acting,
-                            verb,
+                            command,
                             req_b=len(raw),
                             resp_b=resp_b,
                             ms=ms,
@@ -2106,10 +2106,10 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         from agent_coord.server.push import api_log
 
                         ms = (time.perf_counter() - t0) * 1000.0
-                        api_log(f"POST /api/mill/{verb} 400 ms={ms:.0f} owner={owner_log} err={e}")
+                        api_log(f"POST /api/mill/{command} 400 ms={ms:.0f} owner={owner_log} err={e}")
                         from agent_coord.server.push import perf_log
 
-                        perf_log(f"api.mill.{verb}", ms, status=400, owner=owner_log, err=" ".join(str(e).split())[:160])
+                        perf_log(f"api.mill.{command}", ms, status=400, owner=owner_log, err=" ".join(str(e).split())[:160])
                     except Exception:
                         pass
                     self._send(400, _json({"error": str(e)}), "application/json; charset=utf-8")
@@ -2118,15 +2118,15 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         from agent_coord.server.push import api_log, mill_admin_alert
 
                         ms = (time.perf_counter() - t0) * 1000.0
-                        api_log(f"POST /api/mill/{verb} 500 ms={ms:.0f} owner={owner_log} err={e}")
+                        api_log(f"POST /api/mill/{command} 500 ms={ms:.0f} owner={owner_log} err={e}")
                         from agent_coord.server.push import perf_log
 
-                        perf_log(f"api.mill.{verb}", ms, status=500, owner=owner_log, err=" ".join(str(e).split())[:160])
+                        perf_log(f"api.mill.{command}", ms, status=500, owner=owner_log, err=" ".join(str(e).split())[:160])
                         with _office() as c2:
                             mill_admin_alert(
                                 c2._cn,
-                                f"mill-wall {verb}: {e}"[:4000],
-                                verb=str(verb or ""),
+                                f"mill-wall {command}: {e}"[:4000],
+                                command=str(command or ""),
                             )
                     except Exception:
                         pass

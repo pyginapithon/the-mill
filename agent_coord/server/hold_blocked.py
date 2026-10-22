@@ -51,7 +51,7 @@ def _holder_of(result: Any) -> str:
 
 def note_hold(
     desk: str | None,
-    verb: str,
+    command: str,
     result: Any,
     *,
     body: dict[str, Any] | None = None,
@@ -62,9 +62,9 @@ def note_hold(
     - hold ok=False starts (or keeps) wait for (desk, resource); records holder
     - hold ok=True after a wait stamps ms= and clears
     - hold ok=True with no prior wait: noop
-    - non-hold verbs ignored
+    - non-hold commands ignored
     """
-    v = (verb or "").strip().lower()
+    v = (command or "").strip().lower()
     if v != "hold":
         return
     if not isinstance(result, dict):

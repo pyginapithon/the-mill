@@ -47,9 +47,9 @@ DOCS = [
 ]
 
 
-@pytest.mark.parametrize("verb", ["inbox", "mail-thread"])
-def test_help_does_not_say_fetch_marks(verb):
-    text = _help(["mill", verb, "--help"])
+@pytest.mark.parametrize("command", ["inbox", "mail-thread"])
+def test_help_does_not_say_fetch_marks(command):
+    text = _help(["mill", command, "--help"])
     assert not BAD.search(text), BAD.search(text).group(0)
     assert "--no-mark" not in text
 

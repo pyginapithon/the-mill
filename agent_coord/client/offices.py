@@ -87,7 +87,7 @@ def current_office(*, dest: Path | None = None) -> str:
 
 
 def pull_office_flag(argv: list[str]) -> tuple[str, list[str]]:
-    """Pull --office from anywhere in argv so it works before or after the verb."""
+    """Pull --office from anywhere in argv so it works before or after the command."""
     office = ""
     out: list[str] = []
     i = 0
@@ -313,7 +313,7 @@ def ca_path(host: str, *, dest: Path | None = None) -> Path:
 
 
 def write_host_invite(host: str, token: str, *, dest: Path | None = None) -> Path:
-    """Door invite for later mill verbs. Owner-only. Not sent as the desk bearer."""
+    """Door invite for later mill commands. Owner-only. Not sent as the desk bearer."""
     path = host_dir(host, dest=dest) / "invite"
     path.parent.mkdir(parents=True, exist_ok=True)
     _lock(path.parent, is_dir=True)
@@ -356,7 +356,7 @@ def read_office_invite(*, dest: Path | None = None) -> str:
 
 
 def write_host_active(host: str, desk: str, *, dest: Path | None = None) -> Path:
-    """Legacy per-host desk pointer. Verbs must not use this as the sender."""
+    """Legacy per-host desk pointer. Commands must not use this as the sender."""
     path = host_dir(host, dest=dest) / "active"
     path.parent.mkdir(parents=True, exist_ok=True)
     _replace(path, desk + "\n")
@@ -364,7 +364,7 @@ def write_host_active(host: str, desk: str, *, dest: Path | None = None) -> Path
 
 
 def read_host_active(host: str, *, dest: Path | None = None) -> str:
-    """Legacy per-host desk pointer. Verbs must not read this to choose a sender."""
+    """Legacy per-host desk pointer. Commands must not read this to choose a sender."""
     try:
         return (host_dir(host, dest=dest) / "active").read_text(encoding="utf-8").strip()
     except (OSError, ValueError):

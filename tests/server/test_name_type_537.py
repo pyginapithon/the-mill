@@ -25,12 +25,12 @@ def _admin():
         yield
 
 
-@pytest.mark.parametrize("verb,body,call", [
+@pytest.mark.parametrize("command,body,call", [
     ("retire", {"slug": "d1", "confirm": "d1", "yes": True}, "retire"),
     ("reclaim", {"slug": "d1", "confirm": "d1", "yes": True}, "reclaim"),
     ("rename", {"old": "d1", "new": "d2", "confirm": "d2", "yes": True}, "rename"),
 ])
-def test_the_named_type_is_used_without_a_lookup(verb, body, call):
+def test_the_named_type_is_used_without_a_lookup(command, body, call):
     seen = {}
 
     def fake(cn, *a):
@@ -39,7 +39,7 @@ def test_the_named_type_is_used_without_a_lookup(verb, body, call):
 
     with patch(f"agent_coord.server.records.name.{call}", fake), \
             patch("agent_coord.server.records.db.rows_done", side_effect=AssertionError("no lookup")):
-        getattr(catalog, verb)(object(), "admin-desk", dict(body, name_type="label"))
+        getattr(catalog, command)(object(), "admin-desk", dict(body, name_type="label"))
     assert seen["args"][-1] == "label"
 
 

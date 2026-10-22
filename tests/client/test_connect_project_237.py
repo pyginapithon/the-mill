@@ -75,7 +75,7 @@ def test_valid_prints_held_sync(monkeypatch, capsys) -> None:
 
 
 def test_old_server_keeps_sitting(monkeypatch, capsys) -> None:
-    _, stop, outcome = _run(monkeypatch, [{"ok": False, "error": "unknown mill verb project"}])
+    _, stop, outcome = _run(monkeypatch, [{"ok": False, "error": "unknown mill command project"}])
     cap = capsys.readouterr()
     assert "does not check projects yet" in cap.err
     assert '"sync"' in cap.out

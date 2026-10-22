@@ -3,7 +3,7 @@
 
 A 3xx comes back as urllib.error.HTTPError, so a credential sent to the first
 URL is never carried to a second one. The wall's wake POST and the client's
-verb calls and CA fetch share it.
+command calls and CA fetch share it.
 """
 from __future__ import annotations
 

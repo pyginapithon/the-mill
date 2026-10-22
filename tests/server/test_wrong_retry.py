@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""A2 wrong-verb / retry: stamp formula + score_tick scrape."""
+"""A2 wrong-command / retry: stamp formula + score_tick scrape."""
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -24,7 +24,7 @@ def test_book_wrong_retry_kpi_formula() -> None:
     assert BOOK_TARGET[KPI_WRONG_N] == ""
     assert BOOK_TARGET[KPI_RETRY] == ""
     assert "non-ok" in BOOK_PERF[KPI_WRONG_N].lower() or "wrong" in BOOK_PERF[KPI_WRONG_N].lower()
-    assert "retry" in BOOK_PERF[KPI_RETRY].lower() or "same-verb" in BOOK_PERF[KPI_RETRY].lower()
+    assert "retry" in BOOK_PERF[KPI_RETRY].lower() or "same-command" in BOOK_PERF[KPI_RETRY].lower()
     assert KPI_WRONG_N == "mill-office.wrong_verb_n"
     assert KPI_RETRY == "mill-office.retry_before_ok"
 
@@ -40,7 +40,7 @@ def test_wrong_retry_stamp_fields(monkeypatch) -> None:
     desk = "DESK_builder"
     wf.mark_wake(desk)
     wf.note_rpc(desk, "heartbeat", ok=True)  # skip
-    wf.note_rpc(desk, "todo", ok=False)  # wrong +1 (different verb)
+    wf.note_rpc(desk, "todo", ok=False)  # wrong +1 (different command)
     wf.note_rpc(desk, "claim", ok=False)  # wrong +1, retry for claim
     wf.note_rpc(desk, "claim", ok=False)  # wrong +1, retry for claim
     wf.note_rpc(desk, "claim", ok=True)  # first ok -> stamp
@@ -69,8 +69,8 @@ def test_wrong_zero_when_first_ok_clean(monkeypatch) -> None:
     assert lines[0][2]["verb"] == "inbox"
 
 
-def test_retry_only_same_verb(monkeypatch) -> None:
-    """wrong counts all non-ok; retry only prior fails of the ok verb."""
+def test_retry_only_same_command(monkeypatch) -> None:
+    """wrong counts all non-ok; retry only prior fails of the ok command."""
     lines: list[tuple] = []
     monkeypatch.setattr(
         "agent_coord.server.push.perf_log",

@@ -66,7 +66,7 @@ def budget_left(payload: dict[str, Any]) -> int:
     return BODY_MAX - len(json.dumps(dict(payload)))
 
 
-def over_budget(before: dict[str, Any], after: dict[str, Any], verb: str = "note") -> str:
+def over_budget(before: dict[str, Any], after: dict[str, Any], command: str = "note") -> str:
     """The refusal when a note would take the card past BODY_MAX, else "" (#360).
 
     Every note on a card shares one budget, so the refusal says how much this
@@ -80,7 +80,7 @@ def over_budget(before: dict[str, Any], after: dict[str, Any], verb: str = "note
         "%s: refused, nothing written: this note needs %d characters and the card has %d left "
         "of its %d (every note on a card shares one budget). Put the long text in a room letter "
         "(mill reply <mail_id> --body-file PATH) and note just its mail id here."
-        % (verb, need, left, BODY_MAX)
+        % (command, need, left, BODY_MAX)
     )
 
 
