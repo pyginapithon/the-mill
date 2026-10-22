@@ -66,6 +66,13 @@ BEGIN
   IF v_del IS NOT NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name retired: mill reclaim first';
   END IF;
+  -- #722: the reserved rosters keep their names (the Admin guards read id 2).
+  IF v_id = 1 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'cannot rename Office';
+  END IF;
+  IF v_id = 2 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'cannot rename Admin';
+  END IF;
   SELECT id INTO v_hit
     FROM name WHERE type = p_type AND name = TRIM(p_new) LIMIT 1;
   IF v_hit IS NOT NULL THEN
