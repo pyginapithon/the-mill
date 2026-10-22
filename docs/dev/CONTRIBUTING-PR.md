@@ -91,6 +91,24 @@ deletion, linear history, and every change lands through a pull request
    email"). `check_pack` fails on main if a personal address lands anyway;
    fixing that is a history rewrite the human office owner approves.
 
+   Scan the squash message before the merge. The squash title and body are
+   written at merge time, after the PR's CI ran, so they reach `main`
+   unchecked, and a hit there turns `main` red for every PR. Before a merge,
+   the merger writes the exact title, a blank line and the body to a file
+   and runs the commit-message check `main` runs:
+
+       python tools/precommit_hygiene.py msg squash-msg.txt
+
+   Exit 0 means the message is clean; anything else means reword, never
+   merge. Merge with that same title and body (`gh pr merge N --squash
+   --subject "..." --body-file body.txt --match-head-commit SHA`), never
+   with the text GitHub composes and never with `--auto`. Builder's box runs
+   this as one step: its `gh` wrapper refuses a `pr merge` without its own
+   subject and body, runs the check_pack name-token rule on the whole
+   message, and runs the office's private scrub list on it too (that list
+   stays on the box, never in the repo). A message already on `main` that
+   fails is reworded, not added to a reviewed list (S-8, #724).
+
 6. If Builder asks for a rebase:
 
        git fetch origin
