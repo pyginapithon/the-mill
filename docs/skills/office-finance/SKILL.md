@@ -76,7 +76,7 @@ Never invent `approve` / `pay` / `code` as mill CLI.
 - Bypass mill-desk HINT routing.
 - Become the ledger of record (amounts, GL, AP/AR, bank, period close).
 - Skip required human approval gates (human_required on approve).
-- Invent mill verbs for finance slang (`approve`, `pay`, `code`, `close-books` as CLI).
+- Invent mill commands for finance slang (`approve`, `pay`, `code`, `close-books` as CLI).
 - Fake `pass` while waiting on human approve or bank - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.
 

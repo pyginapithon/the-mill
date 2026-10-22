@@ -3,7 +3,7 @@
 Measure spine: [MEASURE-LESSONS.md](MEASURE-LESSONS.md). Pack may lag office-host until next ship.
 
 ## Layer
-1. **mill-desk** - universal floor (HINT->verb, one job, STOP). The coordination meta-layer.
+1. **mill-desk** - universal floor (HINT->command, one job, STOP). The coordination meta-layer.
 2. **office-*** - thin adapters: **product**, **inputs**, lingo -> mill, done.
 3. **model-*** - runtime delta only. Not a second office. Index: [models/README.md](../protocol/models/README.md).
 4. Domain systems (GitHub, Zendesk, CRM...) stay systems of record; mill coordinates.
@@ -40,7 +40,7 @@ Template: [TEMPLATE.md](TEMPLATE.md). Lingo research: [FUNCTION-LINGO.md](FUNCTI
 
 Across functions the same **collab moves** recur; only **nouns** change:
 
-| Human collab move | Mill verb set | Notes |
+| Human collab move | Mill command set | Notes |
 |---|---|---|
 | There's work | `create todo` | doing = artifact-oriented |
 | I'll take it | `claim` / `assign` | one owner |
@@ -58,20 +58,20 @@ Across functions the same **collab moves** recur; only **nouns** change:
 - hold is rare (eng trees, legal docs) - don't teach it in sales/support unless needed.
 - human_required clusters: people (offer), finance (approve), legal (clear), marketing (brand approve).
 - score rows (`kpi`, `value`, `target`): ops (SLO), support (SLA), sales (forecast), marketing.
-- "Escalate" always = mill send to a more specialized desk, not a new mill verb.
+- "Escalate" always = mill send to a more specialized desk, not a new mill command.
 
 **Approach for new domains**
 1. Name the **artifact** (one sentence).
 2. List 8-15 native lingo terms (product + collab).
-3. Map each to the smallest mill verb set above.
+3. Map each to the smallest mill command set above.
 4. Write must-not: what SoR stays outside mill.
-5. Stop - do not invent mill verbs per industry.
+5. Stop - do not invent mill commands per industry.
 
-## How mill *fulfills* the activity (deeper than verbs)
+## How mill *fulfills* the activity (deeper than commands)
 
 Don't only translate slang ? CLI. Ask: **what office fact does mill record so collaboration can continue without the chat?**
 
-| Human need | Mill representation (fulfillment) | Typical verbs (optional) |
+| Human need | Mill representation (fulfillment) | Typical commands (optional) |
 |---|---|---|
 | Know who's working | **Presence / HERE** on the floor | connect, agents |
 | Shared work item | **Todo card** (doing, detail, owner, state) | `create todo`, claim, assign, note, `pass` |
@@ -83,6 +83,6 @@ Don't only translate slang ? CLI. Ask: **what office fact does mill record so co
 | Human glance | **Wall** over the same records | - |
 | Coverage | Presence + mail, not a side DM as SoR | send, inbox |
 
-**Pattern:** human language names the **intent**; mill stores the **shared fact** (who, what, waiting, evidence, score row). Verbs are just how agents write those facts.
+**Pattern:** human language names the **intent**; mill stores the **shared fact** (who, what, waiting, evidence, score row). Commands are just how agents write those facts.
 
 **Overlap:** every function's "assign / escalate / approve / pass" collapses to card ownership + mail + optional human_required - the product noun in `doing`/`detail` is what differs.

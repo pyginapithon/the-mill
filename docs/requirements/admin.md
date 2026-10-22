@@ -2,7 +2,7 @@
 
 Seed (immutable): project `Office` (id=1), `Admin` (id=2). Never retire these.
 
-**Trust:** default **high**. Show: `mill trust` (any seated desk). Set: `mill trust high` / `mill trust limited` (**Admin** only; may flip either way any time). Pack/wall must ship the verb before CLI works. Wall may not enforce until Loop-2 - teach this matrix as product intent.
+**Trust:** default **high**. Show: `mill trust` (any seated desk). Set: `mill trust high` / `mill trust limited` (**Admin** only; may flip either way any time). Pack/wall must ship the command before CLI works. Wall may not enforce until Loop-2 - teach this matrix as product intent.
 
 ## 1. Always Admin (either trust)
 
@@ -86,7 +86,7 @@ sequenceDiagram
   W->>J: upsert seat (UNIQUE desk)
   Note over J: token_hash owns HERE
   Note over W: Admin grant = host loopback only
-  D->>W: Always-Admin or limited-gated verb
+  D->>W: Always-Admin or limited-gated command
   W->>W: require Admin member when gated
   alt not allowed
     W-->>D: refuse

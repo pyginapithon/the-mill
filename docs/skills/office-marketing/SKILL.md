@@ -73,7 +73,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Treat mill as DAM/CMS or as analytics SoR.
-- Invent mill verbs for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
+- Invent mill commands for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
 - Launch without the review gate the office requires.
 - Fake `pass` while embargoed or waiting brand/legal/finance - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.

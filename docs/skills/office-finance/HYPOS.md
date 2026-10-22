@@ -2,7 +2,7 @@
 
 Product: **Approved / paid**  
 Modes: `approve` | `withhold` | `paid/closed`  
-Day-one verbs only. Gap mix ~5 yes / ~5 no.  
+Day-one commands only. Gap mix ~5 yes / ~5 no.  
 `human_required` where skill requires (approve).  
 Ledger/ERP stays SoR - mill coordinates only.
 

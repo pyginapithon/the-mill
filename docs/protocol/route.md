@@ -1,6 +1,6 @@
 # mill route - this desk's redirector chain
 
-**Local chain:** `mill route add`, `mill route rm`, and `mill route list` are the only arm. The list is a chain of redirectors, called in order. The first one that handles the frame stops the chain. Do not invent a second arm verb. There is no `mill use`.
+**Local chain:** `mill route add`, `mill route rm`, and `mill route list` are the only arm. The list is a chain of redirectors, called in order. The first one that handles the frame stops the chain. Do not invent a second arm command. There is no `mill use`.
 
 The chain is per desk. It lives on the PC where that desk sits `mill connect`. A frame is walked against the desk that received it. Another desk's list is never called. The hub stays a sender: it has no chain and stores no handlers.
 
@@ -30,7 +30,7 @@ flowchart TB
 
 | | mill connect | mill route | skill.md |
 |---|---|---|---|
-| Job | `/ws` + **default spawn agent** | walk this desk's redirectors in order | chat HINT -> mill verb |
+| Job | `/ws` + **default spawn agent** | walk this desk's redirectors in order | chat HINT -> mill command |
 | When | every redirector said not-mine, or no entry matched | agent added a route | human/TUI turn |
 | Lives | process `--vendor` | this desk's file on this PC, not the book | mill-desk skill |
 | Config | `mill connect [roster] DESK [--vendor V] [--session S]` | agent: add/rm routes, program paths | recopy after mill update |
@@ -107,11 +107,11 @@ HINT is enough to **dispatch**, not always enough to **do the job**. Hub is dumb
 
 `id` is a handle into the book. A tree attach pokes ancestors with the payload type, so `id` is the child. Inbox / one card is the safe read.
 
-A redirector gets the same doorbell. `*` can case on the route key. A per-key exe is already the case. Then it mill-verbs. If the program expects the push to contain the letter, it will starve. mill will not put the letter on the HINT. Do not grow the frame.
+A redirector gets the same doorbell. `*` can case on the route key. A per-key exe is already the case. Then it runs mill commands. If the program expects the push to contain the letter, it will starve. mill will not put the letter on the HINT. Do not grow the frame.
 
 ## mill route CLI
 
-Local to this mill connect PC. Not mill-wall. Not a book verb. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). `mill route` waits for a connect started just before in that shell, like the other desk commands. Everything after the key is the program. A flag after the key becomes part of the program argv.
+Local to this mill connect PC. Not mill-wall. Not a book command. Not skill.md. The desk is the sitting `mill connect`. Desk commands run in that same parent shell (the line `mill join` prints). `mill route` waits for a connect started just before in that shell, like the other desk commands. Everything after the key is the program. A flag after the key becomes part of the program argv.
 
 ```
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route list'
@@ -138,7 +138,7 @@ bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add
 bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route add "*" -- python docs/protocol/route-template.py'
 ```
 
-stdin = the frame JSON. The template handles MAIL and TODO with `mill inbox` / `mill todo` (or `python -m agent_coord` if `mill` missing), prints `not-mine` for anything else, and exits non-zero when its verb fails. Agents may replace the body; keep the three exits.
+stdin = the frame JSON. The template handles MAIL and TODO with `mill inbox` / `mill todo` (or `python -m agent_coord` if `mill` missing), prints `not-mine` for anything else, and exits non-zero when its command fails. Agents may replace the body; keep the three exits.
 
 ## Which HINTs reach this desk
 
@@ -153,5 +153,5 @@ todo:TODO =
 * =
 ```
 
-A missing or empty file means every frame is acted on (the default). A non-empty file means only the listed keys are (`*` = any). A `{kind: mail}` frame matches `mail:MAIL` and `*`. Nothing emits `name:NAME`. Frames that are filtered out are still appended to `*.hints.jsonl` but do not spawn. There is no verb for this file; edit it by hand.
+A missing or empty file means every frame is acted on (the default). A non-empty file means only the listed keys are (`*` = any). A `{kind: mail}` frame matches `mail:MAIL` and `*`. Nothing emits `name:NAME`. Frames that are filtered out are still appended to `*.hints.jsonl` but do not spawn. There is no command for this file; edit it by hand.
 

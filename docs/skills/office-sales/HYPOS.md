@@ -1,6 +1,6 @@
 # office-sales - cold-run hypos (H01-H10)
 
-Cold-run asks for **Close-won / handoff** only. Human speech; day-one mill verbs; CRM stays SoR for amounts/accounts/stage history.
+Cold-run asks for **Close-won / handoff** only. Human speech; day-one mill commands; CRM stays SoR for amounts/accounts/stage history.
 
 ## H01
 - **Ask:** Move Acme opp OPP-441 from discovery to demo - note the next step (Thursday demo), keep AE on the card.

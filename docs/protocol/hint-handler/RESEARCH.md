@@ -46,7 +46,7 @@ Search: no `hint-handler` / `HINT-HANDLER` / `tools/hint_handler` hits in mill t
 ## Stub / lib shape (why)
 
 - **lib:** parse stdin JSON -> `HintEvent` (`route_key`, `detail` parse, ignore PING/JOIN); `leftovers()` = MAIL inbox / TODO that-card-or-"" (never full board); `run_mill` thin; exit helpers. Matches route.md "Is the HINT enough?" table + hints.md agent order.
-- **stub:** shorter than task-verb body; imports lib; cases `mail:MAIL` / `todo:TODO`; always exit 0 on success path. mill connect does **not** mill-update for exit 0 (connect.md).
+- **stub:** shorter than task-command body; imports lib; cases `mail:MAIL` / `todo:TODO`; always exit 0 on success path. mill connect does **not** mill-update for exit 0 (connect.md).
 - **TEMPLATE:** contract table + skeleton; exit line aligned with connect.md (not "mill-pass only").
 - **Arm / route CLI:** shipped. `mill route add|rm|list` is the arm. The desk is the sitting connect; commands run in that parent shell. SKILL.md is the cold-desk playbook. Vendor poke runs only when no route hits.
 - Dropped: `--spawn` wrong door (strawman); no teaching retained.
@@ -61,7 +61,7 @@ Cold-read SKILL + dry-run stub with sample MAIL/TODO/PING JSON (no live mill con
 
 ## 2026-10-20 - mill todo #353
 
-- Deleted `REMEASURE-PATCH-1.md`, `LOOP-2-mill-route.md`, and `MILL-DESK-DO-LINE.md`. They still said `mill route` was blocked or not packaged. The verb ships.
+- Deleted `REMEASURE-PATCH-1.md`, `LOOP-2-mill-route.md`, and `MILL-DESK-DO-LINE.md`. They still said `mill route` was blocked or not packaged. The command ships.
 - `--owner` is not on `mill route` or `mill connect`. The desk is the sitting connect. Desk commands run in that same parent shell: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB'`.
 - Tag commands are `mill label` and `mill unlabel`.
 - A letter frame is `{kind: mail}` (no `type` or `hint`). Its route key is `mail:MAIL`. The lib follows `route_chain.route_key` (PR #31).

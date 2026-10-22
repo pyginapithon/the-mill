@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-finance/` exists |
 | Stub | Thin `SKILL.md` present (Product + Lingo + Must-not + Done; **no Inputs / Handoffs / Scope**) |
 | FUNCTION-LINGO.md | Present - S **Finance / admin** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked (alpha hard-cut #60) |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked (alpha hard-cut #60) |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-sales (finance pricing/approve handoff); office-legal (human_required sibling); office-ops / office-support RESEARCH shape |
 
@@ -26,7 +26,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -78,16 +78,16 @@ Not inputs: "manage the books," silent auto-approve without human_required when 
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk).  
-**human_required** is a gate flag / mail pattern (README), not a new mill CLI verb - cite beside approve.
+**human_required** is a gate flag / mail pattern (README), not a new mill CLI command - cite beside approve.
 
 Sources for rows: **FUNCTION-LINGO.md S Finance / admin** (required), mill-desk day-one, stub, README (human_required finance approve; ledger SoR; escalate = send), siblings sales->finance pricing, legal human_required cluster.
 
 Shared spine (one table for the function):
 
-| Their word | Source (FL cite) | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source (FL cite) | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | invoice | FL Finance product words; stub | create todo, open | **`create todo`** (ledger invoice id in detail) | reject `open`; ledger SoR |
 | PO / purchase order | FL Finance product words; stub | create todo | **`create todo`** | same spine |
@@ -97,7 +97,7 @@ Shared spine (one table for the function):
 | accrual | FL Finance product words | note | **`note`** (+ ledger SoR) | don't clone GL |
 | payment / remittance | FL product "payment"; stub paid | note, pass | **`note`** payment pointer + **`pass`** when paid | payment run stays ledger/bank |
 | approval / approve | FL sketch "human_required mail / todo"; stub approval chain; README human_required finance | assign, send, human_required, note | **`assign`** + **human_required** + **`send`** / **`note`** outcome | never invent `approve` CLI; never skip human gate |
-| approval chain | FL collab; stub | assign, send | **`assign`** next + **`send`**; waiting_on until human clicks | chain = ownership + mail, not new verb |
+| approval chain | FL collab; stub | assign, send | **`assign`** next + **`send`**; waiting_on until human clicks | chain = ownership + mail, not new command |
 | coding (GL / cost center) | FL collab; stub "coded / approved -> note" | note | **`note`** (coding in ledger) | not invent `code` CLI |
 | exception | FL sketch "escalate mail"; stub | send | **`send`** escalate (+ `note` reason) | escalate always = send (README) |
 | close the books / period close | FL collab "close the books"; stub closed period | note, pass, create todo | **`note`** / optional close-step todo; **`pass`** when step done | DROP as 2nd product day-one; reject teaching `done` |
@@ -137,7 +137,7 @@ Pattern: README "Escalate always = mill send"; "human_required clusters: ... fin
 - Bypass mill-desk HINT routing.
 - **Become the ledger of record** (stub) - amounts, GL, AP/AR, bank, period close SoR stay ERP/ledger; mill links ids.
 - **Skip required human approval gates** (stub; README human_required finance approve).
-- Invent mill verbs for finance slang (`approve`, `pay`, `code`, `accrue`, `close-books`, `exception` as CLI).
+- Invent mill commands for finance slang (`approve`, `pay`, `code`, `accrue`, `close-books`, `exception` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk day-one hard-cut).
 - Confuse `drop` (hold release) with `unclaim`.
 - Teach `hold` day-one unless the office leases a shared invoice/PO doc resource (README: hold rare - eng/legal/docs).
@@ -180,11 +180,11 @@ Pattern: README "Escalate always = mill send"; "human_required clusters: ... fin
 | `docs/skills/README.md` | Catalog **Approved / paid**; spine create todo->claim->note->send->pass; human_required finance (approve); escalate = send; hold rare; domain SoR outside mill |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S **Finance / admin** | **Required** product words (invoice, PO, budget, forecast, accrual, payment); collab (approval chain, coding, exception, close the books); mill sketch (approval->human_required; exception->escalate mail; paid/closed->done; forecast KPI->score row) |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-finance/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-sales/SKILL.md` + sales RESEARCH | Sibling: finance pricing/approve handoff; CRM SoR pattern analogue to ledger |
 | `docs/skills/office-legal/SKILL.md` | Sibling human_required / clear-hold cluster; hold on docs |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
 | `docs/protocol/verbs.md` | Confirm score/pass lifecycle; removed teaching CLI (open/yield/bare create/done) |
 
 ### Public industry practice (thin)
@@ -193,7 +193,7 @@ Pattern: README "Escalate always = mill send"; "human_required clusters: ... fin
 |---|---|
 | Common AP practice - invoice/PO -> code -> approve -> pay | Stages are **ledger SoR**; mill card tracks ownership, approval chain, exception mail, paid outcome (aligns FL) |
 | Approval chain / segregation of duties | Approver = human_required + `assign`/`send`; agent must not silent-approve when policy requires human |
-| Exception / policy override | Escalate = mill `send`, not a new verb (README) |
+| Exception / policy override | Escalate = mill `send`, not a new command (README) |
 | Forecast / budget vs actual | KPI glance -> mill `score` / score rows; detailed forecast stays finance SoR |
 
 ### Guesses (flagged)
@@ -229,7 +229,7 @@ Pattern: README "Escalate always = mill send"; "human_required clusters: ... fin
 | human_required | Implied via "assign + human_required" | Call out explicitly on every approve path; Must-not skip gates |
 | hold | Absent (good) | Keep absent day-one unless office leases docs |
 | score / forecast | Present as score row | Keep as `score`; not a product |
-| Must-not | Ledger SoR + skip human gates | Add: HINT bypass; no invent verbs; drop!=unclaim; no fake pass; no teach done/open/yield |
+| Must-not | Ledger SoR + skip human gates | Add: HINT bypass; no invent commands; drop!=unclaim; no fake pass; no teach done/open/yield |
 | Done | Approval outcome; paid/closed -> pass; KPI if used | Spell approve / withhold / paid / waiting_on / parked |
 | metadata short-description | "Finance: approvals via mill" | Prefer "Finance: Approved / paid via mill" |
 
@@ -237,7 +237,7 @@ Pattern: README "Escalate always = mill send"; "human_required clusters: ... fin
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-finance/SKILL.md`. Pull mill-desk first. Do not invent verbs. Ledger stays SoR. **human_required** on approve.
+Paste/adapt into `docs/skills/office-finance/SKILL.md`. Pull mill-desk first. Do not invent commands. Ledger stays SoR. **human_required** on approve.
 
 ```markdown
 ---
@@ -314,7 +314,7 @@ Never invent `approve` / `pay` / `code` as mill CLI.
 - Bypass mill-desk HINT routing.
 - Become the ledger of record (amounts, GL, AP/AR, bank, period close).
 - Skip required human approval gates (human_required on approve).
-- Invent mill verbs for finance slang (`approve`, `pay`, `code`, `close-books` as CLI).
+- Invent mill commands for finance slang (`approve`, `pay`, `code`, `close-books` as CLI).
 - Fake `pass` while waiting on human approve or bank - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.
 

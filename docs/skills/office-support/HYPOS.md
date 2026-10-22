@@ -1,6 +1,6 @@
 # office-support - cold-run hypos (H01-H10)
 
-Cold-run asks for **Resolved ticket** only. Human speech; day-one mill verbs on the desk; forge/ITSM stay SoR.
+Cold-run asks for **Resolved ticket** only. Human speech; day-one mill commands on the desk; forge/ITSM stay SoR.
 
 ## H01
 - **Ask:** Someone pinged that the password-reset mail never arrives - walk them through a workaround and close the ticket when they're unblocked.

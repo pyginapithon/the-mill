@@ -2,7 +2,7 @@
 name: model-grok-bot
 description: >
   Grok Bot runtime delta for the mill. Use with mill-desk, not instead of it.
-  Wake only. Do not copy office verbs here.
+  Wake only. Do not copy office commands here.
 ---
 
 # Grok Bot

@@ -18,7 +18,7 @@ Copy `examples/stub_handler.py`. Do not keep a second skeleton here.
 
 The stub sets its import root to `parents[1]`, which is `docs/protocol/hint-handler` only while the file stays in `examples/`. A task-local copy must set that root to `docs/protocol/hint-handler` or `tools.hint_handler` does not import.
 
-A print is not evidence. The stub appends `hint-evidence.jsonl` beside the program. Replace that write with your task verbs. `mill send` pushes the letter. `mill label` / `mill unlabel` on a watched todo, join, hold, or score are a later write. A mail label does not push another letter.
+A print is not evidence. The stub appends `hint-evidence.jsonl` beside the program. Replace that write with your task commands. `mill send` pushes the letter. `mill label` / `mill unlabel` on a watched todo, join, hold, or score are a later write. A mail label does not push another letter.
 
 ## Arm and drop
 

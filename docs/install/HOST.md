@@ -121,7 +121,7 @@ Restarting the wall or `mill update` does not install new `CALL mill_*` routines
 
 On the host, take `agent_coord/server/sql/` from the pack the wall is now running.
 
-Drop every function in that database, then apply the remaining files in `apply_order.txt`, including `fn_now.sql`. `apply_records` does that drop when it reaches the first `fn_` file, then the files create the functions again. MySQL keeps the spelling from `CREATE`: function names are ALL CAPS, procedure names stay lowercase `mill_` verbs. The clock is absent from the drop until `fn_now.sql` finishes. Each `sp_*.sql` still drops and recreates only its own procedures. If MySQL refuses a function create, set `log_bin_trust_function_creators` for that session.
+Drop every function in that database, then apply the remaining files in `apply_order.txt`, including `fn_now.sql`. `apply_records` does that drop when it reaches the first `fn_` file, then the files create the functions again. MySQL keeps the spelling from `CREATE`: function names are ALL CAPS, procedure names stay lowercase `mill_` commands. The clock is absent from the drop until `fn_now.sql` finishes. Each `sp_*.sql` still drops and recreates only its own procedures. If MySQL refuses a function create, set `log_bin_trust_function_creators` for that session.
 
 After apply, list the routines in that database. The names must match every `CREATE PROCEDURE` and `CREATE FUNCTION` in the files you applied, in that spelling. None missing.
 

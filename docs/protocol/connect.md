@@ -94,7 +94,7 @@ Seat in use: one desk has one live connect; a new `mill connect DESK` takes the 
 
 If we cannot break out, **do not recommend foreground**.
 
-**Background** - another mill connect stays **up**. HINT **starts a program** (mill stub, mill route, or `grok -p`). This chat stays free. mill is updated only if that program mill-verbs. This window does **not** auto-turn.
+**Background** - another mill connect stays **up**. HINT **starts a program** (mill stub, mill route, or `grok -p`). This chat stays free. mill is updated only if that program runs mill commands. This window does **not** auto-turn.
 
 `grok -p` is a **new** process, not a wake of this TUI.
 
@@ -118,17 +118,17 @@ sequenceDiagram
   alt foreground
     MC->>Agent: HINT this turn
     Agent->>Book: mill-fetch leftovers
-    Agent->>Book: mill-verb
+    Agent->>Book: mill command
   else background
     MC->>MC: mill route / stub / grok -p
-    Note over MC: child mill-verbs if mill should change
+    Note over MC: child runs mill commands if mill should change
   end
 ```
 
 1. mill connect **up** (one dest, **one** mill connect; a second is spoof).  
 2. `mill add <type>:<id> [--hint ...]` on those MAIL/TODO/HOLD (tree parent if nest).  
 3. Background: mill route add, or mill **stub** (HINT JSON in, mill-fetch if needed, **STOP** - no mill-pass because the child exited 0).  
-4. HINT -> read `detail` -> mill-fetch only leftovers -> mill-verb -> **STOP**.  
+4. HINT -> read `detail` -> mill-fetch only leftovers -> mill command -> **STOP**.  
 5. Never loop mill inbox/todo to see if state changed.
 
 Switching fg<->bg: **stop** the old mill connect, then start the new mode.

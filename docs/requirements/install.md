@@ -94,7 +94,7 @@ Fresh **Linux** VM - deep measure on **each** of AWS, Azure, GCP; other provider
 - [ ] No cloud keys in mill book/session/Wall
 - [ ] Join fail-closed if CA missing (where applicable)
 
-`mill install cloud` is one verb. Flags, no new verb ([CLOUD.md](../install/CLOUD.md)):
+`mill install cloud` is one command. Flags, no new command ([CLOUD.md](../install/CLOUD.md)):
 
 - `--provider aws|azure|gcp|self` on the workstation: preflight, then a phased plan with copy-ready commands for this shell
 - `--ssh <user>@<host>`: on-VM spine over SSH, then read the done-report back

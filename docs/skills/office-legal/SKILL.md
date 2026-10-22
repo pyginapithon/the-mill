@@ -71,7 +71,7 @@ body dumped into mill as SoR.
 - Bypass mill-desk HINT routing.
 - Silent clear without mail; unlock ship while waiting_on legal remains.
 - Replace Contract/CLM/e-sign/Drive SoR - link paths only.
-- Invent mill verbs for legal slang (`clear`, `withhold`, `redline`, `escalate` as CLI).
+- Invent mill commands for legal slang (`clear`, `withhold`, `redline`, `escalate` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse legal "hold" (block ship) with mill `hold`.
 - Skip `human_required` on clear when office requires it.
