@@ -50,15 +50,15 @@ python tools/check_doc_verbs.py --list   # every verb, its positional count and 
 
 CI runs it in the `mill_cli_smoke` job (F83).
 
-## repro_sdist.py
+## check_repro.py
 
-Make the sdist byte-reproducible. setuptools dates sdist members by file mtimes and the build time; this rewrites each `DIR/*.tar.gz` in place with fixed times (`SOURCE_DATE_EPOCH`), owner 0/0, and fixed modes. Contents and member names are unchanged. CI runs it after every build.
+Prove the pack is byte-reproducible. Clones HEAD twice into temp dirs (umask `022`, then `002`, a second apart), builds each with `python -m build --no-isolation` and `SOURCE_DATE_EPOCH` = the commit time, and prints every sha256. With a `dist/` argument, both builds must also match it. The normalizing is in the build backend (`build_backend/mill_build.py`), not here. CI `build_pack` and release `verify` run it.
 
 ```bash
-SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" python tools/repro_sdist.py dist
+python tools/check_repro.py dist
 ```
 
-Exit nonzero with no `SOURCE_DATE_EPOCH`, no sdist, or a member that is not a file or directory.
+Exit 1 when any sha256 differs or a build is not one wheel and one sdist.
 
 ## orphan_scan.py
 

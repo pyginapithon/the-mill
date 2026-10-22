@@ -1271,7 +1271,18 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                 _add_dest(bare, None)
 
     if not dest_set:
-        raise CoordError("reply: no destinations after the reply-all default")
+        # A letter needs a reader other than its sender (no self-To). Name the
+        # forms that work instead of the reply-all default (letters 2199/2200).
+        if isinstance(raw_tos, list) and raw_tos:
+            raise CoordError(
+                "reply: --to-desk names only you, and a reply never goes to its sender; "
+                f"post to the room with mill reply {mail_id} --body-file PATH (reply-all), "
+                "name another desk with --to-desk DESK, or keep a private line with mill note on a card"
+            )
+        raise CoordError(
+            f"reply: you are the only desk on it, so reply-all reaches no one; "
+            f"name a desk with mill reply {mail_id} --to-desk DESK --body-file PATH"
+        )
 
     # If parent is not on a TREE, open a room: parent becomes root, reply nests under it.
     if not rec_tree.on_tree(c._cn, "mail", mail_id):
@@ -1494,7 +1505,7 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
         if room.tree_id and _open_room(room.tree):
             raise CoordError(
                 "mail-thread: not a participant in this room; "
-                f"run mill reply {root_id} <body> to join, "
+                f"run mill reply {root_id} --body-file PATH to join, "
                 "or ask a participant to mill add you at a letter of it"
             )
         # Private letter or a room opened from one: no open-join (#sec S-3).
@@ -2579,33 +2590,16 @@ def _h_invite(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     return door_mod.board_packet()
 
 
-# These verbs do not otherwise write activity. Each pushes its name onto join.doing.
-_DOING_STACK = frozenset(
-    {
-        "todo",
-        "session",
-        "mail-thread",
-        "trail",
-        "member",
-        "trust",
-        "invite",
-        "move",
-        "prune",
-        "detach",
-        "label-remove",
-        "add",
-        "remove",
-    }
-)
-
-
 def _note_doing(c: Book, project: str, owner: str | None, verb: str) -> None:
-    if verb not in _DOING_STACK or not owner:
+    """A verb that writes nothing else bumps the seat; doing stays the desk's (#635)."""
+    from agent_coord.server.records.doing_stack import BUMP_VERBS
+
+    if verb not in BUMP_VERBS or not owner:
         return
     try:
         from agent_coord.server.records import join as rec_join
 
-        rec_join.push_doing(c._cn, project, owner, verb)
+        rec_join.touch(c._cn, project, owner)
     except Exception:
         try:
             c._cn.rollback()
@@ -2843,7 +2837,7 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                     if root_mail and _mail_open_room(c, int(i)):
                         raise CoordError(
                             "trail: not a participant in this room; "
-                            f"run mill reply {root_mail} <body> to join, "
+                            f"run mill reply {root_mail} --body-file PATH to join, "
                             "or ask a participant to mill add you at a letter of it"
                         )
                     # Private letter or a room opened from one: no open-join (#sec S-3).

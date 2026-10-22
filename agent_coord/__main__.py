@@ -48,10 +48,26 @@ def normalize_seat_argv(argv: list[str]) -> list[str]:
     return out
 
 
+BODY_FILE_FIX = "write the body to a UTF-8 file and pass --body-file PATH (a body in the command line is not read)"
+_BODY_VERBS = ("reply", "send")
+
+
 class MillArgumentParser(argparse.ArgumentParser):
+    _verb = ""
+
+    def parse_known_args(self, args=None, namespace=None):
+        words = list(sys.argv[1:] if args is None else args)
+        self._verb = next((w for w in words if not str(w).startswith("-")), "")
+        return super().parse_known_args(args, namespace)
+
     def error(self, message: str) -> None:
         if "--seat" in message and "expected one argument" in message:
             message = message + "; if the value starts with '-', use --seat=VALUE"
+        elif "required: --body-file" in message or (
+            "unrecognized arguments" in message and self._verb in _BODY_VERBS
+        ):
+            # #638: one line that names the fix, not just the missing flag.
+            message = message + "; " + BODY_FILE_FIX
         super().error(message)
 
 

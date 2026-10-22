@@ -144,7 +144,8 @@ def test_outsider_refusal_names_join_route(cn) -> None:
     with pytest.raises(CoordError) as ei:
         rpc._h_mail_thread(r["book"], {"mail_id": r["r1a"]}, "unit", "rfz")
     msg = str(ei.value)
-    assert f"run mill reply {r['root']} <body> to join" in msg
+    assert f"run mill reply {r['root']} --body-file PATH to join" in msg
+    assert "<body>" not in msg
     assert "ask a participant to mill add you" in msg
 
 

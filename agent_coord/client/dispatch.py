@@ -171,8 +171,13 @@ def replay_items(desk: str, sync: list[Any]) -> list[dict[str, Any]]:
     A row the socket delivered live (sent) was walked then. A route exit notice
     (exit) and an expired line are reports, not frames. Each kept frame carries
     the poke key the wall would have stamped, so the walk's key check is the same.
+
+    #670: one frame per poke key, the latest, in the order the keys first appear.
+    Rows with one key are one item (every change of one hold), so the chain would
+    skip all but the first as a repeat anyway; walking the latest hands it the
+    current state, once.
     """
-    out: list[dict[str, Any]] = []
+    by_key: dict[str, dict[str, Any]] = {}
     for row in sync or []:
         if not isinstance(row, dict):
             continue
@@ -189,5 +194,5 @@ def replay_items(desk: str, sync: list[Any]) -> list[dict[str, Any]]:
             continue
         frame["idem"] = key
         frame["replay"] = 1
-        out.append(frame)
-    return out
+        by_key[key] = frame  # a repeat keeps the key's first position, takes the latest frame
+    return list(by_key.values())
