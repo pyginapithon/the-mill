@@ -44,7 +44,7 @@ def capture(monkeypatch, tmp_path):
         return _Resp(b'{"ok":true,"token":"new-sess","owner":"coldagent"}')
 
     monkeypatch.setattr(
-        "agent_coord.client.http.urllib.request.urlopen", fake_urlopen
+        "agent_coord.client.http._open", fake_urlopen
     )
     return cap
 

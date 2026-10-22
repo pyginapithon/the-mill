@@ -69,6 +69,19 @@ def mill_ssl_context() -> ssl.SSLContext:
     return ctx
 
 
+REDIRECT_REFUSED = (
+    "redirect refused: the mill client never follows a 3xx while it carries a "
+    "credential; join the wall's final https URL"
+)
+
+
+def _open(req, *, context: ssl.SSLContext, timeout: float):
+    """Verb call and CA fetch: one request, never a redirect (#654)."""
+    from agent_coord.helpers.nofollow import open_no_redirect
+
+    return open_no_redirect(req, timeout=timeout, context=context)
+
+
 def mill_api_key(owner: str = "") -> str:
     """Bearer for the sitting desk only. Never AGENT_COORD_TOKEN (shared env).
 
@@ -173,7 +186,7 @@ def mill_http_call(body: dict[str, Any]) -> Any:
         headers=headers,
     )
     try:
-        with urllib.request.urlopen(req, context=mill_ssl_context(), timeout=5) as resp:
+        with _open(req, context=mill_ssl_context(), timeout=5) as resp:
             raw = resp.read().decode("utf-8")
             if verb_s == "join":
                 hdrs = getattr(resp, "headers", None)
@@ -194,6 +207,8 @@ def mill_http_call(body: dict[str, Any]) -> Any:
                 print({"DEBUG": "http", "path": path, "status": e.code, "error": err[:160]}, flush=True)
         except Exception:
             pass
+        if 300 <= int(e.code or 0) < 400:
+            raise CoordError(f"mill-wall {e.code}: {REDIRECT_REFUSED}") from e
         low = err.lower()
         if owner and key and ("spoof" in low or "bad token" in low or "desk live" in low):
             raise CoordError(f"token/desk mismatch for {owner}") from e
@@ -358,7 +373,7 @@ def fetch_mill_ca(
         ca_url = f"{parsed.scheme}://{parsed.netloc}{path}"
         req = urllib.request.Request(ca_url, headers=headers)
         try:
-            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
+            with _open(req, context=ctx, timeout=15) as resp:
                 body = resp.read()
                 hdrs = getattr(resp, "headers", None)
                 warn_wall_version(hdrs.get("X-Mill-Version") if hdrs else "")

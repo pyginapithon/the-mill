@@ -52,18 +52,11 @@ def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None,
         return
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A wake POST never follows a redirect: the allowlist checked the first URL only."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
-        return None
-
-
 def _open(req, timeout: float):
-    """One request through an opener that refuses redirects (a 3xx is a failure)."""
-    import urllib.request
+    """One request through the shared opener that refuses redirects (a 3xx is a failure, #654)."""
+    from agent_coord.helpers.nofollow import open_no_redirect
 
-    return urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout)
+    return open_no_redirect(req, timeout=timeout)
 
 
 def _post_status(
