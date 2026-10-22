@@ -77,7 +77,7 @@
     },
     todo: {
       js: "/todo/todo.js?v=wow182",
-      css: "/todo/todo.css?v=wow238",
+      css: "/todo/todo.css?v=wow311",
       marker: "WALL_UI_DEFAULT_TODO"
     }
   };
