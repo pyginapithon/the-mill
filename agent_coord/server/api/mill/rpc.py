@@ -2677,7 +2677,8 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
     import json
 
     from agent_coord.const import CONST_LABEL
-    from agent_coord.helpers.label_ord import missing_label
+    from agent_coord.config import mill_catalog_open
+    from agent_coord.helpers.label_ord import unused_label
     from agent_coord.helpers.trail_text import clip, first_line
     from agent_coord.server.admin.guard import is_role_admin
     from agent_coord.server.records import label as rec_label
@@ -2692,7 +2693,7 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
     if rec_name.get(c._cn, stored, CONST_LABEL) is None:
         return {
             "label": stored,
-            "hint": missing_label(stored),
+            "hint": unused_label(stored, mill_catalog_open(CONST_LABEL)),
             "rows": [],
             "truncated": False,
         }
