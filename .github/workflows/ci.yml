@@ -1,5 +1,5 @@
-# The gate for every pull request, every push to main and (through release.yml)
-# every v* tag. The jobs are the required status checks on main.
+# The gate for every pull request, every merge-queue entry, every push to main
+# and (through release.yml) every v* tag. The jobs are the required status checks on main.
 # Rules: every action is pinned to a full commit SHA, no pull_request_target,
 # no self-hosted runners (fork PRs on a public repo would run code on them),
 # and every PyPI install is hash-checked: the pinned pip wheel, then a lock in
@@ -11,6 +11,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # The merge queue runs the required checks on the queued squash commit (#810).
+  merge_group:
   workflow_dispatch:
   # release.yml calls this file so a tag is gated by the same jobs.
   workflow_call:
@@ -91,6 +93,12 @@ jobs:
           MILL_PRIVATE_NAMES: ${{ secrets.MILL_PRIVATE_NAMES }}
           MILL_PRIVATE_NAMES_REQUIRED: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
         run: python tools/check_pack.py dist
+      # In the merge queue HEAD is the squash commit GitHub puts on main as
+      # is: scan that message alone with every message rule (#810, F109).
+      - if: github.event_name == 'merge_group'
+        env:
+          MILL_PRIVATE_NAMES: ${{ secrets.MILL_PRIVATE_NAMES }}
+        run: python tools/check_pack.py --head-message
       # Whole-tree comment and prose hygiene, the same scan as the pre-commit hook.
       - run: python tools/precommit_hygiene.py tree
       # Audit without installing anything: the runtime floors (the oldest a

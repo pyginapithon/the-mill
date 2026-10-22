@@ -326,3 +326,22 @@ def test_pr_text_scans_every_posted_text_read_only() -> None:
     assert "python3 tools/check_pr_text.py event" in _job(code, "event")
     assert "python3 tools/check_pr_text.py sweep" in _job(code, "sweep")
     assert "pip" not in code
+
+
+def _on_block(text: str) -> str:
+    return text.split("\non:\n", 1)[1].split("\n\n", 1)[0]
+
+
+def test_required_workflows_run_in_the_merge_queue() -> None:
+    """#810 (F109): ci and codeql hold the required checks on main, so both
+    must run on merge_group or a merge queue waits on them forever."""
+    for name in ("ci.yml", "codeql.yml"):
+        assert re.search(r"^  merge_group:", _on_block(_code(WF / name)), re.M), name
+
+
+def test_check_pack_scans_the_queued_squash_message() -> None:
+    """#810 (F109): in the merge queue HEAD is the squash commit GitHub will
+    put on main, so check_pack scans that one message before it lands."""
+    job = _job(_code(WF / "ci.yml"), "check_pack")
+    m = re.search(r"- if: github\.event_name == 'merge_group'\n(?:\s+\S.*\n)*?\s+run: python tools/check_pack\.py --head-message\n", job)
+    assert m, "check_pack job lacks the merge_group --head-message step"

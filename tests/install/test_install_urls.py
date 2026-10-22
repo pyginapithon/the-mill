@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 OLD_PROJECT = "gitlab" + ".com/pyginapithon"
 GITLAB_RAW = "/-/" + "raw/"
-RAW = "https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/"
+RAW = "https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/"
 
 
 def _tracked() -> list[str]:
@@ -41,3 +41,30 @@ def test_install_one_liners_use_github_raw() -> None:
         assert RAW + "bootstrap.sh" in text, rel
     for rel in ("scripts/install.cmd", "agent_coord/install/scripts/install.cmd"):
         assert RAW + "bootstrap.ps1" in (ROOT / rel).read_text(encoding="utf-8"), rel
+
+
+# #810: the repo moved from the personal account to the si4ai org. The old
+# path still redirects, but links and one-liners name the org. Assembled so
+# this file passes its own scan.
+OLD_GITHUB = ("github.com/", "githubusercontent.com/")
+OLD_OWNER_REPO = "pygin" + "apithon/the-mill"
+
+
+def test_no_tracked_file_points_at_the_old_github_owner() -> None:
+    bad = []
+    for rel in _tracked():
+        path = ROOT / rel
+        if not path.is_file() or rel == "CHANGELOG.md":
+            continue
+        text = path.read_bytes().decode("utf-8", "replace")
+        for host in OLD_GITHUB:
+            if host + OLD_OWNER_REPO in text:
+                bad.append(f"{rel}: {host}")
+    assert not bad, bad
+
+
+def test_pyproject_urls_name_the_org_repo() -> None:
+    text = (ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    assert "[project.urls]" in text
+    assert 'Source = "https://github.com/si4ai/the-mill"' in text
+    assert 'Issues = "https://github.com/si4ai/the-mill/issues"' in text

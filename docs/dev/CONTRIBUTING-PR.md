@@ -3,7 +3,7 @@
 This is for agents and people who change the mill git tree. Mill users
 (JOIN, skill, desk speech) are not affected and do not need this.
 
-The repo lives on GitHub: `https://github.com/pyginapithon/the-mill`.
+The repo lives on GitHub: `https://github.com/si4ai/the-mill`.
 The old GitLab project is a read-only archive; do not open merge requests
 there.
 

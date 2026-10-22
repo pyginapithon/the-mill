@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # mill empty-machine bootstrap (Linux / WSL) - silent CLI, no installer wizards.
 # Agents: run this file once. Do not execute it line by line.
-# curl -fsSL https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/bootstrap.sh -o install.sh && bash install.sh && rm -f install.sh
+# curl -fsSL https://raw.githubusercontent.com/si4ai/the-mill/main/scripts/bootstrap.sh -o install.sh && bash install.sh && rm -f install.sh
 # Chicken-egg: machine may have no mill/python. Agent runs this (not a HUMAN wizard).
 # WSL: do NOT hijack Windows MySQL on 127.0.0.1:3306 (mill install preflight enforces).
 set -euo pipefail

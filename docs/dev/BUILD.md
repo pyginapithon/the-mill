@@ -4,7 +4,7 @@ This is for people who **change mill** (the git tree). App users do not build - 
 
 Do not pin mill versions in docs.
 
-**Builds between releases.** The version number changes only at the bump, so a build from a later `main` sha still reports the last release (for example `0.7.8`) in replies and on the Wall. `mill --version` adds `+g<sha7>` when it can tell the commit: run from a git checkout (its HEAD), or installed with `pip install "git+https://github.com/pyginapithon/the-mill@<sha>"` (pip records the commit). A wheel, sdist or plain-folder install of a main sha prints the bare number, so record the sha you installed from. Regression row F61 (dev-version).
+**Builds between releases.** The version number changes only at the bump, so a build from a later `main` sha still reports the last release (for example `0.7.8`) in replies and on the Wall. `mill --version` adds `+g<sha7>` when it can tell the commit: run from a git checkout (its HEAD), or installed with `pip install "git+https://github.com/si4ai/the-mill@<sha>"` (pip records the commit). A wheel, sdist or plain-folder install of a main sha prints the bare number, so record the sha you installed from. Regression row F61 (dev-version).
 
 ## Release order
 
@@ -152,7 +152,7 @@ Dry run: run `release.yml` by hand (`workflow_dispatch`). It runs every `ci` job
 
 Setup, once per project (the human office owner):
 
-- On PyPI, project `the-mill` -> Publishing -> add a trusted publisher (GitHub): owner `pyginapithon`, repository `the-mill`, workflow `release.yml`, environment `pypi`. The workflow file name and the environment name are part of the trust; renaming either breaks publishing.
+- On PyPI, project `the-mill` -> Publishing -> add a trusted publisher (GitHub): owner `si4ai`, repository `the-mill`, workflow `release.yml`, environment `pypi`. The workflow file name and the environment name are part of the trust; renaming either breaks publishing.
 - After the first trusted release, revoke any old PyPI API token for the project.
 - GitHub environment `pypi` (required reviewer, deployment tags `v*`), and the `main` and `v*` rulesets. These are repo settings, not files.
 

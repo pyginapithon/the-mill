@@ -906,6 +906,61 @@ def scan_git_messages(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
     return fails
 
 
+def scan_head_message(pats: tuple[re.Pattern[str], ...] = ()) -> list[str]:
+    """The HEAD commit message alone, every message rule (#810, F109).
+
+    In the GitHub merge queue HEAD is the squash commit that lands on main
+    as is, so its message is scanned before it gets there: the private and
+    local names, addresses, home paths, emails and the name-token rule. The
+    name-token rule runs here whatever the cut, so a shallow clone checks it
+    too. The report is the hash, not the message.
+    """
+    root = mill_root()
+    try:
+        raw = subprocess.check_output(
+            ["git", "log", "-1", "--format=%H%x1f%ae%x1e%B", "HEAD"],
+            cwd=root,
+            stderr=subprocess.DEVNULL,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return ["cannot read the HEAD commit message (failing closed)"]
+    head, _, body = raw.decode("utf-8", "replace").partition("\x1e")
+    rev, _, author = head.strip().partition("\x1f")
+    where = f"the queued message {rev[:12]}"
+    bot = is_dependabot_commit(author, body)
+    body = strip_bot_trailers(body)
+    fails: list[str] = []
+    if _has_local_home_user(body, pats):
+        fails.append(f"local home-user name in {where}")
+    if text_has_forbidden_address(body):
+        fails.append(f"non-documentation address in {where}")
+    if text_has_personal_home_path(body):
+        fails.append(f"home path with a login name in {where}")
+    if text_has_personal_email(body):
+        fails.append(f"email outside placeholder domains in {where}")
+    if not bot and text_has_personal_name_token(name_scan_text(author, body), ordinary_words(root)):
+        fails.append(f"personal name token in {where}")
+    return fails
+
+
+def head_message_main() -> int:
+    """check_pack.py --head-message: the merge-queue step (no dist needed)."""
+    names = private_names()
+    if not names and private_names_required():
+        print(f"FAIL: CI needs the {PRIVATE_NAMES_ENV} secret for the queued-message scan (fail-closed)")
+        return 1
+    pats = _home_user_regexes(tuple(sorted(set(local_home_user_names()) | set(names), key=str.casefold)))
+    fails = scan_head_message(pats)
+    if fails:
+        print(f"FAIL: {len(fails)} issue(s) in the HEAD commit message")
+        for f in fails:
+            print(f"  - {f}")
+        print("Fix the PR title or body (the squash message) and queue it again.")
+        return 1
+    print("OK: the HEAD commit message passed the message rules.")
+    return 0
+
+
 def _under_agent_coord(member: str, kind: str) -> bool:
     n = member.replace("\\", "/")
     if kind == "wheel":
@@ -1080,8 +1135,10 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__.strip())
         print()
-        print("usage: python tools/check_pack.py dist | <wheel> <sdist>")
+        print("usage: python tools/check_pack.py dist | <wheel> <sdist> | --head-message")
         return 0 if argv and argv[0] in ("-h", "--help") else 2
+    if argv == ["--head-message"]:
+        return head_message_main()
 
     whl, sdist = resolve_artifacts(argv)
     all_fails: list[str] = []
