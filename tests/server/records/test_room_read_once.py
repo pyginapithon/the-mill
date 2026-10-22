@@ -86,7 +86,7 @@ def test_outsider_refusal_text_unchanged(cn, room):
         rpc._h_mail_thread(room["book"], {"scope": "room", "mail_id": room["ids"][3]}, "ro", "ro_out")
     assert str(ei.value) == (
         "mail-thread: not a participant in this room; "
-        f"run mill reply {room['ids'][0]} <body> to join, "
+        f"run mill reply {room['ids'][0]} --body-file PATH to join, "
         "or ask a participant to mill add you at a letter of it"
     )
 
