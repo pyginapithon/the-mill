@@ -50,7 +50,7 @@ python tools/orphan_scan.py --root path/to/the-mill
 
 One orphan per line: `module<TAB>repo-relative-path`. A count goes to stderr. Exit 0.
 
-It starts from `pyproject.toml` console scripts (`mill`, `mill-mcp`), every `tests/` import, and `python -m agent_coord...` strings. Importing a package counts that package's `__init__.py` imports. `from . import name` counts the submodule. A file loaded by path (`spec_from_file_location`) counts too.
+It starts from `pyproject.toml` console scripts (`mill`, `mill-hold`, `agent-coord`), every `tests/` import, and `python -m agent_coord...` strings. Importing a package counts that package's `__init__.py` imports. `from . import name` counts the submodule. A file loaded by path (`spec_from_file_location`) counts too.
 
 `web/wall_ui_save/` is a snapshot and is not scanned.
 

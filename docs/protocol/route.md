@@ -124,7 +124,7 @@ bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill route rm 
 - `list` prints this desk's chain in order, one line each: the key, then the program or `suppress`.
 - `rm KEY` removes that one key. A missing key is an error and does not clear the list. Other desks are not touched.
 
-Durable chain: `~/.mill/session/<desk>.route` (`key = value` lines, file order is chain order). mill connect re-reads it on every frame. No mill connect restart. No mill_wait.
+Durable chain: `~/.mill/session/<desk>.route` (`key = value` lines, file order is chain order). mill connect re-reads it on every frame. No mill connect restart.
 
 mill connect has no catch-all flag. A catch-all is the route key `*`: `mill route add "*" -- <program>` (quote `*` so the shell does not expand it). mill route is the chain agents mutate.
 
