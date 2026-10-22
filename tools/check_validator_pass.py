@@ -12,7 +12,8 @@ head) and requires the latest `validator` commit status on each PR's head
 sha to be success. Anything else, or no PR found, fails.
 
 Only statuses the Validator GitHub App posted count (#811, F111): creator
-login exactly VALIDATOR_LOGIN. Anyone with write access can post a
+login exactly VALIDATOR_LOGIN and creator type exactly VALIDATOR_TYPE
+("Bot", #663). Anyone with write access can post a
 `validator` status, so a status from any other creator is ignored, neither
 pass nor fail. Statuses are read from the full list for the exact head sha
 (the combined status keeps one per context, from any creator).
@@ -36,6 +37,8 @@ from typing import Callable
 CONTEXT = "validator"
 # The one creator the gate trusts: the si4ai-validator GitHub App (App ID 5431726).
 VALIDATOR_LOGIN = "si4ai-validator[bot]"
+# and its user object type: an app's bot user is "Bot", a person or token seat "User" (#663).
+VALIDATOR_TYPE = "Bot"
 PER_PAGE = 100
 MAX_PAGES = 10  # GitHub keeps at most 1000 statuses per sha and context
 QUEUE_REF_RE = re.compile(r"^(?:refs/heads/)?gh-readonly-queue/[^/]+(?:/[^/]+)*/pr-(\d+)-[0-9a-f]{40}$")
@@ -74,7 +77,7 @@ def queue_prs(event: dict, repo: str, fetch: Fetch) -> list[int]:
 
 
 def validator_state(repo: str, sha: str, fetch: Fetch) -> str:
-    """Latest `validator` status on sha posted by VALIDATOR_LOGIN:
+    """Latest `validator` status on sha posted by VALIDATOR_LOGIN (type Bot):
     success, failure, error, pending or missing. Other creators are ignored."""
     counted: list[tuple[int, int, str]] = []
     pos = 0
@@ -86,7 +89,10 @@ def validator_state(repo: str, sha: str, fetch: Fetch) -> str:
             pos += 1
             if not isinstance(st, dict) or st.get("context") != CONTEXT:
                 continue
-            if str((st.get("creator") or {}).get("login", "")) != VALIDATOR_LOGIN:
+            creator = st.get("creator") or {}
+            if not isinstance(creator, dict):
+                continue
+            if str(creator.get("login", "")) != VALIDATOR_LOGIN or creator.get("type") != VALIDATOR_TYPE:
                 continue
             url = st.get("url")
             if url is not None and not str(url).endswith(f"/statuses/{sha}"):

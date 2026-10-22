@@ -162,7 +162,8 @@ satisfy (F110, F111, F112):
 - The old `validator_pass` check (`.github/workflows/validator.yml`)
   still runs and is still required. It runs the queued commit's own
   workflow and script, so a PR could edit its own gate; the app-pinned
-  check closes that. Until it goes: on `pull_request` it only reports and
+  check closes that. It counts only a `validator` status whose creator is
+  `si4ai-validator[bot]` with creator type `Bot`. Until it goes: on `pull_request` it only reports and
   stays green (the PR must stay enqueue-able), with its log line,
   `::notice` annotation and job summary starting `WAITING:` or `REPORT:`,
   so green there is not a PASS; on `merge_group` it enforces, fail-closed.

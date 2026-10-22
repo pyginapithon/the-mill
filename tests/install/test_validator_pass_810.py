@@ -35,7 +35,7 @@ def _fake(states: dict[str, list[tuple[str, str]]], subjects: list[str]):
                 return {"number": n, "head": {"sha": sha}}
             if path == f"/repos/{REPO}/commits/{sha}/statuses?per_page=100&page=1":
                 # newest first, posted by the Validator app (#811)
-                return [{"context": c, "state": st, "creator": {"login": BOT}} for c, st in states.get(sha, [])]
+                return [{"context": c, "state": st, "creator": {"login": BOT, "type": "Bot"}} for c, st in states.get(sha, [])]
         raise AssertionError(path)
 
     return fetch, seen

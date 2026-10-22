@@ -30,8 +30,13 @@ def _mod():
     return mod
 
 
-def _st(sha: str, state: str, login: str, sid: int, context: str = "validator") -> dict:
-    return {"id": sid, "context": context, "state": state, "creator": {"login": login},
+def _st(sha: str, state: str, login: str, sid: int, context: str = "validator",
+        ctype: str | None = None) -> dict:
+    # GitHub's user object: type "Bot" for an app's bot user, else "User".
+    if ctype is None:
+        ctype = "Bot" if login.endswith("[bot]") else "User"
+    creator = {"login": login, "type": ctype} if ctype else {"login": login}
+    return {"id": sid, "context": context, "state": state, "creator": creator,
             "url": f"https://api.github.com/repos/{REPO}/statuses/{sha}"}
 
 
@@ -82,6 +87,24 @@ def test_pat_user_success_is_rejected() -> None:
 
 def test_bot_success_is_accepted() -> None:
     rc, lines = _gate({HEAD: [_st(HEAD, "success", BOT, 10)]})
+    assert rc == 0, lines
+
+
+def test_bot_login_with_user_type_is_rejected() -> None:
+    """The login alone is not enough: the creator type must be Bot (#663)."""
+    rc, lines = _gate({HEAD: [_st(HEAD, "success", BOT, 10, ctype="User")]})
+    assert rc == 1, lines
+    assert any(ln.startswith("FAIL") and f"PR #{PR}" in ln for ln in lines), lines
+
+
+def test_bot_login_without_a_creator_type_is_rejected() -> None:
+    rc, lines = _gate({HEAD: [_st(HEAD, "success", BOT, 10, ctype="")]})
+    assert rc == 1, lines
+
+
+def test_user_type_failure_over_a_bot_success_is_ignored() -> None:
+    """A status with the bot login but type User neither passes nor fails."""
+    rc, lines = _gate({HEAD: [_st(HEAD, "failure", BOT, 11, ctype="User"), _st(HEAD, "success", BOT, 10)]})
     assert rc == 0, lines
 
 
