@@ -1,4 +1,4 @@
-# PR and issue text hygiene (#723, F91). GitHub keeps every revision of a PR
+# PR and issue text hygiene (#723, F94). GitHub keeps every revision of a PR
 # or issue body in its edit history, so text is scanned when it is posted.
 # The text is untrusted input: tools/check_pr_text.py reads it from the event
 # JSON file or the API. No workflow expression puts event text into a shell

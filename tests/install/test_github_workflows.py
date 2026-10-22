@@ -306,14 +306,14 @@ def test_pack_uses_the_reproducible_backend_and_spdx_license() -> None:
 
 
 def test_no_expression_in_any_run_line() -> None:
-    """F91: event text (PR title, body, comments) is untrusted. No run: line in
+    """F94: event text (PR title, body, comments) is untrusted. No run: line in
     any workflow expands a ${{ }} expression; values reach a shell only by env."""
     bad = [f"{p.name}: {ln}" for p in _workflows() for ln in _run_lines(p) if "${{" in ln]
     assert not bad, bad
 
 
 def test_pr_text_scans_every_posted_text_read_only() -> None:
-    """F91: PR and issue title, body and comments are scanned when posted and daily."""
+    """F94: PR and issue title, body and comments are scanned when posted and daily."""
     text = (WF / "pr_text.yml").read_text(encoding="utf-8")
     on = _on(text)
     assert "pull_request:\n    types: [opened, edited, synchronize, reopened]" in on, on

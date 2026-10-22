@@ -1,4 +1,4 @@
-"""#723 (F91): PR and issue text get the commit-message hygiene rules."""
+"""#723 (F94): PR and issue text get the commit-message hygiene rules."""
 from __future__ import annotations
 
 import json
