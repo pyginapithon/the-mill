@@ -2060,7 +2060,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         peer = (self.client_address or ("", 0))[0]
                         from agent_coord.server.admin.guard import mark_host
 
-                        mark_host(data, peer)
+                        fwd = (self.headers.get("x-forwarded-for") or "").strip()
+                        mark_host(data, peer, forwarded=bool(fwd))
                         row = dispatch(c, data, token=token)
                         acting = str(getattr(c, "acting_desk", "") or "")
                         if verb == "join" and isinstance(row, dict):
