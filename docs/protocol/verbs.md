@@ -384,8 +384,8 @@ Trust default **high**; Admin may set **limited** (or back to high). Show: `mill
 | **`reclaim`** | Admin: undelete a retired name (name twice + `--yes`). Acts on the TYPE named (F60). A retired desk comes back with no seat: `invite --seat` it (F65). | `mill_name_reclaim` |
 | **`rename`** | Admin (or desk self-rename by hash). Acts on the TYPE named (F60). | `mill_name_rename` |
 | **`retire`** | Admin: flag `name.deleted`. A desk retired this way also loses its seat, so that seat stops connecting (F65). Acts on the TYPE named: `retire label d1` leaves desk `d1` alone, as a desk-focus label needs; a request with no type for a name two types share is refused with both forms (F60). | `mill_name_retire` |
-| **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only | `mill_member_put` |
-| **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident | `mill_member_delete` |
+| **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only, in any spelling of the name (#675) | `mill_member_put`; Admin: `mill_member_admin_put` |
+| **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident. `Admin` revoke = host loopback and an Admin caller, in any spelling (#675) | `mill_member_delete`; Admin: `mill_member_admin_delete` |
 | **`trust`** | show office trust (any seated desk). `mill trust high` / `mill trust limited` = Admin set. Pack/wall must ship verb first | - |
 
 **Always Admin (either trust):** invite; rename/retire/reclaim/reset; `mill trust high` / `mill trust limited`; `Admin` grant/revoke via **host loopback only** (`mill join --Admin` does not grant; connect-on-host does not grant).

@@ -715,7 +715,13 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     target = _stored(str(body.get("desk") or owner or ""))
     self_desk = _stored(owner or "")
     g = _stored(group)
-    admin_slot = bool(g) and g == CONST_ADMIN
+    # #675: the name table matches any case or accent, so gate on the roster the
+    # name resolves to, not the raw string. SQL refuses Admin on the generic path.
+    from agent_coord.server.admin.guard import is_admin_roster
+
+    admin_slot = bool(g) and is_admin_roster(getattr(c, "_cn", None), g)
+    if admin_slot:
+        g = CONST_ADMIN
     if admin_slot and not body.get("host"):
         raise CoordError(f"{CONST_ROSTER} {CONST_ADMIN}: office host only (loopback)")
     if admin_slot and verb == "member-remove":
@@ -731,13 +737,19 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
         was_admin = is_role_admin(c._cn, target)
     slot_kind = CONST_ROSTER
     if verb == "member-add":
-        rows = rec_member.put(c._cn, g, target, slot_kind)
+        if admin_slot:
+            rows = rec_member.put_admin(c._cn, target)
+        else:
+            rows = rec_member.put(c._cn, g, target, slot_kind)
         # Name the desk and roster, not only ids (#274).
         rows = [{"desk": target, "roster": g, "op": "added", **dict(r)} for r in (rows or [])]
         if admin_slot and not was_admin:
             _mail_role_admin(c, project, owner, target, added=True)
     else:
-        rows = rec_member.delete(c._cn, g, target, slot_kind)
+        if admin_slot:
+            rows = rec_member.delete_admin(c._cn, target)
+        else:
+            rows = rec_member.delete(c._cn, g, target, slot_kind)
         if admin_slot and was_admin:
             _mail_role_admin(c, project, owner, target, added=False)
     return rows

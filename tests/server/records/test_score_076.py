@@ -157,7 +157,7 @@ def test_retire_by_admin_and_legacy_owner(cn) -> None:
     seed_names(cn, ("s76g", "roster"), ("Admin", "roster"), ("ad", "desk"), ("own", "desk"), ("rec", "desk"))
     from agent_coord.server.records import member as rec_member
 
-    rec_member.put(cn, "Admin", "ad", "roster")
+    rec_member.put_admin(cn, "ad")
     rpc._h_score(_Book(cn), {"name": "a", "value": "1"}, "s76g", "rec")
     rec_score.upsert(cn, "s76g", "own", "legacy", "7", "", "")
     assert rpc._h_score(_Book(cn), {"name": "legacy", "retire": True}, "s76g", "own")["retired"] is True
