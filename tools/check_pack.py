@@ -329,7 +329,7 @@ DESK_WORD_ALLOWLIST = frozenset(
         "issue", "issues", "item", "items", "its", "join",
         "keep", "key", "label", "labels", "lan", "large",
         "last", "later", "least", "left", "letter", "letters",
-        "like", "linux", "list", "load", "local", "lock",
+        "like", "linux", "live", "list", "load", "local", "lock",
         "log", "loop", "loops", "mail", "main", "make",
         "mark", "measure", "merge", "message", "messages", "mill",
         "miss", "move", "must", "mysql", "name", "names",
