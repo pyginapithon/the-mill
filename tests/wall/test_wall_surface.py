@@ -46,7 +46,7 @@ MAIL_PAINT = ROOT / "default" / "mail" / "mail-paint.js"
 HTML_PINS = {
     "boot.js": "wow313",
     "board.css": "wow299",
-    "lazy.js": "wow307",
+    "lazy.js": "wow311",
     "shell.css": "wow269",
     "shell-early.js": "wow281",
     "theme.css": "wow165",
@@ -63,7 +63,7 @@ LAZY_PINS = (
     "/todo/todo.js?v=wow182",
     "/mail/mail.css?v=wow238",
     "/score/score.css?v=wow238",
-    "/todo/todo.css?v=wow238",
+    "/todo/todo.css?v=wow311",
 )
 PERF_PIN = "/lib/perf.js?v=wow162"
 

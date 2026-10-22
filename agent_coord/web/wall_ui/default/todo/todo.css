@@ -118,13 +118,16 @@
     }
     body[data-text-mode="clip"] table td,
     body[data-text-mode="clip"] .card,
-    body[data-text-mode="clip"] .mail-col,
+    body[data-text-mode="clip"] #pane-todo .mail-col,
     body[data-text-mode="clip"] .floor-detail {
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    /* #772: this sheet loads with TODO but stays for the session, so a bare .mail-col
+       here also hit MAIL: the thread column lost its scroll once TODO had been opened.
+       The .mail-col part is scoped to the TODO pane. */
     body[data-text-mode="wrap"] table td,
     body[data-text-mode="wrap"] .card,
-    body[data-text-mode="wrap"] .mail-col {
+    body[data-text-mode="wrap"] #pane-todo .mail-col {
       white-space: normal; overflow: hidden;
     }
     body[data-text-mode="overflow"] table td,
