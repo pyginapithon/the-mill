@@ -1494,7 +1494,7 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
         if room.tree_id and _open_room(room.tree):
             raise CoordError(
                 "mail-thread: not a participant in this room; "
-                f"run mill reply {root_id} <body> to join, "
+                f"run mill reply {root_id} --body-file PATH to join, "
                 "or ask a participant to mill add you at a letter of it"
             )
         # Private letter or a room opened from one: no open-join (#sec S-3).
@@ -2843,7 +2843,7 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                     if root_mail and _mail_open_room(c, int(i)):
                         raise CoordError(
                             "trail: not a participant in this room; "
-                            f"run mill reply {root_mail} <body> to join, "
+                            f"run mill reply {root_mail} --body-file PATH to join, "
                             "or ask a participant to mill add you at a letter of it"
                         )
                     # Private letter or a room opened from one: no open-join (#sec S-3).
