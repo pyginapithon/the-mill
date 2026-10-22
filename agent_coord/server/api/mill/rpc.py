@@ -1169,6 +1169,28 @@ def _mail_reader(c: Book, mail_id: int, owner: str | None) -> bool:
     return rec_mail.room_participant(c._cn, int(mail_id), me)
 
 
+def _ends_read(fn):
+    """End the read transaction when a read verb returns (#672).
+
+    The participant check used to commit as a side effect. With no check left,
+    a read verb must not leave a snapshot or metadata lock open on a pooled
+    connection (a later DDL or migrate would wait on it).
+    """
+    import functools
+
+    @functools.wraps(fn)
+    def run(c, *a, **k):
+        try:
+            return fn(c, *a, **k)
+        finally:
+            try:
+                c._cn.commit()
+            except Exception:
+                pass
+
+    return run
+
+
 def _read_redact(text: str) -> str:
     """Store-policy redaction on a read path (#672, S-3/S-6).
 
@@ -1453,6 +1475,7 @@ def _ids_in_tree_order(nodes: list[dict], ids: list[int], extra: int = 0) -> lis
     return [i for i in order if i in have]
 
 
+@_ends_read
 def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """Read a room by mail id or TREE/room name. Lean MAIL rows only (no opened).
 
@@ -2698,6 +2721,7 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
     return {"label": stored, "hint": "", "rows": rows, "truncated": truncated}
 
 
+@_ends_read
 def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """Read-only branch under a mail or todo: mail + todo children, any depth.
 
