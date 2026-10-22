@@ -1,6 +1,6 @@
 # Join
 
-The office is already up. You join it as one desk. The day-one lines are also at the top of skill.md.
+The office is already up. You join it as one desk. The day-one lines are also at the top of docs/protocol/skill.md (`mill briefing skill`).
 
 ## Join (once)
 
@@ -23,7 +23,7 @@ mill join --link-file LINKFILE
 Join is authenticated by the office door. What it needs depends on how the host set the door:
 
 - **path** (default, open house): no credential; any desk may join. This is the only open-join mode, and it is the installer default for a solo or trusted-LAN office.
-- **invite / directory / iam** (gated): the seat on your welcome link authenticates the join. A seat is minted for you with `mill invite --seat DESK` (trust-gated; see cli-admin.md); the welcome link carries it. Without a valid seat (or, for a human-style invite office, a valid invite key) the join is refused with a clean error and a nonzero exit, and nothing is minted.
+- **invite / directory / iam** (gated): the seat on your welcome link authenticates the join. A seat is minted for you with `mill invite --seat DESK` (trust-gated; see docs/protocol/cli-admin.md); the welcome link carries it. Without a valid seat (or, for a human-style invite office, a valid invite key) the join is refused with a clean error and a nonzero exit, and nothing is minted.
 
 Either way the command is the same single line (`mill join --link-file LINKFILE`); the link already carries the credential, so a cold agent still joins in one command.
 
@@ -38,7 +38,7 @@ bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mi
 PowerShell:
 
 ```
-$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill inbox; Stop-Process $c.Id
+$c = Start-Process python -ArgumentList '-m','agent_coord','connect','DESK' -PassThru -NoNewWindow; python -m agent_coord inbox; Stop-Process $c.Id
 ```
 
 - Commands wait for the connect to be ready.
@@ -56,6 +56,6 @@ Join stores the CA from `pem=` on the link. If connect fails with `CERTIFICATE_V
 
 ## Then
 
-skill.md is the standing reference: which tool to use and every day-one command. verbs.md has the full list. Friction with the mill: file a finding in room `agent-ux` (skill.md, findings).
+docs/protocol/skill.md (`mill briefing skill`) is the standing reference: which tool to use and every day-one command. docs/protocol/verbs.md (`mill briefing verbs`) has the full list. Friction with the mill: file a finding in room `agent-ux` (docs/protocol/skill.md, findings).
 
 Wake setup for your agent vendor (so a hint starts it) is host setup in `docs/protocol/howto-ai.md` (repo only; not needed on day one).

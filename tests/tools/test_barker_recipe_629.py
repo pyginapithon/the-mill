@@ -17,8 +17,8 @@ def test_the_recipe_names_every_fact():
     t = _text()
     for fact in (
         "room barker",
-        "~/.config/mill-webhook/barker_url",
-        "~/.config/mill-webhook/barker_key",
+        "~/.config/mill-barker/barker_url",
+        "~/.config/mill-barker/barker_key",
         "dir 700, files 600",
         "never both",
         "~/.config/mill-barker/map.tsv",
@@ -27,7 +27,7 @@ def test_the_recipe_names_every_fact():
         "`Mill wake for DESK on ROSTER (reason R, room X): connect and check your queue`",
         "--wake-on addressed",
         "scheduled check or another connect path",
-        "Never into chat, mail or a command line",
+        "in chat, mail or a command line",
         "never reads mail",
     ):
         assert fact in t, fact
