@@ -11,6 +11,12 @@ branch name and the "(#N)" squash subjects between the base and the queued
 head) and requires the latest `validator` commit status on each PR's head
 sha to be success. Anything else, or no PR found, fails.
 
+Only statuses the Validator GitHub App posted count (#811, F111): creator
+login exactly VALIDATOR_LOGIN. Anyone with write access can post a
+`validator` status, so a status from any other creator is ignored, neither
+pass nor fail. Statuses are read from the full list for the exact head sha
+(the combined status keeps one per context, from any creator).
+
 pull_request: reports the `validator` state on the PR head and passes. The
 queue is the gate: a PR may wait for its PASS without a red check.
 
@@ -26,6 +32,10 @@ import urllib.request
 from typing import Callable
 
 CONTEXT = "validator"
+# The one creator the gate trusts: the si4ai-validator GitHub App (App ID 5431726).
+VALIDATOR_LOGIN = "si4ai-validator[bot]"
+PER_PAGE = 100
+MAX_PAGES = 10  # GitHub keeps at most 1000 statuses per sha and context
 QUEUE_REF_RE = re.compile(r"^(?:refs/heads/)?gh-readonly-queue/[^/]+(?:/[^/]+)*/pr-(\d+)-[0-9a-f]{40}$")
 SUBJECT_PR_RE = re.compile(r"\(#(\d+)\)\s*$")
 API = "https://api.github.com"
@@ -62,12 +72,29 @@ def queue_prs(event: dict, repo: str, fetch: Fetch) -> list[int]:
 
 
 def validator_state(repo: str, sha: str, fetch: Fetch) -> str:
-    """Latest `validator` status on sha: success, failure, error, pending or missing."""
-    combined = fetch(f"/repos/{repo}/commits/{sha}/status?per_page=100")
-    for st in (combined or {}).get("statuses", []) if isinstance(combined, dict) else []:
-        if st.get("context") == CONTEXT:
-            return str(st.get("state", "missing"))
-    return "missing"
+    """Latest `validator` status on sha posted by VALIDATOR_LOGIN:
+    success, failure, error, pending or missing. Other creators are ignored."""
+    counted: list[tuple[int, int, str]] = []
+    pos = 0
+    for page in range(1, MAX_PAGES + 1):
+        batch = fetch(f"/repos/{repo}/commits/{sha}/statuses?per_page={PER_PAGE}&page={page}")
+        if not isinstance(batch, list):
+            break
+        for st in batch:
+            pos += 1
+            if not isinstance(st, dict) or st.get("context") != CONTEXT:
+                continue
+            if str((st.get("creator") or {}).get("login", "")) != VALIDATOR_LOGIN:
+                continue
+            url = st.get("url")
+            if url is not None and not str(url).endswith(f"/statuses/{sha}"):
+                continue
+            sid = st.get("id")
+            # newest first: the highest id, else the first listed
+            counted.append((sid if isinstance(sid, int) else -1, -pos, str(st.get("state", "missing"))))
+        if len(batch) < PER_PAGE:
+            break
+    return max(counted)[2] if counted else "missing"
 
 
 def run(event_name: str, event: dict, repo: str, fetch: Fetch, out=print) -> int:
