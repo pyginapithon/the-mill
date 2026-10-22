@@ -450,7 +450,9 @@ def check(token: str) -> bool:
 
     # Board knows this token but it is revoked/expired -> fail closed (do not honor legacy hash).
 
-    if _board_knows_token(plain):
+    # Board unreadable (book down or query raised) -> fail closed too (#652).
+
+    if _board_knows_token(plain) is not False:
 
         return False
 
@@ -474,7 +476,9 @@ def check(token: str) -> bool:
 
 
 
-def _board_knows_token(token: str) -> bool:
+def _board_knows_token(token: str) -> bool | None:
+
+    """True if mill_invite has this token, False if it does not, None if the board cannot be read."""
 
     digest = _digest(token)
 
@@ -482,7 +486,7 @@ def _board_knows_token(token: str) -> bool:
 
     if cn is None:
 
-        return False
+        return None
 
     try:
 
@@ -500,7 +504,7 @@ def _board_knows_token(token: str) -> bool:
 
     except Exception:
 
-        return False
+        return None
 
     finally:
 
