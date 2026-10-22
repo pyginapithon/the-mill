@@ -18,7 +18,9 @@ pass nor fail. Statuses are read from the full list for the exact head sha
 (the combined status keeps one per context, from any creator).
 
 pull_request: reports the `validator` state on the PR head and passes. The
-queue is the gate: a PR may wait for its PASS without a red check.
+queue is the gate: a PR may wait for its PASS without a red check. The line
+starts WAITING (no verdict, or not success) or REPORT, never OK, and goes to
+a ::notice annotation and the job summary too, so green is not read as PASS.
 
 The report names PR numbers, shas and states, never PR text.
 """
@@ -97,7 +99,25 @@ def validator_state(repo: str, sha: str, fetch: Fetch) -> str:
     return max(counted)[2] if counted else "missing"
 
 
-def run(event_name: str, event: dict, repo: str, fetch: Fetch, out=print) -> int:
+def pr_stage_line(sha: str, state: str) -> tuple[str, str]:
+    """The pull_request line: never reads as a pass, the queue enforces (#811)."""
+    tail = "(report only; merge queue enforces)"
+    if state == "success":
+        return f"REPORT: {VALIDATOR_LOGIN} success on {sha} {tail}", "report"
+    if state == "missing":
+        return f"WAITING: no {VALIDATOR_LOGIN} verdict on {sha} yet {tail}", "waiting"
+    return f"WAITING: {VALIDATOR_LOGIN} verdict on {sha} is {state} {tail}", "waiting"
+
+
+def append_step_summary(text: str) -> None:
+    path = os.environ.get("GITHUB_STEP_SUMMARY", "")
+    if path:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text)
+
+
+def run(event_name: str, event: dict, repo: str, fetch: Fetch, out=print,
+        summary: Callable[[str], None] | None = None) -> int:
     if event_name == "merge_group":
         prs = queue_prs(event, repo, fetch)
         if not prs:
@@ -123,8 +143,12 @@ def run(event_name: str, event: dict, repo: str, fetch: Fetch, out=print) -> int
         pr = event.get("pull_request") or {}
         sha = str((pr.get("head") or {}).get("sha", ""))
         state = validator_state(repo, sha, fetch) if re.fullmatch(r"[0-9a-f]{40}", sha) else "missing"
-        out(f"PR #{pr.get('number')} head {sha[:12]}: {CONTEXT} {state}"
-            " (report only here; the merge queue requires success on this sha)")
+        line, title = pr_stage_line(sha, state)
+        out(line)
+        # an annotation, so the green check is not read as a pass
+        out(f"::notice title=validator_pass {title}::{line}")
+        if summary is not None:
+            summary(f"### validator_pass (PR #{pr.get('number')})\n\n{line}\n")
         return 0
     out(f"nothing to check on {event_name}")
     return 0
@@ -138,7 +162,7 @@ def main() -> int:
         return 2
     with open(path, encoding="utf-8") as f:
         event = json.load(f)
-    return run(os.environ.get("GITHUB_EVENT_NAME", ""), event, repo, http_fetch)
+    return run(os.environ.get("GITHUB_EVENT_NAME", ""), event, repo, http_fetch, summary=append_step_summary)
 
 
 if __name__ == "__main__":

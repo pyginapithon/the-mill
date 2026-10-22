@@ -118,3 +118,54 @@ def test_forged_statuses_cannot_push_the_bot_status_off_the_first_page() -> None
     spam = [_st(HEAD, "success", SEAT, 1000 - i) for i in range(150)]
     rc, lines = _gate({HEAD: spam + [_st(HEAD, "success", BOT, 10)]})
     assert rc == 0, lines
+
+
+def _pr_stage(by_sha, env_summary: list[str] | None = None):
+    fetch, _ = _fake(by_sha)
+    lines: list[str] = []
+    kw = {} if env_summary is None else {"summary": env_summary.append}
+    rc = _mod().run("pull_request", {"pull_request": {"number": PR, "head": {"sha": HEAD}}}, REPO, fetch,
+                    out=lines.append, **kw)
+    return rc, lines
+
+
+def test_pr_stage_without_a_verdict_says_waiting_not_pass() -> None:
+    # a forged success is no verdict either
+    summary: list[str] = []
+    rc, lines = _pr_stage({HEAD: [_st(HEAD, "success", SEAT, 10)]}, summary)
+    assert rc == 0, lines  # green: the PR must stay enqueue-able
+    want = f"WAITING: no {BOT} verdict on {HEAD} yet (report only; merge queue enforces)"
+    assert want in lines, lines
+    assert f"::notice title=validator_pass waiting::{want}" in lines, lines
+    assert not any(ln.startswith(("OK", "PASS")) for ln in lines), lines
+    assert any(want in s for s in summary), summary
+
+
+def test_pr_stage_names_a_failure_or_pending_verdict_as_waiting() -> None:
+    for state in ("failure", "pending", "error"):
+        rc, lines = _pr_stage({HEAD: [_st(HEAD, state, BOT, 10)]})
+        assert rc == 0, lines
+        want = f"WAITING: {BOT} verdict on {HEAD} is {state} (report only; merge queue enforces)"
+        assert want in lines and f"::notice title=validator_pass waiting::{want}" in lines, lines
+
+
+def test_pr_stage_with_a_bot_success_still_says_report_only() -> None:
+    rc, lines = _pr_stage({HEAD: [_st(HEAD, "success", BOT, 10)]})
+    assert rc == 0, lines
+    want = f"REPORT: {BOT} success on {HEAD} (report only; merge queue enforces)"
+    assert want in lines and f"::notice title=validator_pass report::{want}" in lines, lines
+
+
+def test_main_writes_the_pr_stage_line_to_the_job_summary(tmp_path, monkeypatch) -> None:
+    mod = _mod()
+    ev = tmp_path / "event.json"
+    ev.write_text('{"pull_request": {"number": %d, "head": {"sha": "%s"}}}' % (PR, HEAD), encoding="utf-8")
+    summ = tmp_path / "summary.md"
+    fetch, _ = _fake({HEAD: []})
+    monkeypatch.setattr(mod, "http_fetch", fetch)
+    monkeypatch.setenv("GITHUB_EVENT_PATH", str(ev))
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request")
+    monkeypatch.setenv("GITHUB_REPOSITORY", REPO)
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summ))
+    assert mod.main() == 0
+    assert f"WAITING: no {BOT} verdict on {HEAD} yet" in summ.read_text(encoding="utf-8")

@@ -96,4 +96,5 @@ def test_pull_request_reports_state_and_passes() -> None:
     ev = {"pull_request": {"number": 150, "head": {"sha": SHA[150]}}}
     rc, lines = _run("pull_request", ev, fetch)
     assert rc == 0
-    assert "PR #150" in lines[0] and "validator pending" in lines[0] and "report only" in lines[0], lines
+    assert lines[0].startswith("WAITING:") and SHA[150] in lines[0] and "is pending" in lines[0], lines
+    assert "report only; merge queue enforces" in lines[0], lines
