@@ -1,6 +1,8 @@
 DROP PROCEDURE IF EXISTS mill_member_put;
 DROP PROCEDURE IF EXISTS mill_member_delete;
 DROP PROCEDURE IF EXISTS mill_member_select;
+DROP PROCEDURE IF EXISTS mill_member_admin_put;
+DROP PROCEDURE IF EXISTS mill_member_admin_delete;
 
 DELIMITER //
 
@@ -21,6 +23,11 @@ BEGIN
   END IF;
   IF v_del IS NOT NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name retired: mill reclaim (mill host)';
+  END IF;
+  -- #675: the reserved Admin roster (id 2) is never reached by name. The name
+  -- collation matches any case or accent, so only mill_member_admin_put adds it.
+  IF v_id = 2 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'roster Admin: office host only (loopback)';
   END IF;
   SET v_d = MILL_NAME_GET('desk', p_desk);
   INSERT IGNORE INTO member (name_id, desk_id) VALUES (v_id, v_d);
@@ -46,11 +53,49 @@ BEGIN
   IF v_id = 1 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'cannot leave Office';
   END IF;
+  -- #675: off Admin only through mill_member_admin_delete (office host).
+  IF v_id = 2 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'roster Admin: office host only (loopback)';
+  END IF;
   DELETE FROM member WHERE name_id = v_id AND desk_id = v_d;
   IF ROW_COUNT() = 1 THEN
     UPDATE name SET n = IF(n > 0, n - 1, 0) WHERE id = v_id;
   END IF;
   SELECT p_desk AS desk, 'removed' AS op, (SELECT n FROM name WHERE id = v_id) AS n;
+END //
+
+-- #675: the office host Admin grant. The caller is the loopback member-add path
+-- only (rpc._h_member with a wall-set host flag); the roster is fixed to id 2.
+CREATE PROCEDURE mill_member_admin_put(
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  DECLARE v_d BIGINT UNSIGNED;
+  SET v_d = MILL_NAME_GET('desk', p_desk);
+  IF v_d IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name not found';
+  END IF;
+  INSERT IGNORE INTO member (name_id, desk_id) VALUES (2, v_d);
+  IF ROW_COUNT() = 1 THEN
+    UPDATE name SET n = n + 1 WHERE id = 2;
+  END IF;
+  SELECT 2 AS name_id, v_d AS desk_id, (SELECT n FROM name WHERE id = 2) AS n;
+END //
+
+CREATE PROCEDURE mill_member_admin_delete(
+  IN p_desk VARCHAR(64)
+)
+BEGIN
+  DECLARE v_d BIGINT UNSIGNED;
+  SELECT id INTO v_d FROM name WHERE type = 'desk' AND name = p_desk LIMIT 1;
+  IF v_d IS NULL THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name not found';
+  END IF;
+  DELETE FROM member WHERE name_id = 2 AND desk_id = v_d;
+  IF ROW_COUNT() = 1 THEN
+    UPDATE name SET n = IF(n > 0, n - 1, 0) WHERE id = 2;
+  END IF;
+  SELECT p_desk AS desk, 'removed' AS op, (SELECT n FROM name WHERE id = 2) AS n;
 END //
 
 CREATE PROCEDURE mill_member_select(
