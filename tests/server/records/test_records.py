@@ -133,8 +133,8 @@ def test_doing_stack_lands_on_the_join_row(cn) -> None:
         "WHERE n.type='desk' AND n.name=%s",
         ("stack",),
     )
-    assert stored == "a \\| b | present"
-    assert split(str(stored)) == ["a | b", "present"]
+    assert stored == "a \\| b"
+    assert split(str(stored)) == ["a | b"]
 
 
 def test_hold_unique(cn) -> None:
@@ -321,3 +321,25 @@ def test_tree_auto_and_named_plans(cn) -> None:
     rec_tree.delete(cn, "PROJECT_B_PLAN")
     todo.delete(cn, pid, "a")
     todo.delete(cn, cid, "a")
+
+
+def test_touch_bumps_the_seat_and_cleans_the_trail(cn) -> None:
+    from agent_coord.server.records.db import scalar
+
+    here.upsert(cn, "unit", "trail635", "", token_hash="c" * 64, doing="present")
+    cn.cursor().execute(
+        "UPDATE `join` j JOIN name n ON n.id = j.desk_id SET j.doing = %s, "
+        "j.updated = '2000-01-01' WHERE n.type='desk' AND n.name=%s",
+        ("todo | purpose | member | present", "trail635"),
+    )
+    cn.commit()
+    here.touch(cn, "unit", "trail635")
+    doing, updated = cn.cursor(), None
+    doing.execute(
+        "SELECT j.doing, j.updated FROM `join` j JOIN name n ON n.id = j.desk_id "
+        "WHERE n.type='desk' AND n.name=%s",
+        ("trail635",),
+    )
+    doing, updated = doing.fetchone()
+    assert doing == "purpose | present"
+    assert str(updated) > "2001"
