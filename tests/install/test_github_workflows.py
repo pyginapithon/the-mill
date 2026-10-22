@@ -259,7 +259,8 @@ def _perm_block(text: str) -> dict[str, str]:
 def test_permissions_are_minimal() -> None:
     """Top level read-only (release: none); id-token: write only in publish_pypi."""
     allowed_write = {("release.yml", "publish_pypi"): {"id-token": "write"},
-                     ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"}}
+                     ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"},
+                     ("pr_text.yml", "sweep"): {"contents": "read", "issues": "read", "pull-requests": "read"}}
     for p in _workflows():
         text = _code(p)
         top = _perm_block(text.split("\njobs:\n", 1)[0])
@@ -302,3 +303,26 @@ def test_pack_uses_the_reproducible_backend_and_spdx_license() -> None:
     assert py["project"]["license"] == "MIT"
     assert py["project"]["license-files"] == ["LICENSE"]
     assert "include build_backend/mill_build.py" in (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+
+def test_no_expression_in_any_run_line() -> None:
+    """F91: event text (PR title, body, comments) is untrusted. No run: line in
+    any workflow expands a ${{ }} expression; values reach a shell only by env."""
+    bad = [f"{p.name}: {ln}" for p in _workflows() for ln in _run_lines(p) if "${{" in ln]
+    assert not bad, bad
+
+
+def test_pr_text_scans_every_posted_text_read_only() -> None:
+    """F91: PR and issue title, body and comments are scanned when posted and daily."""
+    text = (WF / "pr_text.yml").read_text(encoding="utf-8")
+    on = _on(text)
+    assert "pull_request:\n    types: [opened, edited, synchronize, reopened]" in on, on
+    for ev in ("issues:", "issue_comment:", "pull_request_review_comment:", "pull_request_review:",
+               "schedule:", "workflow_dispatch:"):
+        assert f"\n  {ev}" in on, ev
+    code = _code(WF / "pr_text.yml")
+    assert "secrets." not in code and "write" not in code
+    assert re.search(r"github\.event\.[\w.]*(title|body)", code) is None
+    assert "python3 tools/check_pr_text.py event" in _job(code, "event")
+    assert "python3 tools/check_pr_text.py sweep" in _job(code, "sweep")
+    assert "pip" not in code

@@ -1,0 +1,61 @@
+# PR and issue text hygiene (#723, F91). GitHub keeps every revision of a PR
+# or issue body in its edit history, so text is scanned when it is posted.
+# The text is untrusted input: tools/check_pr_text.py reads it from the event
+# JSON file or the API. No workflow expression puts event text into a shell
+# line. Same rules as the commit-message scan, read-only token, no secrets,
+# checkout pinned to a full SHA, system Python, nothing installed.
+name: pr_text
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  issues:
+    types: [opened, edited]
+  issue_comment:
+    types: [created, edited]
+  pull_request_review_comment:
+    types: [created, edited]
+  pull_request_review:
+    types: [submitted, edited]
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-text-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  event:
+    if: github.event_name != 'schedule' && github.event_name != 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # Default branch tools for comment events; the PR merge commit for PR events.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools
+      - run: python3 tools/check_pr_text.py event
+
+  sweep:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: tools
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/check_pr_text.py sweep
