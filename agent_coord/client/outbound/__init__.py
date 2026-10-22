@@ -411,6 +411,11 @@ def body_from_args(args: Any) -> dict[str, Any]:
     if cmd in ("retire", "rename", "reclaim") and str(getattr(args, "kind", "") or "") in ("roster", "label", "desk"):
         # #537: the wall acts on the type named; a label may share its desk's name.
         body["name_type"] = str(args.kind)
+    if cmd in ("retire", "reclaim") and str(getattr(args, "kind", "") or "") == "todo":
+        # #19: retire / reclaim a card; project is the ROSTER, need the NEED (or a comma list).
+        body["name_type"] = "todo"
+        body.pop("slug", None)
+        body.pop("confirm", None)
     if verb == "todo" and bool(getattr(args, "done", False)):
         body["done"] = True
     if verb == "todo" and bool(getattr(args, "fixtures", False)):

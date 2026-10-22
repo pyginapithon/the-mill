@@ -218,6 +218,17 @@ def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
             args.retire_score = True
             args.yes = False
             return args
+        if args.kind == "todo":
+            # #19: mill retire todo ROSTER NEED[,NEED...] (asker or Admin); reclaim undoes it.
+            need = str(getattr(args, "score_name", "") or "").strip()
+            if not need:
+                raise CoordError("retire: mill retire todo ROSTER NEED")
+            confirm(f"retire todo {args.slug} {need}?", yes=yes, ask=ask)
+            args.project = args.slug
+            args.need = need
+            args.slug = ""
+            args.yes = False
+            return args
         if str(getattr(args, "score_name", "") or ""):
             raise CoordError(f"retire: {args.kind} takes one NAME")
         if args.kind == "desk":
@@ -231,6 +242,17 @@ def translate(args: Any, ask: Callable[[str], str] | None = None) -> Any:
         return args
 
     if cmd == "reclaim":
+        if args.kind == "todo":
+            need = str(getattr(args, "need", "") or "").strip()
+            if not need:
+                raise CoordError("reclaim: mill reclaim todo ROSTER NEED")
+            confirm(f"reclaim todo {args.slug} {need}?", yes=yes, ask=ask)
+            args.project = args.slug
+            args.slug = ""
+            args.yes = False
+            return args
+        if str(getattr(args, "need", "") or ""):
+            raise CoordError(f"reclaim: {args.kind} takes one NAME")
         confirm(f"reclaim {args.kind} {args.slug}?", yes=yes, ask=ask)
         args.confirm = args.slug
         args.yes = True

@@ -38,6 +38,9 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 | `unpark` | `mill unpark <roster> <need> [--parent-type mail|todo --parent-id N]` | Parked to open; needs a tree parent. |
 | `assign` | `mill assign <roster> <need> <desk>` | Put a named desk on an unassigned card; a claimed card is refused (no overwrite). Trust-gated: high any desk, limited Admin. To hand off your own card: `unclaim`, then `assign` (or the receiver runs `claim`). Regression row F47 (assign-handoff). |
 | `pass` | `mill pass <roster> <need> [--done \| --back]` | Claimed to shipped. `--done`: the asker moves shipped to done. `--back`: one stage back (done to shipped, shipped to claimed). A pass that does not fit the card is refused (F67). |
+| | `mill pass <roster> <need> --done` | Close a shipped card: the asker, or Admin when the asker is gone or idle; any other desk is refused and the error names the asker. NEED may be a comma list (`a,b,c`): one result row per card, and a bad card does not stop the rest (F103). |
+| | `mill retire todo <roster> <need> [--yes]` | Take a stale card off every `mill todo` list, `--done` included. The asker or Admin; asks y/N. NEED may be a comma list. The card, its trail and its history are kept (F103). |
+| | `mill reclaim todo <roster> <need> [--yes]` | Undo `retire todo`: the card comes back with the status it had. The asker or Admin; NEED may be a comma list (F103). |
 
 ## Hold
 
