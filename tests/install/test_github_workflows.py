@@ -260,7 +260,8 @@ def test_permissions_are_minimal() -> None:
     """Top level read-only (release: none); id-token: write only in publish_pypi."""
     allowed_write = {("release.yml", "publish_pypi"): {"id-token": "write"},
                      ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"},
-                     ("pr_text.yml", "sweep"): {"contents": "read", "issues": "read", "pull-requests": "read"}}
+                     ("pr_text.yml", "sweep"): {"contents": "read", "issues": "read", "pull-requests": "read"},
+                     ("validator.yml", "validator_pass"): {"contents": "read", "pull-requests": "read", "statuses": "read"}}
     for p in _workflows():
         text = _code(p)
         top = _perm_block(text.split("\njobs:\n", 1)[0])
@@ -345,3 +346,14 @@ def test_check_pack_scans_the_queued_squash_message() -> None:
     job = _job(_code(WF / "ci.yml"), "check_pack")
     m = re.search(r"- if: github\.event_name == 'merge_group'\n(?:\s+\S.*\n)*?\s+run: python tools/check_pack\.py --head-message\n", job)
     assert m, "check_pack job lacks the merge_group --head-message step"
+
+
+def test_validator_pass_runs_in_the_queue_outside_ci() -> None:
+    """#810 (F110): validator_pass runs on merge_group and pull_request, in its
+    own workflow (release.yml calls ci.yml with contents read only)."""
+    code = _code(WF / "validator.yml")
+    on = _on_block(code)
+    assert re.search(r"^  merge_group:", on, re.M) and re.search(r"^  pull_request:", on, re.M), on
+    assert "python3 tools/check_validator_pass.py" in _job(code, "validator_pass")
+    assert "secrets." not in code and "pip" not in code
+    assert "validator_pass" not in _code(WF / "ci.yml")

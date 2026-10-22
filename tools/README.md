@@ -38,6 +38,10 @@ python tools/check_pr_text.py file body.md
 
 Exit 1 on a hit; the report names the field, line and kind, never the text.
 
+## check_validator_pass.py
+
+The Validator gate in the merge queue. CI runs it from `.github/workflows/validator.yml` as the `validator_pass` check. On `merge_group` it passes only when every PR in the queue entry has a `validator` success status on its head sha; on `pull_request` it reports that state and passes. Standard library only, read-only token.
+
 ## check_sql.py
 
 Compare the pack's routines to the live book. Run it on the wall host. It reads mill config, skips `wipe.sql` and `tables.sql`, and prints names only. The match is case-sensitive.
