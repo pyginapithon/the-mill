@@ -84,3 +84,18 @@ def test_expected_parts_query_strings_documented_in_boot():
     assert '"/api/v1/rooms"' in src
     assert '"/api/v1/mailbox"' in src
     assert "&parts=" in src
+
+
+def test_tick_reuses_fresh_rail_read():
+    """The restore tick and the pick tick it starts read /api/pov once, not twice."""
+    src = _boot()
+    assert "const WALL_RAIL_FRESH_MS = 5000;" in src
+    assert "_railBookAt = Date.now();" in src
+    assert "if (Date.now() - _railBookAt > WALL_RAIL_FRESH_MS) loadRailBook();" in src
+
+
+def test_clock_never_bare_utc():
+    """Every clock paint keeps version, node and the local zone (wallClockLine)."""
+    src = _boot()
+    assert "toISOString().slice(11, 19)" not in src
+    assert src.count("textContent = wallClockLine(") >= 4
