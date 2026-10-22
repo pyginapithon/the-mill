@@ -7,7 +7,6 @@ Bearer or PRIVATE-TOKEN. mill-wall does not write ~/.mill/session for laptops.
 from __future__ import annotations
 
 import logging
-import re
 import secrets
 import threading
 from collections import OrderedDict
@@ -1196,13 +1195,16 @@ def _send_room_free(c: Book, body: dict[str, Any]) -> None:
 
 
 def _mail_reader(c: Book, mail_id: int, owner: str | None) -> bool:
-    """True when this desk may already read the letter (#sec S-3).
+    """True when this desk is on the letter or its room, or Admin (#sec S-3).
 
-    The read rule, reused from mail-thread and trail: Admin, or a room
-    participant -- any desk that sent or received this letter or (when it is on
-    a room TREE) any letter on that room. For an off-tree letter that is exactly
-    its sender and its recipients.
+    Gates changing who else is on a letter (mill add|remove mail:ID OTHER).
+    Reading is open to every seated desk (#672). Admin, or a room participant:
+    any desk that sent or received this letter or (when it is on a room TREE)
+    any letter on that room. For an off-tree letter that is exactly its sender
+    and its recipients.
     """
+    from agent_coord.server.admin.guard import is_role_admin
+
     me = _stored(owner or "")
     if not me:
         return False
@@ -1216,25 +1218,38 @@ def _mail_reader(c: Book, mail_id: int, owner: str | None) -> bool:
     return rec_mail.room_participant(c._cn, int(mail_id), me)
 
 
-# A reply to an off-tree letter names its new room with secrets.token_hex(5).
-_REPLY_ROOM_NAME = re.compile(r"[0-9a-f]{10}")
+def _ends_read(fn):
+    """End the read transaction when a read verb returns (#672).
 
-
-def _open_room(tree_name: str) -> bool:
-    """Is this tree a named room (send --room), open to join by reply? (#sec S-3)
-
-    A room opened by replying to a private letter keeps that letter's privacy:
-    only its cast reads it, and others join by mill add. Off-tree: not a room.
+    The participant check used to commit as a side effect. With no check left,
+    a read verb must not leave a snapshot or metadata lock open on a pooled
+    connection (a later DDL or migrate would wait on it).
     """
-    name = (tree_name or "").strip()
-    return bool(name) and not _REPLY_ROOM_NAME.fullmatch(name)
+    import functools
+
+    @functools.wraps(fn)
+    def run(c, *a, **k):
+        try:
+            return fn(c, *a, **k)
+        finally:
+            try:
+                c._cn.commit()
+            except Exception:
+                pass
+
+    return run
 
 
-def _mail_open_room(c: Book, mail_id: int) -> bool:
-    from agent_coord.server.records import mail as rec_mail
+def _read_redact(text: str) -> str:
+    """Store-policy redaction on a read path (#672, S-3/S-6).
 
-    crumbs = rec_mail.tree_crumbs(c._cn, int(mail_id)) or {}
-    return _open_room(str(crumbs.get("tree") or ""))
+    Writes are scrubbed at the dispatch choke point (#504). Every desk in the
+    office now reads every letter, so a read scrubs again: a letter stored
+    before #504 never shows a raw secret. Already-redacted text is unchanged.
+    """
+    from agent_coord.server.redact import redact_text
+
+    return redact_text(text or "")[0] if text else text
 
 
 def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
@@ -1270,13 +1285,9 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             raise CoordError(f"reply: no such mail {mail_id}")
         parent_letter = parent_rows[0]
 
-    # #sec S-3: a reply makes the replier a participant, so it needs read access
-    # first. Only a named room (send --room) stays open-join by reply, as documented.
-    if not _mail_reader(c, mail_id, owner) and not _mail_open_room(c, mail_id):
-        raise CoordError(
-            f"reply: mail {mail_id} is private to its participants; "
-            "ask one of them to mill add you"
-        )
+    # #672 S-3: nothing is private between desks in an office, so any seated desk
+    # may reply to any letter, named room or not. The reply joins it visibly: it
+    # is a letter from the Bearer desk (sender binding unchanged, #653).
 
     dest_aff: dict[str, str | None] = {}
     dest_set: list[str] = []
@@ -1513,6 +1524,7 @@ def _ids_in_tree_order(nodes: list[dict], ids: list[int], extra: int = 0) -> lis
     return [i for i in order if i in have]
 
 
+@_ends_read
 def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """Read a room by mail id or TREE/room name. Lean MAIL rows only (no opened).
 
@@ -1522,20 +1534,13 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
     scope=subtree = the letter and every reply under it; scope=room =
     whole TREE; a bare room name = summary (root plus latest few, counts).
     --after <id> keeps catch-up: id > after, and with no scope it means room.
-    Read access = room participants (sent or received any letter on the TREE).
-    A desk joins by replying (#149); the refusal names that route.
-    Each returned letter is one this desk sent or was named on (#191),
-    or a room letter whose cast still covered every desk already in the room (#219).
-    Admin still sees the whole scope.
-    The room root is shown to every participant, including a desk that joined
-    by replying and was not on the root (#209). A letter that left off a desk
-    already in the room stays hidden. Replies sent before this desk joined stay
-    visible when they were room letters.
-    latest_id, room_letters, ids, and hints count only letters this desk can see
-    (#206). Admin counts the whole room.
+    Read access (#672, S-3): every seated desk reads every letter and room,
+    named or opened by reply, participant or not. Nothing is private between
+    desks in an office. A read adds no participant, delivers nothing to an inbox
+    and wakes no one; a desk joins by replying (#149) or by mill add mail:ID.
+    latest_id, room_letters, ids, and hints count the whole room (#206).
     """
     from agent_coord.server.records import mail as rec_mail
-    from agent_coord.server.admin.guard import is_role_admin
 
     if not owner:
         raise CoordError("mail-thread: owner required")
@@ -1561,22 +1566,12 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
     room = rec_mail.RoomRead(c._cn, mid)
     nodes = room.nodes
     root_id = int(nodes[0]["id"]) if nodes else mid
-    admin = is_role_admin(c._cn, owner)
-    # Read rule = room participants: any desk that sent or received (mail_to)
-    # any letter on the room's TREE. Off-tree mail: that letter's sender U mail_tos.
-    # Admin may browse everything. One EXISTS read, not the whole cast.
-    if not admin and not rec_mail.room_participant(c._cn, mid, self_bare, room):
-        if room.tree_id and _open_room(room.tree):
-            raise CoordError(
-                "mail-thread: not a participant in this room; "
-                f"run mill reply {root_id} --body-file PATH to join, "
-                "or ask a participant to mill add you at a letter of it"
-            )
-        # Private letter or a room opened from one: no open-join (#sec S-3).
-        raise CoordError(
-            f"mail-thread: mail {mid} is private to its participants; "
-            "ask one of them to mill add you"
-        )
+    # Read rule (#sec S-3, #672): collaboration by default. Every desk holding
+    # minted access to this office (the Bearer desk; the wall refuses a caller
+    # with none before this) reads every letter and room, named or opened by
+    # reply, whole, at any trust level. A read adds no participant, lands nothing
+    # in an inbox and wakes no one. Bodies are redacted when stored (S-6) and
+    # again on this read (_read_redact), for letters stored before #504.
 
     all_ids = [int(n["id"]) for n in nodes] or [mid]
     if after_id and after_id not in set(all_ids):
@@ -1601,28 +1596,16 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
                 pick = _branch_since(pick, mid, last)
             tip = max([int(last), int(mid)] + [int(i) for i in pick])
             rec_mail.advance_read_cursor(c._cn, int(did), int(tree_nid), tip)
-    # #191: a letter that left off a desk already in the room stays hidden.
-    # #209: the root is visible to every participant.
-    # #219: a room letter (cast still covered the room at the time) is visible
-    # to a later participant, including replies sent before that desk joined.
-    # #206: counts use that same visible set, not the hidden room.
-    unfiltered = list(pick)
-    if admin:
-        visible = list(all_ids)
-    else:
-        visible = rec_mail.room_visible_ids(
-            c._cn, all_ids, self_bare, room_ids=all_ids, root_id=root_id
-        )
-        seen_visible = set(visible)
-        pick = [i for i in pick if i in seen_visible]
-        if root_id and root_id not in set(visible):
-            visible = _ids_in_tree_order(nodes, visible, root_id)
-        if root_id and root_id not in set(pick) and root_id in set(unfiltered):
-            pick = _ids_in_tree_order(nodes, pick, root_id)
-    # After the root add-back, so a letter this desk sent is not put back (#222).
+    # #672 S-3: every letter of the room is visible to every seated desk, so the
+    # #191/#219 per-cast filter is gone; counts cover the whole room (#206).
+    visible = list(all_ids)
+    # A letter this desk sent is left out of a later branch read (#222).
     if scope == "branch" and branch_last > 0:
         pick = _omit_own_sent(c._cn, pick, mid, self_bare)
     out = rec_mail.public_mail_chain(c._cn, mid, ids=pick, room=room)
+    for letter in out.get("chain") or []:
+        if isinstance(letter, dict) and isinstance(letter.get("body"), str):
+            letter["body"] = _read_redact(letter["body"])
     # Room-name summary is a list: 256-char bodies, no per-letter mail_tos (#154).
     if scope == "summary":
         for letter in out.get("chain") or []:
@@ -2570,10 +2553,16 @@ def _add_remove(c: Book, body: dict[str, Any], owner: str | None) -> Any:
         # #sec S-3: only a desk that can already read this letter may change who
         # is on it (including adding itself). Admin, sender, recipient, or a
         # participant of its room.
-        if not _mail_reader(c, nid, owner):
+        # #672 S-3: every desk reads every letter, so any seated desk may add
+        # itself (a visible join without posting), as a reply would join it.
+        # Adding or removing another desk still needs the caller to be the
+        # sender, a recipient, a participant of its room, or Admin.
+        self_join = verb == "add" and kind == CONST_DESK and who == _stored(owner or "")
+        if not self_join and not _mail_reader(c, nid, owner):
             raise CoordError(
                 f"{verb}: not allowed on mail {nid}; "
-                "you are not its sender, a recipient, or a participant of its room"
+                "you are not its sender, a recipient, or a participant of its room "
+                "(you may add yourself)"
             )
         if verb == "add":
             before = {_stored(r.get("desk") or "") for r in rec_mail.to_list(c._cn, nid) or []}
@@ -2744,17 +2733,16 @@ def _label_created(value: Any) -> str:
 def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | None, tag: str) -> Any:
     """Mail and todo wearing one label, ord then created (#199).
 
-    Unknown label: empty rows and a hint, not an error. A mail this desk cannot
-    read is left out. Deleted activity is left out. The row list is byte-capped.
+    Unknown label: empty rows and a hint, not an error. Every seated desk reads
+    every labelled mail (#672, S-3). Deleted activity is left out. The row list
+    is byte-capped.
     """
     import json
 
     from agent_coord.const import CONST_LABEL
     from agent_coord.helpers.label_ord import missing_label
     from agent_coord.helpers.trail_text import clip, first_line
-    from agent_coord.server.admin.guard import is_role_admin
     from agent_coord.server.records import label as rec_label
-    from agent_coord.server.records import mail as rec_mail
     from agent_coord.server.records import name as rec_name
     from agent_coord.server.records import todo as rec_todo
     from agent_coord.server.records import tree as rec_tree
@@ -2771,23 +2759,6 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
         }
     found = rec_label.rows_for(c._cn, stored)
     info = rec_tree.trail_details(c._cn, [(str(r["type"]), int(r["id"])) for r in found])
-    admin = is_role_admin(c._cn, owner)
-    me = _stored(owner)
-    mail_ids = [int(r["id"]) for r in found if str(r["type"]) == "mail"]
-    tos = rec_tree.mail_tos_names(c._cn, mail_ids) if not admin else {}
-    parts: dict[int, bool] = {}
-
-    def _can_read(mid: int, src: str) -> bool:
-        if admin or _stored(src) == me:
-            return True
-        if me in {_stored(n) for n in tos.get(mid, set())}:
-            return True
-        cached = parts.get(mid)
-        if cached is None:
-            cached = rec_mail.room_participant(c._cn, mid, me)
-            parts[mid] = cached
-        return cached
-
     rows: list[dict[str, Any]] = []
     used = 0
     truncated = False
@@ -2798,10 +2769,7 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
         if d.get("deleted_utc") is not None:
             continue
         if typ == "mail":
-            src = str(d.get("mail_src") or d.get("actor") or "")
-            if not _can_read(nid, src):
-                continue
-            text_body = clip(first_line(d.get("mail_body") or ""))
+            text_body = clip(first_line(_read_redact(d.get("mail_body") or "")))
             text_need = ""
         else:
             fields = rec_todo.unpack(d.get("todo_body") or "", nid)
@@ -2826,6 +2794,7 @@ def _h_trail_label(c: Book, body: dict[str, Any], project: str, owner: str | Non
     return {"label": stored, "hint": "", "rows": rows, "truncated": truncated}
 
 
+@_ends_read
 def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """Read-only branch under a mail or todo: mail + todo children, any depth.
 
@@ -2835,8 +2804,6 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     """
     from agent_coord.helpers.ptime import pt_label
     from agent_coord.helpers.trail_text import clip, first_line, last_line, mark_of
-    from agent_coord.server.admin.guard import is_role_admin
-    from agent_coord.server.records import mail as rec_mail
     from agent_coord.server.records import todo as rec_todo
     from agent_coord.server.records import tree as rec_tree
 
@@ -2870,25 +2837,8 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     truncated = len(shaped) > TRAIL_MAX_NODES
     shaped = shaped[:TRAIL_MAX_NODES]
     info = rec_tree.trail_details(c._cn, [(t, i) for t, i, _d in shaped])
-    # Mail read access = mail-thread rule: admin, sender, a dest, or a room participant.
-    admin = is_role_admin(c._cn, owner)
-    me = _stored(owner)
-    mail_ids = [i for t, i, _d in shaped if t == "mail"]
-    root_mail = 0
-    if tree:
-        top = rec_tree.select(c._cn, tree) or []
-        if top and str(top[0].get("type") or "") == "mail":
-            root_mail = int(top[0].get("id") or 0)
-    tos = rec_tree.mail_tos_names(c._cn, mail_ids) if not admin else {}
-    in_room = False
-    if root_mail and not admin:
-        # Room participant: sent or received any letter on the room's TREE (one EXISTS).
-        in_room = rec_mail.room_participant(c._cn, root_mail, me)
-
-    def _can_read(mid: int, src: str) -> bool:
-        if admin or in_room or _stored(src) == me:
-            return True
-        return me in {_stored(n) for n in tos.get(mid, set())}
+    # Mail read access = mail-thread rule (#672, S-3): every seated desk reads
+    # every letter; the read adds no participant.
 
     nodes: list[dict[str, Any]] = []
     for typ, i, depth in shaped:
@@ -2919,32 +2869,16 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         else:
             src = str(d.get("mail_src") or d.get("actor") or "")
             when = d.get("mail_created_utc") or d.get("updated_utc")
-            if not _can_read(i, src):
-                if i == nid:
-                    # Same shape as mail-thread: the room root, and how to join (#221).
-                    if root_mail and _mail_open_room(c, int(i)):
-                        raise CoordError(
-                            "trail: not a participant in this room; "
-                            f"run mill reply {root_mail} --body-file PATH to join, "
-                            "or ask a participant to mill add you at a letter of it"
-                        )
-                    # Private letter or a room opened from one: no open-join (#sec S-3).
-                    raise CoordError(
-                        f"trail: mail {int(i)} is private to its participants; "
-                        "ask one of them to mill add you"
-                    )
-                node.update({"state": "hidden", "title": "", "last_note": "", "mark": "", "who": ""})
-            else:
-                first = first_line(d.get("mail_body") or "")
-                node.update(
-                    {
-                        "state": "deleted" if (deleted or d.get("mail_body") is None) else "sent",
-                        "title": clip(first),
-                        "last_note": "",
-                        "mark": mark_of(first),
-                        "who": _stored(src),
-                    }
-                )
+            first = first_line(_read_redact(d.get("mail_body") or ""))
+            node.update(
+                {
+                    "state": "deleted" if (deleted or d.get("mail_body") is None) else "sent",
+                    "title": clip(first),
+                    "last_note": "",
+                    "mark": mark_of(first),
+                    "who": _stored(src),
+                }
+            )
         node["at_utc"] = when.strftime("%Y-%m-%dT%H:%M:%SZ") if when is not None else ""
         node["at_pt"] = pt_label(when)
         nodes.append(node)
