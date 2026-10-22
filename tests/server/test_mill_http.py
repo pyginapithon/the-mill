@@ -87,7 +87,7 @@ def test_mill_http_call_join_sends_bearer_not_body_token(monkeypatch, tmp_path):
         captured["body"] = json.loads(req.data.decode("utf-8"))
         return Resp()
 
-    monkeypatch.setattr("agent_coord.client.http.urllib.request.urlopen", fake_urlopen)
+    monkeypatch.setattr("agent_coord.client.http._open", fake_urlopen)
     row = mill_http_call({"verb": "join", "project": "the-mill", "owner": "desk"})
     assert row["ok"] is True
     assert captured["url"].endswith("/mill/v1/join")
@@ -552,7 +552,7 @@ def test_fetch_mill_ca_prefers_api_path(monkeypatch, tmp_path):
         return Resp()
 
     monkeypatch.setattr(mill_client, "mill_ca_file", lambda: tmp_path / "ca.crt")
-    monkeypatch.setattr(mill_client.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mill_client, "_open", fake_urlopen)
     got = mill_client.fetch_mill_ca("https://198.51.100.10/")
     assert got is not None
     assert urls[0].endswith("/api/ca.crt")
@@ -574,7 +574,7 @@ def test_fetch_mill_ca_warns_on_version_mismatch(monkeypatch, tmp_path, capsys) 
         def __exit__(self, *a):
             return False
 
-    monkeypatch.setattr(mill_client.urllib.request, "urlopen", lambda *a, **k: Resp())
+    monkeypatch.setattr(mill_client, "_open", lambda *a, **k: Resp())
     monkeypatch.setattr("agent_coord.install.packver.package_version", lambda: "0.5.2")
     got = mill_client.fetch_mill_ca("https://203.0.113.10/", dest=tmp_path / "ca.crt")
     assert got is not None
@@ -612,7 +612,7 @@ def test_fetch_mill_ca_sends_invite(monkeypatch, tmp_path):
         seen["invite"] = url.get_header("X-mill-invite") or ""
         return Resp()
 
-    monkeypatch.setattr(mill_client.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(mill_client, "_open", fake_urlopen)
     got = mill_client.fetch_mill_ca("https://203.0.113.10/?invite=cloud-key", dest=tmp_path / "ca.crt")
     assert got is not None
     assert seen["url"].endswith("/api/ca.crt")

@@ -30,7 +30,7 @@ commands), not second day-one products. The PR object lives in forge SoR - link 
 
 ## Inputs
 On the desk **before** implement (else `note` gap + `send` asker / `waiting_on`
-or `create todo` `<project> <need> --status parked`):
+or `create todo` `<roster> <need> --status parked`):
 - **Card** - claimed or assigned; need + detail locked enough to build (or explicit spike)
 - **Scope crumbs** - repo/path, pack, or service named; acceptance in detail or linked Claims
 - **If remasure Fail** - Validator Fail mail + evidence paths (`inbox`)
@@ -54,7 +54,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 | RC / release / pack Last | pack cut + `send` validator; `pass` after gate |
 | hotfix | urgent `create todo`/`claim` + `send` ops when runtime |
 | blocked (review/QA/CI/ops) | waiting_on + `send` / `note` |
-| park / spike later | `create todo` `<project> <need> --status parked` |
+| park / spike later | `create todo` `<roster> <need> --status parked` |
 | find Fail / eng mail | `inbox` |
 | close after Pass | `pass` (shipped->done per mill-desk; no teaching `done`) |
 | eng KPI | `score` - a row in the score table (`kpi`, `value`, `target`), only if the office sets it |

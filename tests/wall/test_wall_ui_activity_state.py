@@ -46,11 +46,13 @@ def test_pill_paints_only_known_states():
 def test_state_rides_events_into_diary_and_wire():
     src = BOOT.read_text(encoding="utf-8")
     assert "WALL_ACTIVITY_STATE_92" in src
-    rows = src[src.index("function presenceRowsForUi("): src.index("function evidenceCount(")]
+    rows_at = src.index("function presenceRowsForUi(")
+    rows = src[rows_at: src.index("\n    function ", rows_at + 1)]
     assert "state: r.state || null" in rows
     diary = src[src.index("function paintSessionWire("): src.index("function wire(d)")]
     assert "activityStatePill(p)" in diary
-    wire = src[src.index("function wire(d)"): src.index("function mailReadChips(")]
+    start = src.index("function wire(d)")
+    wire = src[start: src.index("\n    function ", start + 1)]
     assert "activityStatePill(p)" in wire
 
 
@@ -68,7 +70,7 @@ def test_pill_is_read_only_and_styled_outside_shell():
 def _presence_src() -> str:
     src = BOOT.read_text(encoding="utf-8")
     start = src.index("function presenceRowsForUi(")
-    end = src.index("function evidenceCount(")
+    end = src.index("\n    function ", start + 1)
     return src[start:end]
 
 

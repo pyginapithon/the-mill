@@ -65,7 +65,7 @@ Open the configured Wall URL (or the share URL mill install prints). Tabs: **SES
 
 `mill install wall --http nginx` = TLS in front of FastAPI mill-wall. `--http service` = mill-wall as the httpd (loopback).
 
-Optional human-page ACL: `~/.mill/wall-allow.txt` (or `AGENT_COORD_WALL_ALLOW`). Empty = no extra ACL. Applies to Wall HTML and `/api/floor`, not `POST /mill/v1/*`.
+Optional human-page ACL: `~/.mill/wall-allow.txt` (or `AGENT_COORD_WALL_ALLOW`). Empty = no extra ACL. Applies to Wall HTML and `/api/floor`, not `POST /mill/v1/*`. It reads `X-Forwarded-For` the same way as door=ip below (trusted proxy only, last hop that is not a proxy), and so does the glance keypad lockout; a forwarded loopback address must be on the list.
 
 Certificate: after `mill install`, this machine should open `https://127.0.0.1/` without a warning (mill CA, never `wall.crt`). Other devices may need Advanced then Proceed.
 
@@ -82,7 +82,7 @@ mill join --link-file LINKFILE
 The other doors:
 
 - **Browser invite-key (humans):** `https://<wall>/?invite=<KEY>`. Host `mill invite --mint --label "..."` writes it once to an owner-only file named by `link_file` in the reply (`--print-link` prints it instead; pending); then `mill invite --enable <KEY>`. Humans open it in the Wall. Agents do not pass it to `mill join`.
-- **door=ip (office LAN):** `AGENT_COORD_DOOR=ip` or `mill invite --door ip`; CIDRs in `wall-allow.txt`. Loopback always allowed. Off-LAN still uses invite. `mill invite --seat <desk>` mints a seat welcome link for each LAN desk (no hand-placed tokens).
+- **door=ip (office LAN):** `AGENT_COORD_DOOR=ip` or `mill invite --door ip`; CIDRs in `wall-allow.txt`. A direct loopback connection is always allowed. `X-Forwarded-For` is read only when the TCP peer is a trusted proxy: this host's loopback (the installed nginx edge) by default, or the IPs/CIDRs in `AGENT_COORD_TRUSTED_PROXIES` (`none` trusts no proxy). The client is the last hop that is not a proxy, and a forwarded loopback address is not this machine: it must be on the allow list. Off-LAN still uses invite. `mill invite --seat <desk>` mints a seat welcome link for each LAN desk (no hand-placed tokens).
 - **Reachability:** run `mill join` and `mill connect` on a machine that can open the Wall HTTPS URL (office LAN, the host, or a tunnel). A chat that cannot reach the Wall runs the mill CLI on a Wall-reachable host; the desk tokens live on that host.
 - **Office vs test book:** each `--office <alias>` is one book. Throwaway cold work uses a different alias. The alias is local (`~/.mill/alias/`), not on the wire.
 
@@ -174,7 +174,8 @@ When mill-wall serves static:
 
 | Asset | `Cache-Control` (product) |
 |---|---|
-| Board HTML, JS, CSS, and other wall files | `public, max-age=60`. Board HTML also sends `ETag` (304 on `If-None-Match`) |
+| Pinned wall files (query carries `?v=`, e.g. `boot.js?v=wow285`) | `public, max-age=31536000, immutable` plus `ETag` |
+| Board HTML and unpinned wall files | `public, max-age=60` plus `ETag` (304 on `If-None-Match`) |
 | API JSON | `no-store` (default) |
 
 Gzip is at the ASGI layer (above). A front httpd can still add its own deflate/expires when you restore the catalog shape.

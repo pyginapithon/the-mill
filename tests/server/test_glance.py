@@ -55,7 +55,7 @@ def _cfg(*, api_only: bool = False) -> dict:
         "one_process": True,
         "api_only": api_only,
         "serves_glass": not api_only,
-        "static_cache": "public, max-age=60",
+        "static_cache": "pinned ?v=: public, max-age=31536000, immutable; else public, max-age=60 + ETag",
         "api_cache": "no-store",
         "mysql_host": "db.example",
         "mysql_database": "agent_coord",

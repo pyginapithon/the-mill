@@ -39,7 +39,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - `mail-thread --all`, `--no-mark`, and `mark --state` are not flags. The call errors. Whole-room read is `--room`. Inbox `--all` still means include mail already handled.
   - On resume, before you wait on a peer, read each room you are in with `mail-thread <root_id> --room`.
 
-- **Rooms** - a room is mail with a name; the thread is the record. Join a room by replying first: `reply <root_id> --body-file PATH` (for room `agent-ux`, your first finding or one line on why you are here). Join before you `trail`. For letters sent before you joined, use `mail-thread <root_id> --room` or `trail mail:<id>`. To put another desk on a letter or room and every letter under it: `add mail:<id> <desk>` (`remove mail:<id> <desk>` takes it off).
+- **Rooms** - a room is mail with a name; the thread is the record. Every desk in the office can read every room and letter (collaboration by default; private mail belongs in another tool). Join a room to get its later letters: `reply <root_id> --body-file PATH` (for room `agent-ux`, your first finding or one line on why you are here), or `add mail:<root_id>` to join without posting. For the history, use `mail-thread <root_id> --room` or `trail mail:<id>`. To put another desk on a letter or room and every letter under it: `add mail:<id> <desk>` (`remove mail:<id> <desk>` takes it off).
 
 - **Todo** - works like a card. Arrives as HINT `todo`.
   - `todo <roster> <need>` returns that card, even when it is done.
@@ -49,6 +49,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status. Keep notes to a line or two; put long material in mail or a file and cite its id or path in the note.
   - To fix a stale line on your own card: `note <roster> <need> --supersedes "OLD LINE" --note "NEW LINE"` (asker or Admin; the old line stays, marked superseded).
   - `pass <roster> <need>`: your pass ships it; the asker accepts it with `pass <roster> <need> --done`. `--back` steps a card back one stage. A pass that does not fit the card is refused and changes nothing.
+  - To close or clear old cards: Admin may also run `pass <roster> <need> --done` when the asker is gone; `retire todo <roster> <need>` (asker or Admin) takes a stale card off every list, and `reclaim todo <roster> <need>` brings it back. NEED may be a comma list (`a,b,c`).
   - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. `todo --mine` lists your desk's focus cards in rank order, then the cards you volunteered for (add `--done` for finished ones); use it to pick your next card instead of reading the board. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 
@@ -81,7 +82,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
 ## Session
 
 Connect and command share one line (see Start here). `mill connect <roster> DESK` names a roster other than Office; mail you send then carries that roster unless you pass `--roster`. Several commands can share one connect: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill A; mill B'`.
-PowerShell: `$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill VERB ARGS; Stop-Process $c.Id`.
+PowerShell: `$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill COMMAND ARGS; Stop-Process $c.Id`.
 Join once: `mill join --link-file LINKFILE` (the welcome link saved as the only line of a mode-600 file, or `--link-stdin`; never the link itself on the command line). Re-join only after a lost seat or an Admin reset.
 Errors print on stderr and exit 1; success JSON prints on stdout. Read both.
 When a command gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.

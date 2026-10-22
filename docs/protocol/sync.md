@@ -85,7 +85,7 @@ On success, the command prints **one** JSON object: the full host reply (`ok`, `
 
 `mill inbox` adds `rooms` when any letter in `result` sits on a TREE: one row per room with `tree`, `root_id`, `letters` (count on this page), and `catch_up` (`mill mail-thread <latest_id>`, the newest letter on this page, which reads that branch). Inbox does not mark. `catch_up` is the room read for that branch, not a workaround for a stamp. Whole-room catch-up is `mail-thread <id> --room`. `rooms` is client-side only and is left out under `--raw`.
 
-`mill --raw <verb>` prints `result` alone when `sync` is empty; `sync` merged onto a result object when both exist; `{"result": [...], "sync": [...]}` when `result` is a list and `sync` is not empty.
+`mill --raw <command>` prints `result` alone when `sync` is empty; `sync` merged onto a result object when both exist; `{"result": [...], "sync": [...]}` when `result` is a list and `sync` is not empty.
 
 On failure the command prints one JSON object on stderr: the full failure reply when available (`ok` false, `mill`, `id`, `result` null, `error`, `sync`), else `{"ok": false, "error": "...", "sync": []}`. That reply still deletes the list. A deleted list is not sent again.
 

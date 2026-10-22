@@ -40,6 +40,10 @@ def test_desk_post_requires_invite(monkeypatch):
 def test_desk_post_send(monkeypatch):
     monkeypatch.setattr("agent_coord.server.admin.door.check", lambda t: True)
     monkeypatch.setattr(
+        "agent_coord.server.records.join.desk_for_token_hash",
+        lambda cn, digest: "desk-a",
+    )
+    monkeypatch.setattr(
         "agent_coord.server.records.mail.insert",
         lambda cn, p, src, dst, body, **_k: [{"id": 7}],
     )
@@ -54,6 +58,10 @@ def test_desk_post_send(monkeypatch):
 
 def test_desk_post_rejects_star(monkeypatch):
     monkeypatch.setattr("agent_coord.server.admin.door.check", lambda t: True)
+    monkeypatch.setattr(
+        "agent_coord.server.records.join.desk_for_token_hash",
+        lambda cn, digest: "desk-a",
+    )
     try:
         human.desk_post(object(), {"token": "t", "body": "hi", "dst": "*"})
         raise AssertionError("expected CoordError")

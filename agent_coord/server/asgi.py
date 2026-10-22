@@ -360,21 +360,26 @@ def make_asgi_app(
 
     async def _dispatch_inner(request: Request, t0: float) -> Response:
         path = request.url.path
-        from .allow import allowed, client_ip, is_mill_verb
+        from .allow import allowed, door_client, is_mill_verb
 
         peer = request.client.host if request.client else "127.0.0.1"
-        ip = client_ip(peer, request.headers.get("x-forwarded-for") or "")
+        fwd = request.headers.get("x-forwarded-for") or ""
         from agent_coord.server.admin.door import mode as door_mode
 
         if door_mode() == "ip":
-            if not allowed(ip, empty_open=False):
+            # Forwarded only from a trusted proxy; a forwarded loopback is not
+            # this machine (#651).
+            ip, via_proxy = door_client(peer, fwd)
+            if not allowed(ip, empty_open=False, forwarded=via_proxy):
                 return Response(
                     content=b"mill-wall: door=ip; add this address to wall-allow.txt\n",
                     status_code=403,
                     media_type="text/plain; charset=utf-8",
                 )
         elif not is_mill_verb(path):
-            if not allowed(ip):
+            # Same trusted-proxy read as door=ip (#731).
+            ip, via_proxy = door_client(peer, fwd)
+            if not allowed(ip, forwarded=via_proxy):
                 return Response(
                     content=b"mill-wall: IP not on wall-allow (human Wall ACL)\n",
                     status_code=403,

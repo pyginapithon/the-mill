@@ -42,6 +42,10 @@ BEGIN
    WHERE type = p_type AND name = TRIM(p_name)
    LIMIT 1;
   IF v_id IS NULL THEN
+    -- #722: Office names roster id 1, also after an Admin renamed it.
+    IF p_type = 'roster' AND TRIM(p_name) COLLATE utf8mb4_0900_ai_ci = 'Office' THEN
+      RETURN 1;
+    END IF;
     RETURN NULL;
   END IF;
   IF v_del IS NOT NULL THEN
@@ -75,6 +79,10 @@ BEGIN
         SET MESSAGE_TEXT = 'name retired: mill reclaim NAME NAME --yes (mill host only)';
     END IF;
     RETURN v_id;
+  END IF;
+  -- #722: Office names roster id 1 (renamed or not); never a second roster.
+  IF p_type = 'roster' AND TRIM(p_name) COLLATE utf8mb4_0900_ai_ci = 'Office' THEN
+    RETURN 1;
   END IF;
   INSERT INTO name (type, name) VALUES (p_type, TRIM(p_name));
   IF v_dup = 1 THEN

@@ -438,66 +438,6 @@ def ids_for_desk(cn, mail_ids: list[int], desk: str) -> list[int]:
     return out
 
 
-def room_visible_ids(
-    cn,
-    mail_ids: list[int],
-    desk: str,
-    *,
-    room_ids: list[int] | None = None,
-    root_id: int = 0,
-) -> list[int]:
-    """Ids this desk may read, in the given order.
-
-    A letter this desk sent or was named on is visible (#191).
-    The room root is visible to a participant (#209).
-    A room letter is visible to a participant (#219): its cast (sender plus
-    mail_tos) covers every desk that had already sent or received on this room.
-    A letter that left off a desk already in the room stays hidden.
-    room_ids is the whole room, so a branch pick still knows who was left off.
-    """
-    who = _stored(desk)
-    ids = [int(i) for i in mail_ids if int(i or 0)]
-    if not who or not ids:
-        return []
-    universe: list[int] = []
-    seen: set[int] = set()
-    for raw in list(room_ids or []) + ids:
-        mid = int(raw or 0)
-        if mid and mid not in seen:
-            seen.add(mid)
-            universe.append(mid)
-    casts = room_cast_by_id(cn, universe)
-
-    def _cast(mid: int) -> set[str]:
-        sender, dests = casts.get(mid, ("", []))
-        cast = {d for d in dests if d}
-        if sender:
-            cast.add(sender)
-        return cast
-
-    prior: set[str] = set()
-    room_wide: set[int] = set()
-    root = int(root_id or 0)
-    for mid in sorted(universe):
-        cast = _cast(mid)
-        if (root and mid == root) or prior <= cast:
-            room_wide.add(mid)
-        prior |= cast
-    participant = who in prior
-    out: list[int] = []
-    for mid in ids:
-        if participant and mid in room_wide:
-            out.append(mid)
-            continue
-        sender, dests = casts.get(mid, ("", []))
-        if sender == who:
-            out.append(mid)
-            continue
-        if who in dests:
-            out.append(mid)
-    return out
-
-
 def public_mail_tos(dest_rows: list[dict]) -> list[dict]:
     """Agent-facing mail_to cast: [{deskId, receipt}, ...]. No ids / opened.
 

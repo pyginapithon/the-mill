@@ -1445,6 +1445,9 @@
       }
       if ((name === "score" || name === "scorecards") && typeof wallEnsureDomain === "function") {
         wallEnsureDomain("score").catch(function () {});
+      }      /* #710: COLLAB paint code and its map load together on the tab. */
+      if (name === "floor" && typeof wallEnsureModule === "function") {
+        wallEnsureModule("floorPaint").catch(function () {});
       }
     }
     function mdLite(src) {
@@ -2014,19 +2017,9 @@
         const el = document.getElementById(row[0]);
         if (!el) return;
         const key = row[1];
-        let ready = !!_stripReady[key];
-        if (!ready) {
-          let body = document.getElementById(row[2]);
-          if (key === "floor" && !body) body = document.getElementById("floor-view");
-          if (key === "todo" && (!body || !wallHasRealContent(body))) {
-            const alt = document.getElementById("jobs-list") || document.getElementById("jobs-outline");
-            if (alt) body = alt;
-          }
-          if (body && wallHasRealContent(body)) {
-            ready = true;
-            _stripReady[key] = true;
-          }
-        }
+        /* Ready only when this scope's payload carried the part (strip()). A painted
+           pane is no proof: it can still hold the previous roster's rows (#715). */
+        const ready = key === "score" ? !!_officeScoreSeen : !!_stripReady[key];
         if (ready) {
           el.classList.remove("kpi-loading");
           el.setAttribute("data-wall-strip-loading", "0");
@@ -2036,12 +2029,17 @@
           el.classList.add("kpi-loading");
           el.setAttribute("data-wall-strip-loading", "1");
           if (!el.querySelector(".kpi-load")) {
-            const b = el.querySelector("b");
+            const bNow = el.querySelector("b");
             const tmp = document.createElement("span");
             tmp.innerHTML = wallStripLoadHtml();
             const node = tmp.firstChild;
-            if (node) el.insertBefore(node, b || null);
+            if (node) el.insertBefore(node, bNow || null);
           }
+          /* Not loaded is not zero: drop the count and cue left from the last scope. */
+          const b = el.querySelector("b");
+          if (b) b.textContent = key === "mail" ? "\u2014" : "...";
+          const cue = el.querySelector(".kpi-cue");
+          if (cue) try { cue.remove(); } catch (eCue) {}
         }
       });
     }
@@ -3017,6 +3015,10 @@
       _railPickApplied = "";
       window._floorBook = null;
       window._floorRaw = null;
+      /* #715: progressive paints merge into window._floor; a new scope must not
+         inherit the last scope's rows and parts (the strip counted them). Panes
+         keep their DOM until the new paint lands. */
+      window._floor = null;
     }
     function bookIsProject(query) {
       return !!_floorBook && _floorBookKey === ("project:" + String(query || ""));
@@ -3916,9 +3918,10 @@
       packVer = (j && j.version) ? String(j.version) : "";
       paintWallClock();
     }).catch(function () {});
-    const _stripLast = { hereN: null, openN: null, scoreOff: null, mailUnreadN: null, waitingN: null, claimedN: null };
+    const _stripLast = { hereN: null, openN: null, scoreOff: null, mailUnreadN: null, waitingN: null, claimedN: null, sharedN: null };
     let _stripFillKey = "";
     let _stripFillTries = 0;
+    let _stripSharedKey = "";
     function wallResetStripReady() {
       _stripReady.session = false;
       _stripReady.floor = false;
@@ -3933,6 +3936,8 @@
       _stripLast.mailUnreadN = null;
       _stripLast.waitingN = null;
       _stripLast.claimedN = null;
+      _stripLast.sharedN = null;
+      _stripSharedKey = "";
     }
     function wallStripFillScope() {
       /* A station scope asks the lan procedure for todos, and that call 500s.
@@ -3943,12 +3948,30 @@
       } catch (eProj) {}
       return floorScope();
     }
+    function wallFillStripShared() {
+      /* COLLAB counts Between rows (/api/activity window=between), the same read as
+         its pane. Other tabs never carry them, so read them once per scope. */
+      let between;
+      try { between = activityBetweenQuery(); } catch (eQ) { return; }
+      if (!between || _stripSharedKey === between.key) return;
+      _stripSharedKey = between.key;
+      wallFetchFloorV1({ key: between.key, query: "" }, [{ path: between.url, kind: "between", absolute: true }]).then(function (res) {
+        const rows = res && !res.down && res.raw && res.raw.between;
+        if (!Array.isArray(rows)) { _stripSharedKey = ""; return; }
+        if (activityBetweenQuery().key !== between.key) return;
+        _stripLast.sharedN = (floorShared({ between: rows }) || {}).rows || 0;
+        _stripReady.floor = true;
+        strip(window._floor || {});
+      }).catch(function () { _stripSharedKey = ""; });
+    }
     function wallFillStripCounts() {
       /* Chips stay on the spinner until their part has been fetched. The open tab's
          poll stays narrow. One pass fills TODO and MAIL. SCORE is the Office book. */
       const need = [];
+      if (!_stripReady.session) need.push("agents");
       if (!_stripReady.todo) need.push("todos");
       if (!_stripReady.mail) need.push("mail");
+      if (!_stripReady.floor) wallFillStripShared();
       if (!need.length || _stripFillTries >= 2) return;
       let scope;
       try { scope = wallStripFillScope(); } catch (eScope) { return; }
@@ -3965,7 +3988,7 @@
         } catch (eFill) {}
       }).then(function (res) {
         if (!res || res.down) _stripFillKey = "";
-        else if (!_stripReady.todo || !_stripReady.mail) _stripFillKey = "";
+        else if (!_stripReady.session || !_stripReady.todo || !_stripReady.mail) _stripFillKey = "";
       }).catch(function () { _stripFillKey = ""; });
     }
     function strip(d) {
@@ -3979,22 +4002,15 @@
       const hasTodos = parts.indexOf("todos") >= 0 || (Array.isArray(d.needs) && d.needs.length > 0) || (Array.isArray(d.issues) && d.issues.length > 0);
       const hasScores = parts.indexOf("scores") >= 0 || (Array.isArray(d.kpis) && d.kpis.length > 0);
       const hasMail = parts.indexOf("mail") >= 0 || (Array.isArray(d.mailbox) && d.mailbox.length > 0);
-      if (hasAgents) { _stripReady.session = true; _stripReady.floor = true; }
+      /* #715: a chip is known only once this scope's payload carried its part
+         (resetFloorBook clears all of it on a rail switch). Until then it shows
+         the loading mark, never a 0 counted from rows that were not read. */
+      if (hasAgents) _stripReady.session = true;
       if (hasTodos) _stripReady.todo = true;
       if (hasScores) _stripReady.score = true;
       if (hasMail) _stripReady.mail = true;
-      try {
-        const hereEl = document.getElementById("here");
-        if (hereEl && wallHasRealContent(hereEl)) _stripReady.session = true;
-        const floorEl = document.getElementById("floor-map") || document.getElementById("floor-view");
-        if (floorEl && wallHasRealContent(floorEl)) _stripReady.floor = true;
-        const todoEl = document.getElementById("parked") || document.getElementById("jobs-list") || document.getElementById("jobs-outline");
-        if (todoEl && wallHasRealContent(todoEl)) _stripReady.todo = true;
-        const scoreEl = document.getElementById("score-desk-table");
-        if (scoreEl && wallHasRealContent(scoreEl)) _stripReady.score = true;
-        const mailEl = document.getElementById("mail");
-        if (mailEl && wallHasRealContent(mailEl)) _stripReady.mail = true;
-      } catch (eReady) {}
+      const hasShared = Array.isArray(d.between);
+      if (hasShared) _stripReady.floor = true;
       const live = uniqueDesksByOwner((d.agents || []).filter(a => a.alive));
       let hereN = live.length;
       if (!hasAgents && _stripLast.hereN != null) hereN = _stripLast.hereN;
@@ -4064,7 +4080,12 @@
       else if (_stripLast.scoreOff != null) scoreOff = _stripLast.scoreOff;
       const sessCue = waitingN ? (waitingN + " waiting") : "all working";
       let sharedN = 0;
-      try { sharedN = (floorShared(d) || {}).rows || 0; } catch (eSharedN) {}
+      if (hasShared) {
+        try { sharedN = (floorShared(d) || {}).rows || 0; } catch (eSharedN) {}
+        _stripLast.sharedN = sharedN;
+      } else if (_stripLast.sharedN != null) {
+        sharedN = _stripLast.sharedN;
+      }
       const floorCue = "shared";
       const todoCue = claimedN ? (claimedN + " moving") : "none moving";
       const scoreCue = scoreOff ? "off target" : "on target";
@@ -4730,6 +4751,25 @@
       if (noun) return noun;
       return n;
     }
+    /* #717: a plan row's face. Most plans carry only a 10-hex name, so the head was
+       "unnamed plan" on every row. With no plan name the root card's title is the head and
+       the line under it says the root's status and who has it; a named plan keeps its name
+       as the head and the root title as the line. */
+    function millPlanRowFace(label, rootPayload, root) {
+      const p = rootPayload || {};
+      const title = String(p.title || "").replace(/\s+/g, " ").trim();
+      const name = String(label || "").trim();
+      if (name) return { head: name, line: title, full: name };
+      if (title) {
+        const bits = [String(p.status || "").trim(), String(p.who || "").trim()].filter(Boolean);
+        /* The plans column is narrow: keep the head to about two lines. */
+        const head = title.length > 64 ? (title.slice(0, 63).replace(/\s+\S*$/, "") + "\u2026") : title;
+        return { head: head, line: bits.join(" | "), full: title };
+      }
+      const id = root && root.id != null && String(root.id) !== "" ? String(root.id) : "";
+      const head = id ? ("card " + id) : "plan";
+      return { head: head, line: String(p.status || "").trim(), full: head };
+    }
     /* #33: one nested-set pass per nodes array. Parent map + depth memo (a parent's
        depth is set before its kids in lft order), O(n log n) once, O(1) per lookup.
        Overlap, ties, inverted rows, or a repeated row mark the index bad and callers
@@ -5152,7 +5192,7 @@
         if (!todos.length) return;
         if (q && !todos.some(n => todoTreeMatch(d, n, q))) return;
         const planId = String((t && (t.name || t.id)) || ("t" + ti));
-        forests.push({ planId: planId, label: millTreePlanLabel(t) || "unnamed plan", todos: todos });
+        forests.push({ planId: planId, label: millTreePlanLabel(t), todos: todos });
       });
       let hitN = 0;
       if (q) forests.forEach(f => { f.todos.forEach(n => { if (todoTreeMatch(d, n, q)) hitN += 1; }); });
@@ -5185,12 +5225,12 @@
       const roots = forest ? millTodoRootsOf(forest.todos).filter(n => todoTreeOnSpine(forest.todos, n, d, q)) : [];
       const forestRows = forests.map(f => {
         const root = millTodoRootsOf(f.todos)[0];
-        const line = root ? millTreePayload(d, root).title : "";
+        const face = millPlanRowFace(f.label, root ? millTreePayload(d, root) : null, root);
         const on = forest && f.planId === forest.planId ? " on" : "";
         return { key: f.planId, html: `<button type="button" class="todo-tree-row${on}" data-plan="${esc(f.planId)}">` +
-          `<b>${esc(f.label)}</b>` +
+          `<b title="${esc(face.full)}">${esc(face.head)}</b>` +
           `<span class="todo-tree-n">${f.todos.length}</span>` +
-          `<span class="todo-tree-line">${esc(line)}</span>` +
+          `<span class="todo-tree-line">${esc(face.line)}</span>` +
           `</button>` };
       });
       const forestHtml = forestRows.map(r => r.html).join("");
@@ -6053,98 +6093,15 @@
         b.classList.toggle("on", b.getAttribute("data-floor-agg") === floorAgg);
       });
     }
-    function setFloorAgg(mode) {
-      if (mode !== "desk" && mode !== "workstation") return;
-      floorAgg = mode;
-      try { localStorage.setItem(FLOOR_AGG_KEY, mode); } catch (e) {}
-      paintFloorAgg();
-      if (floorGlanceCache) paintFloorView(floorGlanceCache);
-      else loadFloorGlance(true);
-    }
-    /* WALL_UI_LIB_GRAPH + WALL_UI_DEFAULT_FLOOR: floorHostOf from lib or domain module */
-    /* WALL_UI_DEFAULT_FLOOR: floorStateRank from domain module */
-    function aggregateFloorGlance(g) {
-      /* Map-only rollup. Timeline stays per-desk. Desk default = identity. */
-      if (!g || floorAgg !== "workstation") return g;
-      const dFloor = window._floor || {};
-      const hostByOwner = {};
-      (dFloor.agents || []).forEach(a => {
-        const o = String(a.owner || "").trim();
-        if (!o) return;
-        const h = String(a.owner_host || a.host || "").trim();
-        if (h) hostByOwner[o] = h;
-      });
-      const desksIn = (g.desks || []).slice();
-      desksIn.forEach(d => {
-        if (!d.owner_host) d.owner_host = hostByOwner[d.owner] || "";
-      });
-      const byHost = {};
-      desksIn.forEach(d => {
-        const host = floorHostOf(d, hostByOwner);
-        let box = byHost[host];
-        if (!box) {
-          box = byHost[host] = {
-            owner: host,
-            kind: "workstation",
-            owner_host: host,
-            desks: [],
-            unread: 0, tokens: 0, usd: 0, jobs_done: 0,
-            alive: false, stale: false, doing: "", role: "",
-            _state: "idle"
-          };
-        }
-        box.desks.push(d.owner);
-        box.unread += Number(d.unread || 0);
-        box.tokens += Number(d.tokens || 0);
-        box.usd += Number(d.usd || 0);
-        box.jobs_done += Number(d.jobs_done || 0);
-        box.alive = box.alive || !!d.alive;
-        box.stale = box.stale || !!d.stale;
-        const agent = (dFloor.agents || []).find(a => a.owner === d.owner && a.alive)
-          || (dFloor.agents || []).find(a => a.owner === d.owner)
-          || { owner: d.owner, doing: d.doing || "", waiting_on: d.waiting_on || "", stale: d.stale };
-        let st = "idle";
-        try { st = (hereGlance(dFloor, agent).state) || (d.stale ? "stale" : "idle"); } catch (e) { st = d.stale ? "stale" : "idle"; }
-        if (floorStateRank(st) > floorStateRank(box._state)) box._state = st;
-        if (!box.doing) box.doing = d.doing || "";
-      });
-      const desks = Object.keys(byHost).sort().map(h => {
-        const box = byHost[h];
-        box.usd = Math.round(Number(box.usd || 0) * 10000) / 10000;
-        if (box.desks.length > 1) {
-          box.doing = box.desks.length + " desks" + (box.doing ? (" | " + box.doing) : "");
-        }
-        box.rollup_state = box._state;
-        delete box._state;
-        return box;
-      });
-      const ownerToHost = {};
-      desksIn.forEach(d => { ownerToHost[d.owner] = floorHostOf(d, hostByOwner); });
-      const pair = {};
-      ((g.edges) || []).forEach(e => {
-        const a0 = String(e.a || "");
-        const b0 = String(e.b || "");
-        const a = ownerToHost[a0] || a0;
-        const b = ownerToHost[b0] || b0;
-        if (!a || !b || a === b) return;
-        const lo = a <= b ? a : b, hi = a <= b ? b : a;
-        const key = lo + "\0" + hi;
-        let p = pair[key];
-        if (!p) p = pair[key] = { a: lo, b: hi, count: 0, a_to_b: 0, b_to_a: 0, back_and_forth: false, kinds: { mail: 0, todo: 0, hold: 0 } };
-        p.count += Number(e.count || 0);
-        const ek = e.kinds || {};
-        p.kinds.mail += Number(ek.mail || 0);
-        p.kinds.todo += Number(ek.todo || 0);
-        p.kinds.hold += Number(ek.hold || 0);
-        /* direction approx: if original a maps to lo */
-        const aIsLo = (ownerToHost[a0] || a0) === lo;
-        if (aIsLo) { p.a_to_b += Number(e.a_to_b || 0); p.b_to_a += Number(e.b_to_a || 0); }
-        else { p.a_to_b += Number(e.b_to_a || 0); p.b_to_a += Number(e.a_to_b || 0); }
-        p.back_and_forth = p.back_and_forth || !!e.back_and_forth || (p.a_to_b > 0 && p.b_to_a > 0);
-      });
-      const edges = Object.values(pair).sort((x, y) => Number(y.count || 0) - Number(x.count || 0));
-      return Object.assign({}, g, { desks: desks, edges: edges, _agg: "workstation" });
-    }
+    /* #710 COLLAB paint code lives in floor/floor-paint.js (lib/lazy.js MODULES.floorPaint); it loads with
+     * the pane. Until then each entry below loads it and replays the call; the file's
+     * function declarations replace these stubs as globals. */
+    function ensureFloorPaint() { return wallLazyCall("floorPaint", "ensureFloorPaint", ensureFloorPaint, arguments); }
+    function paintFloorMap() { return wallLazyCall("floorPaint", "paintFloorMap", paintFloorMap, arguments); }
+    function paintFloorTimeline() { return wallLazyCall("floorPaint", "paintFloorTimeline", paintFloorTimeline, arguments); }
+    function setFloorAgg() { return wallLazyCall("floorPaint", "setFloorAgg", setFloorAgg, arguments); }
+    function setFloorMode() { return wallLazyCall("floorPaint", "setFloorMode", setFloorMode, arguments); }
+    function setFloorSpan() { return wallLazyCall("floorPaint", "setFloorSpan", setFloorSpan, arguments); }
 
     function normalizeFloorSpan(span) {
       if (span === "15m" || span === "min") return "min";
@@ -6169,12 +6126,6 @@
     })();
     let floorGlanceCache = null;
     let floorDetailSel = null;
-    function floorSpanLabel(span) {
-      const s = normalizeFloorSpan(span || floorSpan || "daily") || "daily";
-      if (s === "min") return "Activity";
-      if (s === "hourly") return "Hour";
-      return "Day";
-    }
     function activitySpanQuery() {
       let kind = "project";
       let id = ((currentFilter().projects || [])[0]) || "Office";
@@ -6246,17 +6197,6 @@
       const span = document.getElementById("floor-span");
       if (span) span.hidden = floorMode !== "timeline";
     }
-    function setFloorSpan(span) {
-      span = normalizeFloorSpan(span);
-      if (!span) return;
-      floorSpan = span;
-      try { localStorage.setItem(FLOOR_SPAN_KEY, span); } catch (e) {}
-      paintFloorSpan();
-      loadPresenceBuckets().then(() => {
-        loadFloorGlance(true);
-        if (window._floor) paintSessionWire(window._floor);
-      });
-    }
         /* FLOOR_DEFAULT_MAP: paint Map (or saved pref) immediately - no blank until click */
     function floorMailSender(m) {
       if (typeof mailSenderDesk === "function") return mailSenderDesk(m);
@@ -6292,21 +6232,6 @@
       const spec = floorWindowSpec("min");
       const now = Date.now();
       return ts >= (now - spec.ms) && ts <= now + 1000;
-    }
-    function floorCountBit(n, one, many) {
-      n = Number(n || 0);
-      if (!n) return "";
-      return n + " " + (n === 1 ? one : many);
-    }
-    function floorEdgeLabel(e) {
-      const k = (e && e.kinds) || {};
-      const bits = [
-        floorCountBit(k.mail, "letter", "letters"),
-        floorCountBit(k.todo, "card", "cards"),
-        floorCountBit(k.hold, "promise", "promises")
-      ].filter(Boolean);
-      if (bits.length) return bits.join(", ");
-      return floorCountBit((e && e.count) || 0, "shared row", "shared rows") || "0 shared";
     }
     /* Shared rows only: a letter, a card that moved, or a promise. */
     function floorShared(d) {
@@ -6453,36 +6378,6 @@
       };
       return g;
     }
-    function ensureFloorPaint() {
-      try { paintFloorMode(); } catch (e) {}
-      let g = null;
-      try { g = floorGlanceCache || floorGlanceFromFloor(window._floor) || null; } catch (e) { g = floorGlanceFromFloor(window._floor); }
-      if (g) {
-        try { paintFloorView(g, { force: true }); } catch (e) {}
-        /* second paint after layout - #floor cold load often has 0-size flex until shown */
-        try {
-          requestAnimationFrame(function() {
-            try { paintFloorView(g, { force: true }); } catch (e2) {}
-          });
-        } catch (e) {}
-      } else {
-        try { loadFloorGlance(true); } catch (e) {}
-      }
-    }
-    function setFloorMode(mode) {
-      if (mode !== "map" && mode !== "timeline") return;
-      floorMode = mode;
-      try { localStorage.setItem(FLOOR_MODE_KEY, mode); } catch (e) {}
-      paintFloorMode();
-      try { wallBumpSwitchGen(); } catch (eGenF) {}
-      try { wallRestoreActivePaneFromFloor({ force: true }); } catch (eRestF) {}
-      try { wallShowPaneOverlay("pane-floor", "Checking\u2026"); } catch (eOvF) {}
-      if (typeof wallReuseInflightForReturn === "function" && wallReuseInflightForReturn()) {
-        /* wow150: reuse in-flight */
-      } else {
-        tick(true);
-      }
-    }
     let _floorSharedFill = "";
     function floorEnsureSharedBook() {
       /* Map already has agents and mail. Cards and promises are separate parts. */
@@ -6531,12 +6426,6 @@
         try { strip(next); } catch (eStrip) {}
       }).catch(function () { _floorSharedFill = "fail:" + key; });
     }
-    function loadFloorGlance() {
-      const g = floorGlanceFromFloor(window._floor);
-      if (!g) return;
-      floorGlanceCache = g;
-      paintFloorView(g);
-    }
     function paintFloorView(g, opts) {
       /* wow146: keep prior floor paint when glance empty / floor pane not on (leave must not blank). */
       paintFloorSpan();
@@ -6567,43 +6456,6 @@
       else paintFloorMap(gUse);
       try { if (active) floorEnsureSharedBook(); } catch (eShare) {}
     }
-    /* WALL_UI_DEFAULT_FLOOR: floorLayout from domain module */
-    function wallBindMapDeps() {
-      try {
-        window.__wallMapDeps = {
-          paintFloorSpan: paintFloorSpan,
-          paintFloorAgg: paintFloorAgg,
-          aggregateFloorGlance: aggregateFloorGlance,
-          floorLayout: floorLayout,
-          floorEdgeLabel: floorEdgeLabel,
-          esc: esc,
-          hereGlance: hereGlance,
-          wallDoingFace: wallDoingFace,
-          millNameBare: millNameBare,
-          floorSpanLabel: floorSpanLabel,
-          showFloorEdge: showFloorEdge,
-          showFloorDesk: showFloorDesk,
-          getFloorAgg: function () { return floorAgg; },
-          getFloorSpan: function () { return floorSpan; }
-        };
-      } catch (eMapDep) {}
-    }
-    function wallEnsureFloorMap() {
-      wallBindMapDeps();
-      if (typeof wallEnsureModule === "function") return wallEnsureModule("floorMap");
-      if (typeof wallLoadScript === "function") return wallLoadScript("/floor/map-paint.js?v=wow280");
-      return Promise.resolve();
-    }
-    function paintFloorMap(g) {
-      wallBindMapDeps();
-      if (window.WallFloorMap && typeof window.WallFloorMap.paint === "function") {
-        return window.WallFloorMap.paint(g);
-      }
-      wallEnsureFloorMap().then(function () {
-        wallBindMapDeps();
-        if (window.WallFloorMap) window.WallFloorMap.paint(g);
-      });
-    }
 
     function floorParseTs(s) {
       if (!s) return NaN;
@@ -6621,15 +6473,6 @@
       if (s === "min") return { ms: 15 * 60 * 1000, bucket: 60 * 1000, unit: "min", slots: 15 };
       if (s === "hourly") return { ms: 24 * 3600000, bucket: 3600000, unit: "hour", slots: 24 };
       return { ms: 30 * 86400000, bucket: 86400000, unit: "day", slots: 30 };
-    }
-    function presenceEventsInWindow(d, span) {
-      const spec = floorWindowSpec(span || floorSpan);
-      const now = Date.now();
-      const since = now - spec.ms;
-      return ((d && d.events) || []).filter(e => {
-        const ts = floorParseTs(e.at || e.updated);
-        return Number.isFinite(ts) && ts >= since && ts <= now + 1000;
-      });
     }
     let _presenceRows = [];
     let _presenceKey = "";
@@ -6671,32 +6514,6 @@
       }
     }
     const DESK_PALETTE = ["#6fbf73", "#e6b84c", "#5ec8d8", "#c17cff", "#f07178", "#9aa7b5", "#d4a574", "#7eb8f0"];
-    function floorTlSvg(namedSeries, ymax, spec, since, nB) {
-      const W = 640, H = 88, padL = 28, padB = 16, padT = 8, padR = 8;
-      const innerW = W - padL - padR, innerH = H - padT - padB;
-      const xAt = i => padL + (nB <= 1 ? 0 : (i / (nB - 1)) * innerW);
-      const yAt = v => padT + innerH - (v / ymax) * innerH;
-      const grid = [0, 0.5, 1].map(f => {
-        const y = yAt(ymax * f);
-        return `<line class="floor-tl-grid" x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}"/>` +
-          `<text class="floor-tl-axis" x="${padL - 4}" y="${(y + 3).toFixed(1)}" text-anchor="end">${esc(String(Math.round(ymax * f)))}</text>`;
-      }).join("");
-      const xLabels = [];
-      const step = nB <= 8 ? 1 : Math.ceil(nB / 8);
-      for (let i = 0; i < nB; i += step) {
-        const t = new Date(since + i * spec.bucket);
-        let lab = "";
-        if (spec.unit === "hour") lab = String(t.getHours()).padStart(2, "0") + "h";
-        else if (spec.unit === "day") lab = (t.getMonth() + 1) + "/" + t.getDate();
-        else lab = String(t.getMinutes()).padStart(2, "0") + "m";
-        xLabels.push(`<text class="floor-tl-axis" x="${xAt(i).toFixed(1)}" y="${H - 2}" text-anchor="middle">${esc(lab)}</text>`);
-      }
-      const lines = namedSeries.map(s => {
-        const pts = s.values.map((v, i) => xAt(i).toFixed(1) + "," + yAt(v).toFixed(1)).join(" ");
-        return `<polyline fill="none" stroke="${s.color}" stroke-width="${s.thick || 1.6}" points="${pts}"/>`;
-      }).join("");
-      return `<svg viewBox="0 0 ${W} ${H}" role="img">${grid}${xLabels.join("")}${lines}</svg>`;
-    }
     function presenceRowsForUi(opts) {
       /* WALL_HISTORY_EVENTS_92: the History diary paints one row per activity (events,
        * with at/kind/state). Hourly and daily span rows are score_evidence (timestamp +
@@ -6720,11 +6537,6 @@
         state: r.state || null,
       }));
     }
-    function evidenceCount(row) {
-      const v = row && row.value;
-      if (v && typeof v === "object" && v.n != null) return Number(v.n) || 0;
-      return 0;
-    }
     function evidenceHour(row) {
       const m = String((row && row.timestamp) || "").match(/(\d{2}):\d{2}:\d{2}/);
       return m ? Number(m[1]) : -1;
@@ -6732,290 +6544,6 @@
     function evidenceDay(row) {
       const m = String((row && (row.timestamp || row.taken)) || "").match(/(\d{4}-\d{2}-\d{2})/);
       return m ? m[1] : "";
-    }
-    function paintEvidenceTimeline(tlEl, rows) {
-      const span = normalizeFloorSpan(floorSpan) || "daily";
-      const byDesk = floorTlSplit !== "type";
-      const owners = [];
-      (rows || []).forEach(function (row) {
-        const o = String((row && row.owner) || "");
-        if (o && owners.indexOf(o) < 0) owners.push(o);
-      });
-      const note = span === "hourly"
-        ? `<p class="floor-tl-note">Hour rollup. Each point is that desk's verb count.</p>`
-        : `<p class="floor-tl-note">Day rollup, 30 midnights. Each point is that desk's verb count.</p>`;
-      if (!owners.length) {
-        const empty = span === "hourly"
-          ? "No hour rollup for these desks."
-          : "No day rollup for these desks.";
-        tlEl.innerHTML = note + `<div class="idle">${empty}</div>`;
-        return;
-      }
-      let spec, since, nB, indexOf;
-      if (span === "hourly") {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        spec = { bucket: 3600000, unit: "hour" };
-        since = start.getTime();
-        nB = 24;
-        indexOf = evidenceHour;
-      } else {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        start.setDate(start.getDate() - 29);
-        spec = { bucket: 86400000, unit: "day" };
-        since = start.getTime();
-        nB = 30;
-        const keys = [];
-        for (let i = 0; i < nB; i++) {
-          const d = new Date(since + i * spec.bucket);
-          keys.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
-        }
-        indexOf = function (row) {
-          return keys.indexOf(evidenceDay(row));
-        };
-      }
-      const perDesk = {};
-      owners.forEach(function (owner) { perDesk[owner] = new Array(nB).fill(0); });
-      (rows || []).forEach(function (row) {
-        const owner = String((row && row.owner) || "");
-        const i = indexOf(row);
-        if (!perDesk[owner] || i < 0 || i >= nB) return;
-        perDesk[owner][i] = evidenceCount(row);
-      });
-      const verbColor = "#5ec8d8";
-      let legend = "";
-      let charts = "";
-      if (byDesk) {
-        legend = `<div class="floor-tl-legend"><span><i style="background:${verbColor}"></i>verbs</span></div>`;
-        charts = owners.map(function (owner) {
-          const values = perDesk[owner];
-          let ymax = 1;
-          values.forEach(function (v) { if (v > ymax) ymax = v; });
-          return `<div class="floor-tl-chart" data-owner="${esc(owner)}" role="button" tabindex="0">` +
-            `<div class="floor-tl-name">${esc(owner)}</div>` +
-            floorTlSvg([{ values: values, color: verbColor, thick: 1.6 }], ymax, spec, since, nB) + `</div>`;
-        }).join("");
-      } else {
-        legend = `<div class="floor-tl-legend">` + owners.map(function (o, i) {
-          return `<span><i style="background:${DESK_PALETTE[i % DESK_PALETTE.length]}"></i>${esc(o)}</span>`;
-        }).join("") + `</div>`;
-        const named = owners.map(function (owner, i) {
-          return { values: perDesk[owner], color: DESK_PALETTE[i % DESK_PALETTE.length], thick: 1.6 };
-        });
-        let ymax = 1;
-        named.forEach(function (s) { s.values.forEach(function (v) { if (v > ymax) ymax = v; }); });
-        charts = `<div class="floor-tl-chart"><div class="floor-tl-name">verbs</div>` +
-          floorTlSvg(named, ymax, spec, since, nB) + `</div>`;
-      }
-      tlEl.innerHTML = `<div class="floor-tl-stick">${note}${legend}</div>` + charts;
-      tlEl.onclick = function (ev) {
-        const lane = ev.target.closest(".floor-tl-chart");
-        if (!lane) return;
-        tlEl.querySelectorAll(".floor-tl-chart").forEach(function (el) { el.classList.toggle("on", el === lane); });
-        const owner = lane.getAttribute("data-owner");
-        if (owner) showFloorDesk(owner);
-      };
-    }
-    function paintFloorTimeline(g) {
-      const tlEl = document.getElementById("floor-timeline");
-      if (!tlEl) return;
-      const q = activitySpanQuery();
-      if (_presenceMiss && _presenceKey === q.key) {
-        tlEl.innerHTML = '<div class="idle">This office has no activity span yet.</div>';
-        return;
-      }
-      const span = q.window;
-      if (span === "hourly" || span === "daily") {
-        const rows = _presenceKey === q.key ? _presenceRows : [];
-        paintEvidenceTimeline(tlEl, rows);
-        return;
-      }
-      const spec = floorWindowSpec(span);
-      const now = Date.now();
-      const since = now - spec.ms;
-      const nB = Math.max(1, Math.round(spec.ms / spec.bucket));
-      const ev = presenceRowsForUi();
-      const owners = [];
-      ((g && g.desks) || []).forEach(function (d) {
-        const o = String((d && d.owner) || "");
-        if (o && owners.indexOf(o) < 0) owners.push(o);
-      });
-      ev.forEach(function (e) {
-        const o = String(e.owner || "");
-        if (o && owners.indexOf(o) < 0) owners.push(o);
-      });
-      const byDesk = floorTlSplit !== "type";
-      const note = byDesk
-        ? `<p class="floor-tl-note">By desk: mail, todo, and hold. Last 15 minutes.</p>`
-        : `<p class="floor-tl-note">By type: one row per kind. Each line is a desk. Last 15 minutes.</p>`;
-      if (!owners.length) {
-        tlEl.innerHTML = note + '<div class="idle">No activity in the last 15 minutes.</div>';
-        return;
-      }
-      function bucketIdx(ts) {
-        return Math.max(0, Math.min(nB - 1, Math.floor((ts - since) / spec.bucket)));
-      }
-      const perDesk = {};
-      owners.forEach(owner => {
-        const series = {};
-        PRESENCE_SERIES.forEach(p => { series[p[0]] = new Array(nB).fill(0); });
-        ev.filter(e => floorDeskKey(e.owner) === owner || String(e.owner || "") === owner).forEach(e => {
-          const ts = floorParseTs(e.at || e.updated);
-          if (!Number.isFinite(ts)) return;
-          const i = bucketIdx(ts);
-          const n = Number(e.n != null ? e.n : 1) || 1;
-          const k = String(e.kind || e.type || "");
-          if (series[k]) series[k][i] += n;
-        });
-        perDesk[owner] = { series };
-      });
-      let charts = "";
-      let legend = "";
-      if (byDesk) {
-        legend = `<div class="floor-tl-legend">` +
-          PRESENCE_SERIES.map(p => `<span><i style="background:${p[1]}"></i>${esc(p[0])}</span>`).join("") +
-          `</div>`;
-        charts = owners.map(owner => {
-          const series = perDesk[owner].series;
-          let ymax = 1;
-          PRESENCE_SERIES.forEach(p => series[p[0]].forEach(v => { if (v > ymax) ymax = v; }));
-          const named = PRESENCE_SERIES.map(p => ({ values: series[p[0]], color: p[1], thick: 1.6 }));
-          return `<div class="floor-tl-chart" data-owner="${esc(owner)}" role="button" tabindex="0">` +
-            `<div class="floor-tl-name">${esc(owner)}</div>` +
-            floorTlSvg(named, ymax, spec, since, nB) + `</div>`;
-        }).join("");
-      } else {
-        legend = `<div class="floor-tl-legend">` + owners.map((o, i) =>
-          `<span><i style="background:${DESK_PALETTE[i % DESK_PALETTE.length]}"></i>${esc(o)}</span>`
-        ).join("") + `</div>`;
-        const typeRows = PRESENCE_SERIES.map(p => [p[0], p[0]]);
-        charts = typeRows.map(tr => {
-          const key = tr[0];
-          const named = owners.map((owner, i) => {
-            const d = perDesk[owner];
-            return { values: d.series[key], color: DESK_PALETTE[i % DESK_PALETTE.length], thick: 1.6 };
-          });
-          let ymax = 1;
-          named.forEach(s => s.values.forEach(v => { if (v > ymax) ymax = v; }));
-          return `<div class="floor-tl-chart" data-type="${esc(key)}">` +
-            `<div class="floor-tl-name">${esc(tr[1])}</div>` +
-            floorTlSvg(named, ymax, spec, since, nB) + `</div>`;
-        }).join("");
-      }
-      tlEl.innerHTML = `<div class="floor-tl-stick">${note}${legend}</div>` + charts;
-      tlEl.onclick = (ev) => {
-        const lane = ev.target.closest(".floor-tl-chart");
-        if (!lane) return;
-        tlEl.querySelectorAll(".floor-tl-chart").forEach(el => el.classList.toggle("on", el === lane));
-        showFloorDesk(lane.getAttribute("data-owner"));
-      };
-    }
-    function showFloorDesk(owner, kind) {
-      const detail = document.getElementById("floor-pop") || document.getElementById("floor-detail");
-      if (!detail) return;
-      detail.hidden = false;
-      const gRaw = floorGlanceCache || floorGlanceFromFloor(window._floor) || {};
-      const gMap = (kind === "workstation" || floorAgg === "workstation") ? (aggregateFloorGlance(gRaw) || gRaw) : gRaw;
-      const g = gRaw;
-      const desk = ((gMap.desks || []).find(d => d.owner === owner)) || ((g.desks || []).find(d => d.owner === owner)) || { owner };
-      const isWs = (kind === "workstation") || desk.kind === "workstation";
-      if (isWs) {
-        const wsFace = wallDoingFace(desk.doing || "");
-        const members = desk.desks || [];
-        const pills = members.map(m => {
-          const unreadM = Math.max(0, Number(((g.desks || []).find(x => x.owner === m) || {}).unread || ((window._floor || {}).desk_unread || {})[m] || 0) | 0);
-          const badgeM = unreadM > 0 ? `<span class="fd-unread" data-n="${unreadM}">${unreadM > 99 ? "99+" : unreadM}</span>` : "";
-          return `<button type="button" class="sg-mail" data-mail-to="${esc(m)}" title="Mail ${esc(m)}">${esc(m)}${badgeM}</button>`;
-        }).join(" ");
-        detail.innerHTML = `<div class="floor-detail-head"><h3>WORKSTATION | ${esc(owner)}</h3></div>` +
-          `<span class="chip">${esc(desk.rollup_state || "")}</span>` +
-          `<span class="chip">tok ${esc(desk.tokens || 0)}</span>` +
-          `<span class="chip">usd ${esc(desk.usd || 0)}</span>` +
-          `<span class="chip">done ${esc(floorSpanLabel(g.window || floorSpan))} ${esc(desk.jobs_done || 0)}</span>` +
-          `<div style="margin-top:.35rem">desks: ${pills || esc("(none)")}</div>` +
-          wallDoingBlock(wsFace.now, wsFace.older);
-        floorDetailSel = { type: "workstation", owner };
-        return;
-      }
-      const lane = ((((g.timeline || {}).lanes) || []).find(L => L.owner === owner)) || null;
-      const d = window._floor || {};
-      const agent = (d.agents || []).find(a => a.owner === owner && a.alive) || {};
-      const storedFace = wallDoingFace((agent && agent.doing) || desk.doing || "");
-      const glance = agent.owner ? hereGlance(d, agent) : { state: (lane && lane.now_state) || "?", doing: storedFace.now, doingOlder: storedFace.older };
-      const unread = Math.max(0, Number(desk.unread != null ? desk.unread : ((d.desk_unread || {})[owner] || 0)) | 0);
-      const badge = unread > 0
-        ? `<span class="fd-unread" data-n="${unread}" title="${unread} agent-unread">${unread > 99 ? "99+" : unread}</span>`
-        : `<span class="fd-unread mute" data-n="0" hidden></span>`;
-      const mailBit = `<button type="button" class="sg-mail" data-mail-to="${esc(owner)}" aria-label="Mail ${esc(owner)}${unread ? (", " + unread + " unread") : ""}" title="Mail ${esc(owner)}${unread ? (" | " + unread + " unread") : ""}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2 3.5h12v9H2z"/><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2.5 4l5.5 4.2L13.5 4"/></svg></button>`;
-      const tok = desk.tokens != null ? desk.tokens : (lane ? lane.tokens : 0);
-      const done = desk.jobs_done != null ? desk.jobs_done : (lane ? lane.jobs_done : 0);
-      detail.innerHTML = `<div class="floor-detail-head"><h3>DESK | ${esc(owner)}</h3>${mailBit}${badge}</div>` +
-        `<span class="chip">${esc(glance.state || (lane && lane.now_state) || "")}</span>` +
-        `<span class="chip">tok ${esc(tok || 0)}</span>` +
-        `<span class="chip">usd ${esc(desk.usd || (lane && lane.usd) || 0)}</span>` +
-        `<span class="chip">done ${esc(floorSpanLabel(g.window || floorSpan))} ${esc(done || 0)}</span>` +
-        wallDoingBlock(glance.doing || storedFace.now || "(no doing)", (glance.doingOlder && glance.doingOlder.length) ? glance.doingOlder : storedFace.older);
-      floorDetailSel = { type: "desk", owner };
-    }
-    function showFloorEdge(a, b) {
-      const detail = document.getElementById("floor-pop") || document.getElementById("floor-detail");
-      if (!detail) return;
-      detail.hidden = false;
-      const d = window._floor || {};
-      const ak = floorDeskKey(a);
-      const bk = floorDeskKey(b);
-      const letters = (d.mailbox || []).filter(m => {
-        const s = floorDeskKey(floorMailSender(m));
-        const dests = floorMailDests(m).map(floorDeskKey);
-        return (s === ak && dests.indexOf(bk) >= 0) || (s === bk && dests.indexOf(ak) >= 0);
-      });
-      let cards = [];
-      try { cards = millTodoCards(d) || []; } catch (eCards) { cards = []; }
-      cards = cards.filter(function (r) {
-        const asker = floorDeskKey(r && (r.creator || r.asker || ""));
-        const holder = floorDeskKey(r && (r.assigned || r.volunteer || ""));
-        return (asker === ak && holder === bk) || (asker === bk && holder === ak);
-      });
-      const promises = (d.locks || []).filter(function (row) {
-        const names = [row && row.owner, row && row.holder, row && row.desk, row && row.volunteer]
-          .map(floorDeskKey).filter(Boolean);
-        return names.indexOf(ak) >= 0 && names.indexOf(bk) >= 0;
-      });
-      const g = floorGlanceCache || {};
-      const edge = ((g.edges || []).find(e => (e.a === a && e.b === b) || (e.a === b && e.b === a)));
-      const counts = edge ? floorEdgeLabel(edge) : [
-        floorCountBit(letters.length, "letter", "letters"),
-        floorCountBit(cards.length, "card", "cards"),
-        floorCountBit(promises.length, "promise", "promises")
-      ].filter(Boolean).join(", ");
-      function listOf(title, rows, line) {
-        if (!rows.length) return "";
-        const shown = rows.slice(0, 8);
-        const more = rows.length > shown.length ? `<div class="meta">${rows.length - shown.length} more</div>` : "";
-        return `<div style="margin-top:.45rem"><b>${esc(title)}</b><ul style="margin:.2rem 0 0 1rem;padding:0">` +
-          shown.map(line).join("") + `</ul>${more}</div>`;
-      }
-      const letterList = listOf("Letters", letters, function (m) {
-        const who = floorMailSender(m) || "";
-        const to = floorMailDests(m).filter(Boolean).join(", ");
-        return `<li><b>${esc(who)}</b> to ${esc(to)} <span class="meta">${esc(dt(m.at || m.created))}</span> - ${esc(String(m.body || "").slice(0, 100))}</li>`;
-      });
-      const cardList = listOf("Cards", cards, function (r) {
-        const title = String(r.doing || r.detail || r.need_id || "card").replace(/\s+/g, " ").trim().slice(0, 80);
-        const asker = r.creator || r.asker || "";
-        const holder = r.assigned || r.volunteer || "";
-        return `<li><b>${esc(asker)}</b> to ${esc(holder)} - ${esc(title)}</li>`;
-      });
-      const promiseList = listOf("Promises", promises, function (row) {
-        const file = String(row.resource || row.path || "a file").split(/[/\\]/).pop();
-        return `<li>${esc(file || "a file")}</li>`;
-      });
-      const body = letterList + cardList + promiseList ||
-        `<div class="idle">No rows for this pair in the current book.</div>`;
-      detail.innerHTML = `<h3>${esc(a)} &lt;-&gt; ${esc(b)}</h3>` +
-        `<div class="note">${esc(counts || "0 shared")}</div>${body}`;
-      floorDetailSel = { type: "edge", a, b };
     }
     (function wireFloorSpan() {
       const root = document.getElementById("floor-span");
@@ -7191,121 +6719,17 @@
         }).join("") +
         `</tbody></table>`;
     }
-    /* WALL_UI_DEFAULT_MAIL: mailDst from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailIsFloor from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailDstKey from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailReadMatchesDst from domain module */
-    /** Primary Wall unread = agent-unread for dst desk (party=agent). Human open alone does not clear. */
-    /* WALL_UI_DEFAULT_MAIL: mailDstAgentRead from domain module */
-    /** Soft cue: human opened on Wall (party=human). Optional - not primary unread. */
-    /* WALL_UI_DEFAULT_MAIL: mailDstHumanOpened from domain module */
-    /** @deprecated name kept: primary read = agent read */
-    /* WALL_UI_DEFAULT_MAIL: mailDstRead from domain module */
-    function mailReadChips(m) {
-      const reads = m.reads || [];
-      if (reads.length) {
-        return reads.map(r => {
-          const who = String((r && r.who) || "").trim();
-          if (!who) return "";
-          const party = String((r && r.party) || "").toLowerCase();
-          const cls = party === "human" ? "mail-chip human" : (party === "agent" ? "mail-chip agent" : "mail-chip");
-          return `<span class="${cls}" title="${esc(who)}">${esc(who)}</span>`;
-        }).filter(Boolean);
-      }
-      return (m.readers || []).map(r => {
-        const s = String(r || "").trim();
-        if (!s) return "";
-        const cls = s.indexOf(":human") >= 0 ? "mail-chip human" : (s.indexOf(":agent") >= 0 ? "mail-chip agent" : "mail-chip");
-        return `<span class="${cls}" title="${esc(s)}">${esc(s)}</span>`;
-      }).filter(Boolean);
-    }
-    function mailGuessEta(d, m) {
-      if (mailIsFloor(m)) return { kind: "unknown" };
-      const dst = mailDst(m);
-      const pid = String(millGid(m) || "");
-      const name = x => String(x || "").trim() === dst;
-      const agents = (d.agents || []).filter(a => a.alive && name(a.owner));
-      const sess = agents.find(a => millGid(a) === pid) || agents[0];
-      if (!sess) return { kind: "offline" };
-      const millCard = r => {
-        const nid = String(r.need_id || "");
-        if (!nid || nid === "leftover" || nid.indexOf("idle-") === 0) return false;
-        if (r.holder_dead) return false;
-        const st = r.status || "";
-        if (st !== "claimed" && st !== "current") return false;
-        if (!name(r.volunteer) && !name(r.owner)) return false;
-        if (pid && millGid(r) && String(millGid(r)) !== pid) return false;
-        return true;
-      };
-      const pool = [].concat(d.on_it || [], d.needs || []);
-      const cards = pool.filter(millCard);
-      const card = cards.find(r => r.eta) || cards[0];
-      if (card) {
-        const eta = { kind: "card" };
-        if (card.eta) eta.at = card.eta;
-        if (card.need_id) eta.need_id = card.need_id;
-        return eta;
-      }
-      const doing = wallDoingFace(sess.doing).now;
-      const idleNid = r => {
-        const nid = String(r.need_id || "");
-        return nid === "leftover" || nid.indexOf("idle-") === 0;
-      };
-      const idleCard = pool.find(r => idleNid(r) && (name(r.volunteer) || name(r.owner)));
-      const idleDoing = !doing || /^idle\b/i.test(doing) || doing === "here";
-      if (idleCard || idleDoing) {
-        const eta = { kind: "idle" };
-        const at = (idleCard && idleCard.eta) || sess.heartbeat || "";
-        if (at) eta.at = at;
-        if (idleCard && idleCard.need_id) eta.need_id = idleCard.need_id;
-        return eta;
-      }
-      return { kind: "unknown" };
-    }
-    function mailReadEta(d, m) {
-      const given = m.read_eta;
-      if (given && ["offline", "card", "idle", "unknown"].indexOf(given.kind) >= 0) return given;
-      return mailGuessEta(d, m);
-    }
-    function mailEtaText(unread, eta) {
-      if (!unread) return "-";
-      const kind = (eta && eta.kind) || "unknown";
-      if (kind === "offline") return "offline";
-      if (kind === "card") return eta.at ? t(eta.at) : "-";
-      if (kind === "idle") return eta.at ? t(eta.at) : "idle";
-      return "-";
-    }
+    /* #710 MAIL paint code lives in mail/mail-paint.js (lib/lazy.js MODULES.mailPaint); it loads with
+     * the pane. Until then each entry below loads it and replays the call; the file's
+     * function declarations replace these stubs as globals. */
+    function ackMailHuman() { return wallLazyCall("mailPaint", "ackMailHuman", ackMailHuman, arguments); }
+    function ensureMailPaint() { return wallLazyCall("mailPaint", "ensureMailPaint", ensureMailPaint, arguments); }
+    function mail() { return wallLazyCall("mailPaint", "mail", mail, arguments); }
+    function paintMailRooms() { return wallLazyCall("mailPaint", "paintMailRooms", paintMailRooms, arguments); }
+    function setMailDestClass() { return wallLazyCall("mailPaint", "setMailDestClass", setMailDestClass, arguments); }
+    function setMailMode() { return wallLazyCall("mailPaint", "setMailMode", setMailMode, arguments); }
+    function setMailView() { return wallLazyCall("mailPaint", "setMailView", setMailView, arguments); }
     const BARE_HUMAN_MAILBOX = new Set(["setter-upper", "human"]);
-    /* WALL_UI_DEFAULT_MAIL: mailBareDst from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailIsBareHumanMailbox from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailActiveRows from domain module */
-    function fillMailToList(d) {
-      const dl = document.getElementById("mail-to-list");
-      if (!dl) return;
-      const roles = wallRoleNames();
-      const desks = new Set();
-      (d.agents || []).forEach(a => {
-        const o = String(a.owner || "").trim();
-        if (o && !BARE_HUMAN_MAILBOX.has(o.toLowerCase())) desks.add(o);
-      });
-      ((d.office_glance && d.office_glance.desks) || []).forEach(x => {
-        const o = String(x.owner || "").trim();
-        if (o && !BARE_HUMAN_MAILBOX.has(o.toLowerCase())) desks.add(o);
-      });
-      const proj = wallProjectName() || String((d.wall && d.wall[0]) || ((d.groups || d.projects) && (d.groups || d.projects)[0]) || "").trim();
-      const opts = [];
-      [...desks].sort().forEach(o => opts.push(o));
-      roles.forEach(r => opts.push(r));
-      opts.push(proj);
-      opts.push("*");
-      const seen = new Set();
-      dl.innerHTML = opts.filter(x => {
-        const k = String(x);
-        if (seen.has(k)) return false;
-        seen.add(k);
-        return true;
-      }).map(x => `<option value="${esc(x)}"></option>`).join("");
-    }
     /* MAIL_TO_SRC_JS */
     const MAIL_MODE_KEY = "factory-mail-mode";
     const MAIL_DESK_KEY = "factory-mail-desk";
@@ -7326,885 +6750,6 @@
     const MAIL_ROOMS_Q_KEY = "factory-mail-rooms-q";
     let mailSelectedRoom = "";
     let mailRoomsQ = "";
-    /* MAIL_BOOT_FIX: paint Mail on enter / when pane visible - same family as Floor cold load */
-    function ensureMailPaint(opts) {
-      /* Wave 3: one paint path. opts.chromeOnly skips mail() when tick already painted. */
-      try {
-        const browser = document.querySelector(".mail-browser, .mail-split");
-        if (browser) browser.setAttribute("data-mail-view", mailView || "rooms");
-        document.querySelectorAll(".mail-view-toggle button").forEach(b => {
-          b.classList.toggle("on", b.dataset.mailView === (mailView || "rooms"));
-        });
-      } catch (e) {}
-      if (opts && opts.chromeOnly) return;
-      if (!window._floor) return;
-      try { mail(window._floor); } catch (e) {}
-    }
-    function setMailView(which) {
-      mailView = (which === "letters") ? "letters" : "rooms";
-      _mailViewChosen = true;
-      if (mailView !== "rooms") {
-        _mailRoomsRailSig = "";
-        _mailRoomsNestSig = "";
-      }
-      document.querySelectorAll(".mail-view-toggle button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailView === mailView);
-      });
-      const browser = document.querySelector(".mail-browser, .mail-split");
-      if (browser) browser.setAttribute("data-mail-view", mailView);
-      try { syncMailRoomsFiltersVisible(); } catch (eRoomsWin) {}
-      /* wow147: bump gen + overlay; stale ticks must not blank; keep theme. */
-      const mailGen = wallBumpSwitchGen();
-      try { wallRestoreActivePaneFromFloor({ force: true }); } catch (eRestMail) {}
-      try { wallShowPaneOverlay("pane-mail", "Checking\u2026"); } catch (eOvMail) {}
-            /* wow148/150: Checking overlay; reuse in-flight if same parts, else tick after fp decide. */
-      if (typeof wallReuseInflightForReturn === "function" && wallReuseInflightForReturn()) {
-        /* keep Checking until in-flight settle */
-      } else if (typeof tick === "function") {
-        try { tick(true); } catch (eTick) {
-          if (wallSwitchGenAlive(mailGen) && window._floor) {
-            try { mail(window._floor); } catch (eMail) {}
-          }
-          if (wallSwitchGenAlive(mailGen)) {
-            try { wallClearPaneOverlay("pane-mail"); } catch (eClr) {}
-          }
-        }
-      } else if (wallSwitchGenAlive(mailGen) && window._floor) {
-        try { mail(window._floor); } catch (eMail2) {}
-        try { wallClearPaneOverlay("pane-mail"); } catch (eClr2) {}
-      }
-    }
-    function setMailRoom(roomId) {
-      mailSelectedRoom = String(roomId || "").trim();
-      try { localStorage.setItem(MAIL_ROOM_KEY, mailSelectedRoom); } catch (e) {}
-      if (window._floor) mail(window._floor);
-    }
-    function setMailRoomsQ(q) {
-      mailRoomsQ = String(q || "").trim();
-      try { localStorage.setItem(MAIL_ROOMS_Q_KEY, mailRoomsQ); } catch (e) {}
-      if (window._floor) mail(window._floor);
-    }
-    function setMailMode(which) {
-      mailMode = (which === "all" || which === "recent") ? which : "attention";
-      try { localStorage.setItem(MAIL_MODE_KEY, mailMode); } catch (e) {}
-      document.querySelectorAll(".mail-mode-toggle button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailMode === mailMode);
-      });
-      if (window._floor) mail(window._floor);
-    }
-    function setMailDestClass(which) {
-      const ok = { all: 1, desk: 1, roster: 1, star: 1 };
-      mailDestClassFilter = ok[which] ? which : "all";
-      try { localStorage.setItem(MAIL_CLASS_KEY, mailDestClassFilter); } catch (e) {}
-      document.querySelectorAll(".mail-dest-class button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailClass === mailDestClassFilter);
-      });
-      if (window._floor) mail(window._floor);
-    }
-    function setMailDesk(desk) {
-      setMailDst(desk);
-    }
-    function setMailDst(dst) {
-      mailSelectedDst = String(dst || "").trim();
-      mailSelectedDesk = mailSelectedDst;
-      mailSelectedSrc = "";
-      try {
-        localStorage.setItem(MAIL_TO_KEY, mailSelectedDst);
-        localStorage.setItem(MAIL_DESK_KEY, mailSelectedDesk);
-        localStorage.setItem(MAIL_SRC_KEY, "");
-      } catch (e) {}
-      if (window._floor) mail(window._floor);
-    }
-    function setMailSrc(src) {
-      mailSelectedSrc = String(src || "").trim();
-      try { localStorage.setItem(MAIL_SRC_KEY, mailSelectedSrc); } catch (e) {}
-      if (window._floor) mail(window._floor);
-    }
-    function ackMailHuman(ids) {
-      const badge = humanBadge();
-      if (!badge || !ids || !ids.length) return Promise.resolve(null);
-      return fetch("/api/desk", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({
-          action: "ack_human", ack_human: true,
-          project: wallProjectName(), src: badge.name, token: badge.token, ids: ids
-        })
-      }).then(r => r.json()).then(data => { if (window.tick) tick(); return data; }).catch(() => null);
-    }
-    /* WALL_UI_DEFAULT_MAIL: mailMsgHumanRequiredOpen from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailMsgAgentUnread from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailMsgNeedsAttention from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailDeskMatches from domain module */
-    function mailKnownDesks(d, rows) {
-      /* also used as mailKnownDsts - desks + rosters + * */
-      const roles = new Set(wallRoleNames());
-      const unreadMap = d.desk_unread || {};
-      const hrMap = d.desk_human_required || {};
-      const attnMap = d.desk_attention || {};
-      const byId = new Map();
-      const proj = wallProjectName() || String((d.wall && d.wall[0]) || ((d.groups || d.projects) && (d.groups || d.projects)[0]) || "").trim();
-      const add = (id, kind) => {
-        const o = String(id || "").trim();
-        if (!o || mailIsBareHumanMailbox(o)) return;
-        const key = (typeof mailDstKey === "function") ? mailDstKey(o) : String(o || "").trim();
-        if (!key || mailIsBareHumanMailbox(key)) return;
-        const cls = kind || (typeof mailDestClass === "function" ? mailDestClass(key, proj) : "desk");
-        const prev = byId.get(key) || { id: key, kind: cls, agentUnread: 0, humanCue: 0, humanRequired: 0 };
-        if (cls && cls !== "desk") prev.kind = cls;
-        byId.set(key, prev);
-      };
-      (d.agents || []).forEach(a => add(a.owner, "desk"));
-      ((d.office_glance && d.office_glance.desks) || []).forEach(x => add(x.owner, "desk"));
-      Object.keys(unreadMap).forEach(k => add(k, "desk"));
-      Object.keys(hrMap).forEach(k => add(k, "desk"));
-      Object.keys(attnMap).forEach(k => add(k, "desk"));
-      roles.forEach(r => add(r, "roster"));
-      if (proj) add(proj, "roster");
-      add("*", "star");
-      (rows || []).forEach(m => {
-        const desks = (typeof mailDstDesks === "function") ? mailDstDesks(m) : [mailDst(m)];
-        desks.forEach(raw0 => {
-          const raw = String(raw0 || "").trim();
-          if (!raw || mailIsBareHumanMailbox(raw)) return;
-          add(raw, typeof mailDestClass === "function" ? mailDestClass(raw, proj) : "desk");
-        });
-      });
-      byId.forEach((rec, key) => {
-        let agentUnread = 0, humanCue = 0, humanRequired = 0;
-        (rows || []).forEach(m => {
-          if (!mailDeskMatches(m, key)) return;
-          if (key === "*") {
-            if ((typeof mailStarWallUnread === "function") ? mailStarWallUnread(m) : false) agentUnread += 1;
-          } else if (mailMsgAgentUnread(m)) agentUnread += 1;
-          else if (!mailDstHumanOpened(m)) humanCue += 1;
-          if (mailMsgHumanRequiredOpen(m)) humanRequired += 1;
-        });
-        if (key !== "*" && unreadMap[key] != null && Number(unreadMap[key]) >= 0) {
-          rec.agentUnread = Math.max(0, Number(unreadMap[key]) | 0);
-        } else {
-          rec.agentUnread = agentUnread;
-        }
-        if (hrMap[key] != null && Number(hrMap[key]) >= 0) {
-          rec.humanRequired = Math.max(0, Number(hrMap[key]) | 0);
-        } else {
-          rec.humanRequired = humanRequired;
-        }
-        rec.humanCue = humanCue;
-        const attn = attnMap[key];
-        if (attn && typeof attn === "object" && "needs_attention" in attn) {
-          rec.needsAttention = !!attn.needs_attention;
-          if (attn.agent_unread != null) rec.agentUnread = Math.max(0, Number(attn.agent_unread) | 0);
-          if (attn.human_required != null) rec.humanRequired = Math.max(0, Number(attn.human_required) | 0);
-        } else if (key === "*") {
-          rec.needsAttention = rec.humanRequired > 0;
-        } else {
-          rec.needsAttention = rec.agentUnread > 0 || rec.humanRequired > 0;
-        }
-      });
-      return [...byId.values()].sort((a, b) => {
-        if (a.needsAttention !== b.needsAttention) return a.needsAttention ? -1 : 1;
-        if (b.agentUnread !== a.agentUnread) return b.agentUnread - a.agentUnread;
-        if (b.humanRequired !== a.humanRequired) return b.humanRequired - a.humanRequired;
-        const rank = { star: 0, project: 1, role: 2, desk: 3 };
-        const ra = rank[a.kind] != null ? rank[a.kind] : 9;
-        const rb = rank[b.kind] != null ? rank[b.kind] : 9;
-        if (ra !== rb) return ra - rb;
-        return String(a.id).localeCompare(String(b.id));
-      });
-    }
-    function mailDeskRailHtml(desks, mode, selected) {
-      return mailDstColHtml(desks, mode, selected);
-    }
-    function mailDstColHtml(dsts, mode, selected) {
-      const show = mode === "attention" ? dsts.filter(x => x.needsAttention) : dsts;
-      if (mode === "attention" && !show.length) {
-        return `<div class="rail-h">Dst</div><div class="col-empty">All clear - none need attention</div>`;
-      }
-      if (!show.length) {
-        return `<div class="rail-h">Dst</div><div class="col-empty">no destinations</div>`;
-      }
-      const rows = show.map(x => {
-        const on = selected === x.id ? " on" : "";
-        const n = x.agentUnread | 0;
-        const badge = `<span class="desk-badge" data-n="${n}" title="${n} agent-unread">${n > 99 ? "99+" : n}</span>`;
-        const hr = x.humanRequired > 0 ? `<span class="hr-cue" title="open human_required">HR</span>` : "";
-        const soft = (n === 0 && x.humanCue > 0)
-          ? `<span class="human-cue" title="human not opened on some">|</span>` : "";
-        let kindLabel = "";
-        if (x.kind === "roster") kindLabel = "roster";
-        else if (x.kind === "star") kindLabel = "star";
-        const kind = kindLabel ? `<span class="desk-kind">${kindLabel}</span>` : "";
-        const label = x.id === "*" ? "*" : x.id;
-        return `<button type="button" class="desk-row${on}" data-mail-dst="${esc(x.id)}" data-mail-desk="${esc(x.id)}" title="${esc(x.id)}">` +
-          `<span class="desk-id">${esc(label)}</span>${kind}${hr}${soft}${badge}</button>`;
-      }).join("");
-      return `<div class="rail-h">Dst</div>${rows}`;
-    }
-    /* WALL_UI_DEFAULT_MAIL: mailSrcsForDst from domain module */
-    function mailSrcColHtml(srcs, selected, hasDst) {
-      if (!hasDst) {
-        return `<div class="rail-h">Src</div><div class="col-empty">pick a dst</div>`;
-      }
-      if (!srcs.length) {
-        return `<div class="rail-h">Src</div><div class="col-empty">no senders for this dst</div>`;
-      }
-      const rows = srcs.map(x => {
-        const on = selected === x.id ? " on" : "";
-        const n = x.agentUnread | 0;
-        const badge = `<span class="desk-badge" data-n="${n}" title="${n} agent-unread">${n > 99 ? "99+" : n}</span>`;
-        const hr = x.humanRequired > 0 ? `<span class="hr-cue" title="open human_required">HR</span>` : "";
-        return `<button type="button" class="src-row${on}" data-mail-src="${esc(x.id)}" title="${esc(x.id)}">` +
-          `<span class="src-id">${esc(x.id)}</span>${hr}${badge}</button>`;
-      }).join("");
-      return `<div class="rail-h">Src</div>${rows}`;
-    }
-    function mailRowsAllRecent(rows, mode) {
-      /* recent-first (mode may slice/filter attention); LIST uses via mailRowsForListDst */
-      let out = (rows || []).slice();
-      if (mode === "attention") {
-        out = out.filter(m => mailMsgAgentUnread(m) || mailMsgHumanRequiredOpen(m));
-      }
-      out.sort((a, b) => {
-        const aa = (typeof mailAt === "function") ? mailAt(a) : (a.at || a.created || "");
-        const bb = (typeof mailAt === "function") ? mailAt(b) : (b.at || b.created || "");
-        return String(bb).localeCompare(String(aa));
-      });
-      if (mode === "recent") out = out.slice(0, 80);
-      return out;
-    }
-    /* WALL_UI_DEFAULT_MAIL: mailRowsForListDst from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailRowsForDesk from domain module */
-    /* WALL_UI_DEFAULT_MAIL: mailRowsForDstSrc from domain module */
-    function mailListHtml(d, rows) {
-      return `<table data-table="mail"><thead><tr>` +
-        `<th>sent</th><th>read</th><th>line</th><th>src</th><th>dst</th><th>kind</th><th>body</th><th></th><th>eta</th>` +
-        `</tr></thead><tbody>` +
-        rows.map(m => {
-          const floor = mailIsFloor(m);
-          const agentRead = mailDstAgentRead(m);
-          const humanOpen = mailDstHumanOpened(m);
-          const unread = (typeof mailWallUnread === "function") ? mailWallUnread(m) : (!floor && !agentRead);
-          const hr = mailMsgHumanRequiredOpen(m);
-          const eta = mailReadEta(d, m);
-          m.read_eta = eta;
-          const soft = (!floor && agentRead && !humanOpen) ? " human-unopened" : "";
-          const hrCls = hr ? " human-required" : "";
-          const cls = `${unread ? "unread" : (agentRead ? "fading" : "")}${soft}${hrCls}${m.fading ? " fading" : ""}${m.kind === "instruct" ? " desk" : ""}`;
-          const chipList = mailReadChips(m);
-          const readers = chipList.length ? " " + chipList.join(" ") : "";
-          const hrChip = hr ? `<span class="mail-chip needs-human mail-hr-chip" title="Needs human (human_required)">Needs human</span>` : "";
-          const mid = String(m.id || "");
-          const hrAck = hr ? ` <button type="button" class="mail-ack-human" data-ack-id="${esc(mid || m.id)}" title="Done / Ack human">Ack human</button>` : "";
-          const st = (mailDst(m) === "*") ? (unread ? "star-unread" : "star-read") : (floor ? "floor" : (unread ? "agent-unread" : (humanOpen ? "read" : "agent-read")));
-          const guess = mailEtaText(unread, eta);
-          const atVal = (typeof mailAt === "function") ? mailAt(m) : (m.at || m.created || "");
-          const srcVal = (typeof mailSenderDesk === "function") ? mailSenderDesk(m) : (m.src || "");
-          const dstVal = mailDst(m);
-          const cast = (typeof mailRoomCast === "function") ? mailRoomCast(m) : [];
-          const dstShow = (cast.length > 2)
-            ? (dstVal + " +" + (cast.length - 1))
-            : (cast.length > 1 ? cast.map(c => c.deskId).filter(d => d !== srcVal).join(",") || dstVal : dstVal);
-          const sent = dt(atVal);
-          const readAt = (!floor && m.read_at) ? dt(m.read_at) : "-";
-          const deskKey = mailDstKey(dstVal);
-          const bodyTrunc = (m.body_trunc === true) ? "1" : "0";
-          return `<tr class="${cls}" data-mail-id="${esc(mid)}" data-mail-dst="${esc(deskKey)}" data-mail-project="${esc(millGid(m) || "")}" data-body-trunc="${bodyTrunc}">` +
-          `<td data-sort="${esc(atVal)}">${esc(sent)}</td>` +
-          `<td data-sort="${esc(m.read_at || "")}">${esc(readAt)}</td>` +
-          `<td>${esc(millGid(m))}</td>` +
-          `<td>${esc(srcVal)}</td><td title="${esc(cast.map(c => c.deskId).join(", "))}">${esc(dstShow)}</td>` +
-          `<td>${esc(m.kind || "note")}</td>` +
-          `<td class="body">${esc(m.body)}${millWatchBadge("mail", m.id)}${hrChip}${hrAck}</td>` +
-          `<td class="note">${st}${readers}</td>` +
-          `<td class="note" data-sort="${esc((eta && (eta.at || eta.kind)) || "")}">${esc(guess)}</td></tr>`;
-        }).join("") +
-        `</tbody></table>`;
-    }
-    function mailGraphHtml(rows) {
-      const edges = rows.filter(m => {
-        const src = (typeof mailSenderDesk === "function") ? mailSenderDesk(m) : String(m.src || "").trim();
-        const dst = mailDst(m);
-        return !mailIsFloor(m) && src && dst;
-      });
-      if (!edges.length) {
-        return '<div class="mail-graph"><div class="idle">no mail edges for this filter (floor-only or empty)</div></div>';
-      }
-      const bySrc = {};
-      edges.forEach(m => {
-        const src = (typeof mailSenderDesk === "function") ? mailSenderDesk(m) : String(m.src || "").trim();
-        (bySrc[src] ??= []).push(m);
-      });
-      Object.keys(bySrc).forEach(k => {
-        bySrc[k].sort((a, b) => {
-          const aa = (typeof mailAt === "function") ? mailAt(a) : (a.at || a.created || "");
-          const bb = (typeof mailAt === "function") ? mailAt(b) : (b.at || b.created || "");
-          return String(bb).localeCompare(String(aa));
-        });
-      });
-      const srcs = Object.keys(bySrc).sort((a, b) => {
-        const ta = (typeof mailAt === "function") ? mailAt(bySrc[a][0]) : ((bySrc[a][0] && bySrc[a][0].at) || "");
-        const tb = (typeof mailAt === "function") ? mailAt(bySrc[b][0]) : ((bySrc[b][0] && bySrc[b][0].at) || "");
-        return String(tb).localeCompare(String(ta));
-      });
-      const tree = srcs.map(src => {
-        const kids = bySrc[src].map(m => {
-          const agentRead = mailDstAgentRead(m);
-          const humanOpen = mailDstHumanOpened(m);
-          const unread = (typeof mailWallUnread === "function") ? mailWallUnread(m) : !agentRead;
-          const hr = mailMsgHumanRequiredOpen(m);
-          const snip = String(m.body || "").slice(0, 72);
-          const cue = unread
-            ? ' | <span class="unread-dot" title="agent-unread">unread</span>'
-            : (hr ? "" : (humanOpen ? " | read" : ' | read <span class="human-cue" title="human not opened">|</span>'));
-          const hrBit = hr ? ' | <span class="mail-chip needs-human mail-hr-chip" title="Needs human (receipt)">Needs human</span> <button type="button" class="mail-ack-human" data-ack-id="' + esc(m.id) + '" title="Done / Ack human">Ack human</button>' : "";
-          const dstShow = mailDst(m);
-          const atShow = (typeof mailAt === "function") ? mailAt(m) : (m.at || m.created || "");
-          return `<li>` +
-            `<span class="whom">${esc(dstShow)}</span>` +
-            ` <span class="meta">${esc(dt(atShow))} | ${esc(m.kind || "note")}` +
-            `${cue}${hrBit}</span>` +
-            (snip ? `<div class="body-snip">${esc(snip)}</div>` : "") +
-            `</li>`;
-        }).join("");
-        return `<li><span class="who">${esc(src)}</span> <span class="meta">-> ${bySrc[src].length}</span><ul>${kids}</ul></li>`;
-      }).join("");
-      return `<div class="mail-graph">` +
-        `<p class="note">Coordination tree from mailbox src->dst (project-scoped). Not Wire mill events.</p>` +
-        `<ul class="tree">${tree}</ul></div>`;
-    }
-
-    function mailTreesWithMail(d) {
-      /* Client-side Rooms root SELECT: keep trees whose root is type=mail AND lft=1 (no GROUP BY).
-       * Sort most-recent-first by latest mail activity in the name_id forest
-       * (lean cast ``created`` / legacy ``at`` via mailAt; crumbs have no clock). */
-      const trees = (d && Array.isArray(d.trees) ? d.trees : []);
-      const mailbox = (d && Array.isArray(d.mailbox) ? d.mailbox : []);
-      if (typeof mailRoomsSortedByLatest === "function") return mailRoomsSortedByLatest(trees, mailbox);
-      let rooms = (typeof mailRoomsFromTrees === "function")
-        ? mailRoomsFromTrees(trees)
-        : trees.filter(function (t) {
-            return !!(typeof mailTreeRoot === "function" ? mailTreeRoot((t && t.nodes) || []) : null);
-          });
-      const latestOf = (typeof mailRoomLatestAt === "function")
-        ? function (t) { return mailRoomLatestAt(t, mailbox) || ""; }
-        : function (t) {
-            let latest = "";
-            const nodes = (t && t.nodes) || [];
-            const byId = {};
-            mailbox.forEach(function (m) {
-              if (m && m.id != null && m.id !== "") byId[String(m.id)] = m;
-            });
-            for (let i = 0; i < nodes.length; i++) {
-              const n = nodes[i];
-              if (!n || String(n.type || "").toLowerCase() !== "mail") continue;
-              const m = byId[String(n.id)];
-              if (!m) continue;
-              const ts = (typeof mailAt === "function") ? mailAt(m) : String(m.at || m.created || "").trim();
-              if (ts && ts > latest) latest = ts;
-            }
-            return latest;
-          };
-      return rooms.slice().sort(function (a, b) {
-        const aa = latestOf(a);
-        const bb = latestOf(b);
-        if (aa !== bb) return bb < aa ? -1 : 1;
-        /* wow168: tie-break higher max mail node id before label. */
-        const ia = (typeof mailRoomMaxMailId === "function") ? mailRoomMaxMailId(a) : 0;
-        const ib = (typeof mailRoomMaxMailId === "function") ? mailRoomMaxMailId(b) : 0;
-        if (ia !== ib) return ib - ia;
-        return 0;
-      });
-    }
-    function mailRoomsTreesSig(trees) {
-      /* Wave 3: left-rail skip key = tree structure only (name + type/id/lft/rgt).
-       * Mailbox badge churn alone must not rebuild Rooms rail DOM. */
-      return (Array.isArray(trees) ? trees : []).map(function (t) {
-        const id = String((t && (t.name || t.id)) || "");
-        const nodes = (t && Array.isArray(t.nodes) ? t.nodes : []);
-        const bits = nodes.map(function (n) {
-          return [n && n.type, n && n.id, n && n.lft, n && n.rgt].join(":");
-        }).join(",");
-        return id + "{" + bits + "}";
-      }).join("|");
-    }
-    function mailRoomPlanId(t, ti) {
-      /* Room identity is the plan name (t.name). */
-      return String((t && (t.name || t.id)) || ("mail-room-" + ti));
-    }
-    function mailRoomTreeRoot(t) {
-      /* Rooms root: type==='mail' AND lft===1 for THIS forest (mill_tree_create; no GROUP BY). */
-      const nodes = (t && Array.isArray(t.nodes) ? t.nodes : []).filter(Boolean);
-      if (!nodes.length) return null;
-      if (typeof mailTreeRoot === "function") return mailTreeRoot(nodes);
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        if ((Number(n.lft) || 0) !== 1) continue;
-        if (String((n && n.type) || "").toLowerCase() !== "mail") continue;
-        return n;
-      }
-      return null;
-    }
-    function mailRoomMailNodes(t) {
-      const nodes = (t && Array.isArray(t.nodes) ? t.nodes.slice() : []).sort(function (a, b) {
-        return (Number(a && a.lft) || 0) - (Number(b && b.lft) || 0);
-      });
-      return nodes.filter(function (n) { return String((n && n.type) || "").toLowerCase() === "mail"; });
-    }
-    function mailRoomRootLabel(d, t) {
-      const root = mailRoomTreeRoot(t);
-      const plan = (typeof millTreePlanLabel === "function") ? millTreePlanLabel(t) : "";
-      if (!root) return plan || "mail room";
-      const p = millTreePayload(d, root);
-      let title = String((p && p.title) || "").trim();
-      if (!title || (typeof millTreeHexName === "function" && millTreeHexName(title))) {
-        if (plan) return plan;
-        const typ = String((root && root.type) || "").toLowerCase() || "mail";
-        title = typ + " #" + String(root.id || "");
-      }
-      return title;
-    }
-    function mailRoomMailbox(d, node) {
-      const id = node && node.id;
-      return ((d && d.mailbox) || []).find(function (x) { return String(x.id) === String(id); }) || null;
-    }
-    function mailRoomCues(d, t) {
-      let agentUnread = 0, humanRequired = 0, n = 0;
-      mailRoomMailNodes(t).forEach(function (node) {
-        n += 1;
-        const m = mailRoomMailbox(d, node);
-        if (m) {
-          if (typeof mailMsgAgentUnread === "function" && mailMsgAgentUnread(m)) agentUnread += 1;
-          if (typeof mailMsgHumanRequiredOpen === "function" && mailMsgHumanRequiredOpen(m)) humanRequired += 1;
-        } else {
-          const p = millTreePayload(d, node);
-          if (p && p.unread) agentUnread += 1;
-        }
-      });
-      return {
-        n: n,
-        agentUnread: agentUnread,
-        humanRequired: humanRequired,
-        needsAttention: agentUnread > 0 || humanRequired > 0
-      };
-    }
-    function mailRoomReplyTo(d, t) {
-      const mails = mailRoomMailNodes(t);
-      for (let i = 0; i < mails.length; i++) {
-        const m = mailRoomMailbox(d, mails[i]);
-        if (!m) continue;
-        const src = (typeof mailSenderDesk === "function") ? mailSenderDesk(m) : String(m.src || "").trim();
-        const desks = (typeof mailDstDesks === "function") ? mailDstDesks(m) : [String(m.dst || "").trim()];
-        for (let j = 0; j < desks.length; j++) {
-          const dst = String(desks[j] || "").trim();
-          if (dst && dst !== "*" && dst !== src) return dst;
-        }
-        const primary = mailDst(m);
-        if (primary && primary !== "*") return primary;
-      }
-      return "";
-    }
-    function mailRoomMatchesQ(d, t, q) {
-      if (!q) return true;
-      const needle = String(q || "").toLowerCase();
-      if (mailRoomRootLabel(d, t).toLowerCase().indexOf(needle) >= 0) return true;
-      /* Identity is the plan name. */
-      const nameId = String((t && t.name) || "").toLowerCase();
-      if (nameId && nameId.indexOf(needle) >= 0) return true;
-      const nodes = mailRoomMailNodes(t);
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        const p = millTreePayload(d, n);
-        const m = mailRoomMailbox(d, n);
-        const hay = [
-          p && p.title, p && p.who, p && p.type,
-          m && m.body, m && m.subject,
-          m && ((typeof mailSenderDesk === "function") ? mailSenderDesk(m) : m.src),
-          m && mailDst(m), m && m.kind,
-          m && ((typeof mailRoomCast === "function") ? mailRoomCast(m).map(function (c) { return c.deskId; }).join(" ") : ""),
-          n && n.title, n && n.body, n && n.who
-        ].map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
-        if (hay.indexOf(needle) >= 0) return true;
-      }
-      return false;
-    }
-    function mailRoomsNestVisible(d, allNodes, mailNodes, q) {
-      const keep = {};
-      if (!q) {
-        mailNodes.forEach(function (_, i) { keep[i] = 1; });
-        return keep;
-      }
-      const needle = String(q || "").toLowerCase();
-      mailNodes.forEach(function (n, i) {
-        const p = millTreePayload(d, n);
-        const m = mailRoomMailbox(d, n);
-        const hay = [
-          p && p.title, p && p.who, p && p.type,
-          m && m.body, m && m.subject,
-          m && ((typeof mailSenderDesk === "function") ? mailSenderDesk(m) : m.src),
-          m && mailDst(m),
-          m && ((typeof mailRoomCast === "function") ? mailRoomCast(m).map(function (c) { return c.deskId; }).join(" ") : "")
-        ].map(function (x) { return String(x || "").toLowerCase(); }).join(" ");
-        if (hay.indexOf(needle) < 0) return;
-        keep[i] = 2;
-        millOutlineAncestors(allNodes, n).forEach(function (a) {
-          if (String((a && a.type) || "").toLowerCase() !== "mail") return;
-          const j = mailNodes.indexOf(a);
-          if (j >= 0 && !keep[j]) keep[j] = 1;
-        });
-      });
-      return keep;
-    }
-    function mailRoomsColHtml(rooms, selected) {
-      const qVal = String(mailRoomsQ || "");
-      const head = `<div class="rail-h">Rooms</div>` +
-        `<input type="search" class="mail-rooms-q" id="mail-rooms-q" placeholder="title / body / src / dst" autocomplete="off" spellcheck="false" value="${esc(qVal)}" title="Filter rooms by title, body, src, or dst. Nest keeps ancestor spine.">`;
-      if (!rooms.length) {
-        return head + `<div class="col-empty">${qVal ? "no rooms match" : "no mail-tree rooms"}</div>`;
-      }
-      const rows = rooms.map(function (r) {
-        const on = selected === r.id ? " on" : "";
-        const unreadCls = r.needsAttention ? " is-unread" : "";
-        const n = r.agentUnread | 0;
-        const badge = `<span class="desk-badge" data-n="${n}" title="${n} agent-unread">${n > 99 ? "99+" : n}</span>`;
-        const hr = r.humanRequired > 0 ? `<span class="hr-cue" title="open human_required">HR</span>` : "";
-        const castN = r.castN | 0;
-        const castBit = castN ? (" / cast " + castN) : "";
-        /* wow168: short recency hint when latestAt is a real clock (not id-fallback). */
-        let whenBit = "";
-        const lat = String(r.latestAt || "").trim();
-        if (lat && !/^\d{16}$/.test(lat)) {
-          const m = lat.match(/^(\d{4}-\d{2}-\d{2})[T ](\d{2}:\d{2})/);
-          whenBit = m ? (" | " + m[1] + " " + m[2]) : (lat.length > 16 ? (" | " + lat.slice(0, 16)) : (" | " + lat));
-        }
-        const frac = (r.partyN | 0) >= 0 ? ("-/-/" + (r.partyN | 0)) : "";
-        const meta = `${frac ? frac + " " : ""}${r.n} letter${r.n === 1 ? "" : "s"}${whenBit}`;
-        const tip = r.castTip ? `${r.label} | ${r.castTip}` : r.label;
-        return `<button type="button" class="mail-rooms-row${on}${unreadCls}" data-mail-room="${esc(r.id)}" title="${esc(tip)}">` +
-          `<span class="room-ttl">${esc(r.label)}</span>${hr}${badge}` +
-          `<span class="room-meta">${esc(meta)}</span></button>`;
-      }).join("");
-      return head + rows;
-    }
-    function mailRoomsNestSig(d, t, q, roomId) {
-      const allNodes = (t && Array.isArray(t.nodes) ? t.nodes : []).slice();
-      const mailNodes = allNodes.filter(function (n) {
-        return String((n && n.type) || "").toLowerCase() === "mail";
-      });
-      const bits = mailNodes.map(function (n) {
-        const p = millTreePayload(d, n);
-        const m = mailRoomMailbox(d, n);
-        const unread = !!(p && p.unread) || (m && typeof mailWallUnread === "function" && mailWallUnread(m));
-        const hr = m && typeof mailMsgHumanRequiredOpen === "function" && mailMsgHumanRequiredOpen(m);
-        const castN = (m && typeof mailCastCount === "function") ? mailCastCount(m) : 0;
-        const body = String((m && (m.body || m.subject)) || (p && p.title) || "").trim();
-        const who = (m && typeof mailSenderDesk === "function") ? mailSenderDesk(m) : (p && p.who) || "";
-        return [n.id, n.lft, n.rgt, body, unread ? 1 : 0, hr ? 1 : 0, castN, who].join("\t");
-      });
-      return String(roomId || "") + "|" + String(q || "") + "|" + bits.join("||");
-    }
-    function mailRoomsNestHtml(d, t, q) {
-      /* Nest under the first letter (type mail, lft 1). Indent counts mail cards only. */
-      const allNodes = (t && Array.isArray(t.nodes) ? t.nodes.slice() : []).sort(function (a, b) {
-        return (Number(a && a.lft) || 0) - (Number(b && b.lft) || 0);
-      });
-      const mailNodes = allNodes.filter(function (n) {
-        return String((n && n.type) || "").toLowerCase() === "mail";
-      });
-      if (!mailNodes.length) {
-        return `<div class="col-empty">no mail in this room</div>`;
-      }
-      const visible = mailRoomsNestVisible(d, allNodes, mailNodes, q);
-      const replyTo = mailRoomReplyTo(d, t);
-      const reply = wallHumanReadonly() ? "" : `<button type="button" class="mail-rooms-reply" data-mail-room-reply="1" data-mail-reply-to="${esc(replyTo)}" title="Reply into this thread (compose to thread dest)">Reply in thread</button>`;
-      const rows = mailNodes.map(function (n, i) {
-        if (q && !visible[i]) return "";
-        const lft = Number(n && n.lft) || 0;
-        const rgt = Number(n && n.rgt) || 0;
-        let depth = 0;
-        mailNodes.forEach(function (o) {
-          if (!o || o === n) return;
-          if ((Number(o.lft) || 0) < lft && (Number(o.rgt) || 0) > rgt) depth += 1;
-        });
-        const p = millTreePayload(d, n);
-        const m = mailRoomMailbox(d, n);
-        const unread = !!(p && p.unread) || (m && typeof mailWallUnread === "function" && mailWallUnread(m));
-        const hr = m && typeof mailMsgHumanRequiredOpen === "function" && mailMsgHumanRequiredOpen(m);
-        const cls = ["mail-room-msg"];
-        if (unread) cls.push("is-unread");
-        if (visible[i] === 2) cls.push("is-hit");
-        if (visible[i] === 1) cls.push("is-spine");
-        const whoDesk = (m && typeof mailSenderDesk === "function") ? mailSenderDesk(m) : (p.who || "");
-        const who = whoDesk ? `<span class="who">${esc(millName("desk", whoDesk) || whoDesk)}</span>` : "";
-        const castN = (m && typeof mailCastCount === "function") ? mailCastCount(m) : 0;
-        const castTip = (m && typeof mailCastTip === "function") ? mailCastTip(m) : "";
-        const cast = (m && typeof mailRoomCast === "function") ? mailRoomCast(m) : [];
-        const castIds = cast.map(function (c) { return c.deskId; }).filter(Boolean);
-        const dstLabel = castIds.length
-          ? castIds.join(", ")
-          : (m && mailDst(m) ? mailDst(m) : "");
-        /* Cast count = 1 (sender) + len(mail_tos); tip lists sender + each mail_to. */
-        const dst = castN
-          ? `<span class="dst cast-n" title="${esc(castTip || ("cast " + castN))}">cast ${castN}</span>`
-          : (dstLabel ? `<span class="dst" title="room cast = sender U mail_tos">cast ${esc(dstLabel)}</span>` : "");
-        const unreadBit = unread ? `<span class="leaf-unread" title="attention">attention</span>` : "";
-        const hrBit = hr ? ` <span class="mail-chip needs-human mail-hr-chip" title="Needs human (receipt)">Needs human</span>` : "";
-        const body = String((m && (m.body || m.subject)) || (p && p.title) || "").trim();
-        const bodyTrunc = (m && m.body_trunc === true) ? "1" : "0";
-        return `<div class="${cls.join(" ")}" style="--d:${depth}" data-depth="${depth}" data-mail-id="${esc(String(n.id || ""))}" data-body-trunc="${bodyTrunc}">` +
-          `<span class="st">mail</span>` +
-          `<div class="ttl"><b>${esc(body)}</b>${unreadBit}${hrBit}${who}${dst}</div>` +
-          `</div>`;
-      }).filter(Boolean).join("");
-      if (!rows) {
-        return reply + `<div class="col-empty">${q ? "no messages match filter" : "empty room"}</div>`;
-      }
-      return reply + `<div class="mail-rooms-nest">${rows}</div>`;
-    }
-    function paintMailRooms(d, opts) {
-      const railOnly = !!(opts && opts.railOnly);
-      const structureOnly = !!(opts && opts.structureOnly);
-      const el = document.getElementById("mail");
-      const dstCol = document.getElementById("mail-dst-col") || document.getElementById("mail-desk-rail");
-      const srcCol = document.getElementById("mail-src-col");
-      const note = document.getElementById("mail-view-note");
-      if (note) {
-        note.textContent = "Rooms, thread, and party. told/pushed/total. A dash means that count is not on this glance. Pushed is still queued. Told has left the queue.";
-      }
-      document.querySelectorAll(".mail-mode-toggle, .mail-dest-class").forEach(function (g) {
-        g.hidden = true;
-      });
-      if (!Array.isArray(d && d.trees)) {
-        _mailRoomsRailSig = ""; _mailRoomsNestSig = "";
-        if (dstCol) dstCol.innerHTML = `<div class="rail-h">Rooms</div>` + wallLoadingHtml("Loading rooms\u2026");
-        if (el) wallShowLoading(el, "Loading nest\u2026");
-        return;
-      }
-      const trees = mailConversationTrees(d);
-      const q = String(mailRoomsQ || "").trim().toLowerCase();
-      let rooms = trees.map(function (t, ti) {
-        const id = mailRoomPlanId(t, ti);
-        const cues = mailRoomCues(d, t);
-        const root = mailRoomFirstLetter(t);
-        const rootM = root ? mailRoomMailbox(d, root) : null;
-        const castN = (rootM && typeof mailCastCount === "function") ? mailCastCount(rootM) : 0;
-        const castTip = (rootM && typeof mailCastTip === "function") ? mailCastTip(rootM) : "";
-        /* wow168: latestAt = mailbox created/at (mailAt); else max mail id padded. */
-        const latestAt = (typeof mailRoomLatestAt === "function")
-          ? (mailRoomLatestAt(t, (d && d.mailbox) || []) || "")
-          : "";
-        const maxMailId = (typeof mailRoomMaxMailId === "function")
-          ? mailRoomMaxMailId(t)
-          : 0;
-        return {
-          id: id,
-          tree: t,
-          label: mailRoomLetterLabel(d, t),
-          n: cues.n,
-          agentUnread: cues.agentUnread,
-          humanRequired: cues.humanRequired,
-          needsAttention: cues.needsAttention,
-          castN: castN,
-          castTip: castTip,
-          partyN: (rootM && typeof mailTos === "function") ? mailTos(rootM).length : 0,
-          latestAt: latestAt,
-          maxMailId: maxMailId
-        };
-      });
-      rooms = rooms.filter(function (r) { return (r.n | 0) > 1; });
-      if (q) rooms = rooms.filter(function (r) { return mailRoomMatchesQ(d, r.tree, q); });
-      /* wow168: Left pane most-recent-first. latestAt = mailbox created/at else max id;
-       * tie-break higher maxMailId before label (hex rooms without mb still rise). */
-      rooms.sort(function (a, b) {
-        const aa = String(a.latestAt || "");
-        const bb = String(b.latestAt || "");
-        if (aa !== bb) return bb.localeCompare(aa);
-        const ia = a.maxMailId | 0;
-        const ib = b.maxMailId | 0;
-        if (ia !== ib) return ib - ia;
-        return String(a.label).localeCompare(String(b.label));
-      });
-      if (mailSelectedRoom && !rooms.some(function (r) { return r.id === mailSelectedRoom; })) {
-        mailSelectedRoom = rooms.length ? rooms[0].id : "";
-        try { localStorage.setItem(MAIL_ROOM_KEY, mailSelectedRoom); } catch (e0) {}
-      }
-      if (!mailSelectedRoom && rooms.length) {
-        mailSelectedRoom = rooms[0].id;
-        try { localStorage.setItem(MAIL_ROOM_KEY, mailSelectedRoom); } catch (e1) {}
-      }
-      /* Trees fingerprint + mode/q/selection - skip full left-rail innerHTML when unchanged. */
-      /* mb0 = trees only (phase 1); mb1 = mailbox landed (phase 2 re-sort/badges/cast).
-       * Wave 3 still skips rebuild on later badge-only churn (mb1 stays mb1). */
-      const mailboxReady = Array.isArray(d && d.mailbox) ? "mb1" : "mb0";
-      const railSig = [mailMode || "", q || "", mailSelectedRoom || "", mailRoomsTreesSig(trees), mailboxReady].join("|");
-      if (dstCol) {
-        const roomsChrome = !!(dstCol.querySelector("#mail-rooms-q") || dstCol.querySelector(".mail-rooms-row") || dstCol.querySelector(".col-empty"));
-        if (railSig !== _mailRoomsRailSig || !roomsChrome) {
-          const prevQ = document.getElementById("mail-rooms-q");
-          const keepFocus = prevQ && document.activeElement === prevQ;
-          const selStart = keepFocus ? prevQ.selectionStart : null;
-          const selEnd = keepFocus ? prevQ.selectionEnd : null;
-          dstCol.innerHTML = mailRoomsColHtml(rooms, mailSelectedRoom);
-          if (typeof wallPerfFirst === "function") {
-            wallPerfFirst("mail_rooms_rail");
-            if (mailboxReady === "mb1") wallPerfFirst("mail_rooms_rail_mb");
-          }
-          _mailRoomsRailSig = railSig;
-          if (!dstCol._roomsDeleg) {
-            dstCol._roomsDeleg = true;
-            dstCol.addEventListener("input", function (ev) {
-              if (ev.target && ev.target.id === "mail-rooms-q") setMailRoomsQ(ev.target.value || "");
-            });
-            dstCol.addEventListener("click", function (ev) {
-              const btn = ev.target.closest("button.mail-rooms-row");
-              if (btn) setMailRoom(btn.dataset.mailRoom || "");
-            });
-          }
-          const qEl = document.getElementById("mail-rooms-q");
-          if (qEl && keepFocus) {
-            qEl.focus();
-            try {
-              if (selStart != null) qEl.setSelectionRange(selStart, selEnd != null ? selEnd : selStart);
-            } catch (eSel) {}
-          }
-        }
-      }
-      if (railOnly) {
-        /* Left rail only; nest shows spinner until structure/mailbox phase. */
-        const nestEl = document.getElementById("mail");
-        if (nestEl && !wallHasRealContent(nestEl)) wallShowLoading(nestEl, "Loading nest\u2026");
-        return;
-      }
-      if (structureOnly) {
-        /* Nest structure from trees; badge that mailbox enrich is still inbound. */
-        if (!rooms.length) {
-          _mailRoomsNestSig = "";
-          const nestEl = document.getElementById("mail");
-          if (nestEl) {
-            nestEl.innerHTML = !trees.length
-              ? wallLoadingHtml("Loading rooms\u2026")
-              : wallLoadingHtml("Loading mailbox\u2026");
-          }
-          return;
-        }
-        if (!mailSelectedRoom && rooms.length) {
-          mailSelectedRoom = rooms[0].id;
-          try { localStorage.setItem(MAIL_ROOM_KEY, mailSelectedRoom); } catch (eSel0) {}
-        }
-        const picked0 = rooms.find(function (r) { return r.id === mailSelectedRoom; }) || rooms[0];
-        const nestEl = document.getElementById("mail");
-        if (nestEl && picked0) {
-          /* wow146: paint structure alone (no loading marker sibling that blanked on re-enter).
-             Opaque pane overlay covers confirm; keep struct as last-good paint. */
-          const struct = mailRoomsNestHtml(d, picked0.tree, q);
-          nestEl.innerHTML = struct;
-          try { wallShowPaneOverlay("pane-mail", "Loading mailbox\u2026"); } catch (eOvSt) {}
-          if (typeof wallPerfFirst === "function") wallPerfFirst("mail_rooms_structure");
-          _mailRoomsNestSig = "struct|" + (mailSelectedRoom || "");
-        } else if (nestEl && !wallHasRealContent(nestEl)) {
-          wallShowLoading(nestEl, "Loading nest\u2026");
-        }
-        return;
-      }
-      if (!rooms.length) {
-        _mailRoomsNestSig = "";
-        if (el) {
-          el.innerHTML = !trees.length
-            ? `<div class="idle">No conversations yet.</div>`
-            : (q
-              ? `<div class="col-empty">no rooms match filter</div>`
-              : `<div class="idle">No conversations yet.</div>`);
-        }
-        try { paintMailPartyCol(d, null); } catch (eParty0) {}
-        return;
-      }
-      if (!mailSelectedRoom) {
-        _mailRoomsNestSig = "";
-        if (el) el.innerHTML = `<div class="col-empty">pick a room</div>`;
-        return;
-      }
-      const picked = rooms.find(function (r) { return r.id === mailSelectedRoom; });
-      if (!picked) {
-        _mailRoomsNestSig = "";
-        if (el) el.innerHTML = `<div class="col-empty">pick a room</div>`;
-        return;
-      }
-      if (el) {
-        const nestSig = mailRoomsNestSig(d, picked.tree, q, mailSelectedRoom);
-        const nestChrome = !!(el.querySelector(".mail-rooms-nest") || el.querySelector("[data-mail-room-reply]") || el.querySelector(".col-empty") || el.querySelector(".idle"));
-        if (nestSig !== _mailRoomsNestSig || !nestChrome) {
-          el.innerHTML = mailRoomsNestHtml(d, picked.tree, q);
-          try { paintMailPartyCol(d, picked.tree); } catch (eParty) {}
-          if (typeof wallPerfFirst === "function") wallPerfFirst("mail_rooms_body");
-          _mailRoomsNestSig = nestSig;
-          const replyBtn = el.querySelector("[data-mail-room-reply]");
-          if (replyBtn) {
-            replyBtn.addEventListener("click", function () {
-              const to = String(replyBtn.getAttribute("data-mail-reply-to") || "").trim();
-              if (typeof openMailPopup === "function") {
-                openMailPopup({ to: to, label: to ? ("REPLY " + to) : "Reply in thread" });
-              } else if (typeof setCompose === "function") {
-                setCompose(true, { to: to, label: to ? ("REPLY " + to) : "Reply in thread" });
-              }
-            });
-          }
-        }
-      }
-    }
-
-    function mailConversationTrees(d) {
-      /* A room has at least two mail letters. The plan root may be another activity. */
-      const trees = ((d && d.trees) || []).filter(function (t) {
-        return mailRoomMailNodes(t).length > 1;
-      });
-      return trees.slice().sort(function (a, b) {
-        return (mailRoomMaxMailId(b) | 0) - (mailRoomMaxMailId(a) | 0);
-      });
-    }
-    function mailRoomFirstLetter(t) {
-      const nodes = mailRoomMailNodes(t);
-      return nodes.length ? nodes[0] : null;
-    }
-    function mailRoomLetterLabel(d, t) {
-      const node = mailRoomFirstLetter(t);
-      const m = node ? mailRoomMailbox(d, node) : null;
-      const body = String((m && (m.body || m.subject)) || "").replace(/\s+/g, " ").trim();
-      if (body) return body.slice(0, 72);
-      const p = node && typeof millTreePayload === "function" ? millTreePayload(d, node) : null;
-      const title = String((p && p.title) || "").trim();
-      if (title) return title.slice(0, 72);
-      return (node && node.id != null) ? ("letter " + node.id) : "conversation";
-    }
-    function mailPartyFraction(m) {
-      let n = (m && typeof mailTos === "function") ? mailTos(m).length : 0;
-      if (!n && m && Array.isArray(m.mail_tos)) n = m.mail_tos.length;
-      return "-/-/" + n;
-    }
-    function paintMailPartyCol(d, tree) {
-      const srcCol = document.getElementById("mail-src-col");
-      if (!srcCol || mailView !== "rooms") return;
-      if (!tree) {
-        srcCol.innerHTML = `<div class="rail-h">Party</div><div class="col-empty">Pick a room.</div>`;
-        return;
-      }
-      const root = mailRoomFirstLetter(tree);
-      const m = root ? mailRoomMailbox(d, root) : null;
-      const tos = (m && typeof mailTos === "function") ? mailTos(m) : [];
-      const head = `<div class="rail-h">Party</div><div class="mail-party-frac" title="told/pushed/total. told and pushed wait on the queue.">${esc(mailPartyFraction(m))} told/pushed/total</div>`;
-      if (!m) {
-        srcCol.innerHTML = head + `<div class="col-empty">Party waits on the letter list.</div>`;
-        return;
-      }
-      if (!tos.length) {
-        srcCol.innerHTML = head + `<div class="col-empty">No one was addressed.</div>`;
-        return;
-      }
-      srcCol.innerHTML = head + tos.map(function (t) {
-        const id = String(t.deskId || "");
-        const name = (typeof millName === "function" && millName("desk", id)) || id;
-        return `<div class="mail-party-row"><span class="desk-id">${esc(name)}</span><span class="desk-kind">addressed</span></div>`;
-      }).join("");
-    }
     const MAIL_LETTER_SPANS = [
       ["1h", "1h", 3600e3, "No letters in the last hour."],
       ["8h", "8h", 8 * 3600e3, "No letters in the last 8 hours."],
@@ -8213,240 +6758,6 @@
       ["all", "All", null, "No letters in this cut."]
     ];
     let mailLetterSpan = "all";
-    function mailLetterMs(m) {
-      const raw = (typeof mailAt === "function") ? mailAt(m) : String((m && (m.at || m.created)) || "");
-      if (!raw || typeof floorParseTs !== "function") return NaN;
-      const t = floorParseTs(raw);
-      return (typeof t === "number" && !isNaN(t)) ? t : NaN;
-    }
-    function paintMailLetters(d) {
-      const el = document.getElementById("mail");
-      const note = document.getElementById("mail-view-note");
-      const browser = document.querySelector(".mail-browser, .mail-split");
-      if (browser) browser.setAttribute("data-mail-view", "letters");
-      if (note) note.textContent = "Every letter in this cut, newest first.";
-      if (!el) return;
-      if (!d || !Array.isArray(d.mailbox)) {
-        wallShowLoading(el, "Loading letters\u2026");
-        return;
-      }
-      if (!MAIL_LETTER_SPANS.some(function (s) { return s[0] === mailLetterSpan; })) mailLetterSpan = "all";
-      const span = MAIL_LETTER_SPANS.find(function (s) { return s[0] === mailLetterSpan; }) || MAIL_LETTER_SPANS[4];
-      const picks = `<div class="mail-desk-picks" role="group" aria-label="letter window">` +
-        MAIL_LETTER_SPANS.map(function (s) {
-          const on = s[0] === mailLetterSpan ? " on" : "";
-          return `<button type="button" data-mail-letter-span="${s[0]}" class="${on.trim()}">${s[1]}</button>`;
-        }).join("") + `</div>`;
-      const now = Date.now();
-      const windowMs = span[2];
-      let rows = (d.mailbox || []).filter(function (m) { return m && m.id != null && m.id !== ""; });
-      rows = rows.filter(function (m) {
-        if (windowMs == null) return true;
-        const t = mailLetterMs(m);
-        if (isNaN(t)) return false;
-        return t >= now - windowMs;
-      });
-      rows.sort(function (a, b) {
-        const ta = mailLetterMs(a);
-        const tb = mailLetterMs(b);
-        const aOk = !isNaN(ta);
-        const bOk = !isNaN(tb);
-        if (aOk && bOk && tb !== ta) return tb - ta;
-        if (aOk !== bOk) return aOk ? -1 : 1;
-        return (Number(b.id) || 0) - (Number(a.id) || 0);
-      });
-      const lines = rows.map(function (m) {
-        const when = (typeof mailAt === "function" && mailAt(m))
-          ? String(mailAt(m))
-          : String((m && (m.at || m.created)) || "");
-        const clock = when ? when.slice(5, 16) : "";
-        let src = (typeof mailSenderDesk === "function") ? String(mailSenderDesk(m) || "") : "";
-        if (!src && m && m.sender && typeof m.sender === "object") src = String(m.sender.deskId || m.sender.desk || "");
-        if (!src) src = String((m && (m.src || m.desk)) || "");
-        const srcName = (src && typeof millName === "function" && millName("desk", src)) || src || "desk";
-        const tos = (typeof mailTos === "function" && mailTos(m).length)
-          ? mailTos(m)
-          : ((m && Array.isArray(m.mail_tos)) ? m.mail_tos : []);
-        const toNames = tos.map(function (t) {
-          const id = String(t.deskId || "");
-          return (typeof millName === "function" && millName("desk", id)) || id;
-        }).filter(Boolean).join(", ");
-        const body = String(m.body || m.subject || "").replace(/\s+/g, " ").trim().slice(0, 96);
-        return `<div class="mail-letter"><span class="ln"><span class="meta">${esc(clock)}</span><span class="meta">${esc(srcName)}${toNames ? " \u2192 " + esc(toNames) : ""}</span><span class="meta">${esc(mailPartyFraction(m))}</span></span><span class="ln">${esc(body)}</span></div>`;
-      }).join("");
-      el.innerHTML = picks + (lines || `<div class="col-empty">${esc(span[3])}</div>`);
-      el.querySelectorAll("[data-mail-letter-span]").forEach(function (btn) {
-        btn.addEventListener("click", function () {
-          mailLetterSpan = String(btn.getAttribute("data-mail-letter-span") || "all");
-          paintMailLetters(d);
-        });
-      });
-    }
-    function mail(d) {
-      fillMailToList(d || {});
-      /* Rooms is the only other live view. list and graph stay off this glass. */
-      if (mailView !== "rooms") {
-        mailView = "letters";
-        try { paintMailLetters(d || {}); } catch (eLetters) {}
-        return;
-      }
-      const raw = d.mailbox || [];
-      const rows = mailActiveRows(raw);
-      const el = document.getElementById("mail");
-      const dstCol = document.getElementById("mail-dst-col") || document.getElementById("mail-desk-rail");
-      const srcCol = document.getElementById("mail-src-col");
-      document.querySelectorAll(".mail-view-toggle button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailView === mailView);
-      });
-      document.querySelectorAll(".mail-mode-toggle button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailMode === mailMode);
-      });
-      document.querySelectorAll(".mail-dest-class button").forEach(b => {
-        b.classList.toggle("on", b.dataset.mailClass === mailDestClassFilter);
-      });
-      document.querySelectorAll(".mail-mode-toggle, .mail-dest-class").forEach(function (g) {
-        g.hidden = (mailView === "rooms");
-      });
-      const note = document.getElementById("mail-view-note");
-      if (note) {
-        if (raw.length !== rows.length) note.dataset.humanArchive = String(raw.length - rows.length);
-        note.textContent = mailView === "rooms"
-          ? "Rooms, thread, and party. told/pushed/total. A dash means that count is not on this glance. Pushed is still queued. Told has left the queue."
-          : (mailView === "graph"
-          ? (mailMode === "attention"
-            ? "GRAPH 3-col: pick dst -> src -> messages (src->dst only). Needs attention dsts."
-            : (mailMode === "recent"
-              ? "GRAPH: recent - pick dst | src | messages."
-              : "GRAPH: all dsts - pick src then messages."))
-          : (mailMode === "attention"
-            ? "LIST 2-col: selected dst messages recent-first. Wrap<->nowrap. No h-scroll."
-            : (mailMode === "recent"
-              ? "LIST: selected dst | recent. Wrap<->nowrap."
-              : "LIST 2-col: selected dst messages. Wrap<->nowrap.")));
-      }
-      /* MAIL_ROOMS early: skip dst|src rails */
-      if (mailView === "rooms") {
-        const browserEarly = document.querySelector(".mail-browser, .mail-split");
-        if (browserEarly) browserEarly.setAttribute("data-mail-view", "rooms");
-        document.querySelectorAll(".mail-view-toggle button").forEach(b => {
-          b.classList.toggle("on", b.dataset.mailView === "rooms");
-        });
-        paintMailRooms(d || {});
-        return;
-      }
-      if (!mailSelectedDst && mailSelectedDesk) mailSelectedDst = mailSelectedDesk;
-      const dstsAll = mailKnownDesks(d || {}, rows);
-      const destKinds = new Set(dstsAll.map(x => x.kind));
-      document.querySelectorAll(".mail-dest-class button").forEach(b => {
-        const k = b.dataset.mailClass;
-        if (k === "all") {
-          b.hidden = !dstsAll.length;
-          return;
-        }
-        b.hidden = !destKinds.has(k) && k !== mailDestClassFilter;
-      });
-      const dsts = mailDestClassFilter === "all"
-        ? dstsAll
-        : dstsAll.filter(x => x.kind === mailDestClassFilter);
-      const attentionDsts = dsts.filter(x => x.needsAttention);
-      /* Always paint three peer columns - empty states OK */
-      if (mailMode === "attention") {
-        if (attentionDsts.length && !attentionDsts.some(x => x.id === mailSelectedDst)) {
-          mailSelectedDst = attentionDsts[0].id;
-          mailSelectedDesk = mailSelectedDst;
-          mailSelectedSrc = "";
-          try {
-            localStorage.setItem(MAIL_TO_KEY, mailSelectedDst);
-            localStorage.setItem(MAIL_DESK_KEY, mailSelectedDesk);
-            localStorage.setItem(MAIL_SRC_KEY, "");
-          } catch (e) {}
-        }
-      } else if (!mailSelectedDst && dsts.length) {
-        /* do not force-select in All - empty src/msg OK */
-      }
-      if (dstCol) {
-        dstCol.innerHTML = mailDstColHtml(dsts, mailMode, mailSelectedDst);
-        dstCol.querySelectorAll("button.desk-row").forEach(btn => {
-          btn.addEventListener("click", () => setMailDst(btn.dataset.mailDst || btn.dataset.mailDesk));
-        });
-      }
-      const browser = document.querySelector(".mail-browser, .mail-split");
-      if (browser) browser.setAttribute("data-mail-view", mailView);
-
-      /* MAIL_LIST_TO_FILTER: LIST = 2-col dst | messages for selected dst only */
-      if (mailView === "list") {
-        /* MAIL_LIST_AUTOSELECT_DST: if no dst + rail has entries, pick first viable (attention: first Needs-attention; else first rail dst). Persist like setMailDst. GRAPH: no auto-pick src. */
-        /* MAIL_BOOT_FIX: Needs attention preferred; if none, fall back to all dsts so LIST is not blank */
-        const listRail = (mailMode === "attention" && attentionDsts.length) ? attentionDsts : dsts;
-        if (!mailSelectedDst && listRail.length) {
-          mailSelectedDst = listRail[0].id;
-          mailSelectedDesk = mailSelectedDst;
-          try {
-            localStorage.setItem(MAIL_TO_KEY, mailSelectedDst);
-            localStorage.setItem(MAIL_DESK_KEY, mailSelectedDesk);
-          } catch (e) {}
-        }
-        if (srcCol) srcCol.innerHTML = "";
-        if (dstCol) {
-          dstCol.innerHTML = mailDstColHtml(dsts, mailMode, mailSelectedDst);
-          dstCol.querySelectorAll("button.desk-row").forEach(btn => {
-            btn.addEventListener("click", () => setMailDst(btn.dataset.mailDst || btn.dataset.mailDesk));
-          });
-        }
-        if (!mailSelectedDst) {
-          el.innerHTML = (mailMode === "attention" && !attentionDsts.length)
-            ? '<div class="mail-all-clear"><b>All clear.</b> No destinations need attention.</div>'
-            : '<div class="col-empty">pick a dst</div>';
-          return;
-        }
-        const listRows = mailRowsForListDst(rows, mailSelectedDst, mailMode);
-        if (!listRows.length) {
-          el.innerHTML = (mailMode === "attention")
-            ? `<div class="col-empty">no attention mail for ${esc(mailSelectedDst)}</div>`
-            : `<div class="col-empty">no mail for ${esc(mailSelectedDst)}</div>`;
-          return;
-        }
-        el.innerHTML = mailListHtml(d, listRows);
-        if (typeof wallPerfFirst === "function") wallPerfFirst("mailbox_body");
-        enhanceTables(el);
-        return;
-      }
-
-      /* GRAPH = 3-col dst|src|messages; col3 = selected src->dst only */
-      const srcs = mailSelectedDst ? mailSrcsForDst(rows, mailSelectedDst) : [];
-      /* MAIL_COL3_SRC_FILTER: never auto-pick src - col3 idle until user selects src */
-      if (!mailSelectedDst) {
-        mailSelectedSrc = "";
-        try { localStorage.setItem(MAIL_SRC_KEY, ""); } catch (e) {}
-      } else if (mailSelectedSrc && !srcs.some(x => x.id === mailSelectedSrc)) {
-        mailSelectedSrc = "";
-        try { localStorage.setItem(MAIL_SRC_KEY, ""); } catch (e) {}
-      }
-      if (srcCol) {
-        srcCol.innerHTML = mailSrcColHtml(srcs, mailSelectedSrc, !!mailSelectedDst);
-        srcCol.querySelectorAll("button.src-row").forEach(btn => {
-          btn.addEventListener("click", () => setMailSrc(btn.dataset.mailSrc));
-        });
-      }
-      if (!mailSelectedDst) {
-        el.innerHTML = (mailMode === "attention" && !attentionDsts.length)
-          ? '<div class="mail-all-clear"><b>All clear.</b> No destinations need attention.</div>'
-          : '<div class="col-empty">pick a dst</div>';
-        return;
-      }
-      if (!mailSelectedSrc) {
-        el.innerHTML = '<div class="col-empty">pick a src</div>';
-        return;
-      }
-      const deskRows = mailRowsForDstSrc(rows, mailSelectedDst, mailSelectedSrc, mailMode);
-      if (!deskRows.length) {
-        el.innerHTML = `<div class="col-empty">no mail from ${esc(mailSelectedSrc)} -> ${esc(mailSelectedDst)}</div>`;
-        return;
-      }
-      el.innerHTML = mailListHtml(d, deskRows);
-      if (typeof wallPerfFirst === "function") wallPerfFirst("mailbox_body");
-      enhanceTables(el);
-    }
     function planNormStatus(st) {
       const s = String(st || "").toLowerCase().trim();
       if (s === "done" || s === "shipped") return "done";
@@ -9082,365 +7393,20 @@
     try { scoreSpan = localStorage.getItem("factory-score-span") || "24h"; } catch (e) {}
     try { scoreFilter = localStorage.getItem("factory-score-filter") || "needs"; } catch (e) {}
     try { scoreSelectedDesk = localStorage.getItem("factory-score-desk") || ""; } catch (e) {}
-
-    /* WALL_UI_DEFAULT_SCORE: scoreParseAt from domain module */
-    /* WALL_UI_DEFAULT_SCORE: scoreWindowMs from domain module */
-    /* WALL_UI_DEFAULT_SCORE: scoreInWindow from domain module */
-    function scoreParseProgress(raw) {
-      const s = String(raw || "").trim();
-      if (!s) return null;
-      let m = s.match(/^(\d+)\s*\/\s*(\d+)/);
-      if (m) {
-        const n = Number(m[1]), of = Number(m[2]);
-        if (of > 0) return { pct: Math.max(0, Math.min(100, (n / of) * 100)), label: n + "/" + of, known: true };
-      }
-      m = s.match(/(\d+)\s*%/);
-      if (m) {
-        const pct = Math.max(0, Math.min(100, Number(m[1])));
-        return { pct: pct, label: pct + "%", known: true };
-      }
-      return { pct: 0, label: s.slice(0, 24), known: false };
-    }
-    function scoreBarHtml(pct, known) {
-      const p = known ? Math.max(0, Math.min(100, Number(pct) || 0)) : 0;
-      const cls = known ? "" : " unknown";
-      const empty = (!known || p <= 0) ? " empty" : "";
-      return `<div class="score-bar${cls}${empty}" title="${known ? (Math.round(p) + "%") : "unknown"}"><i style="width:${p}%"></i></div>`;
-    }
+    /* #710 SCORE paint code lives in score/score-paint.js (lib/lazy.js MODULES.scorePaint); it loads with
+     * the pane. Until then each entry below loads it and replays the call; the file's
+     * function declarations replace these stubs as globals. */
+    function cards() { return wallLazyCall("scorePaint", "cards", cards, arguments); }
+    function ensureScorePaint() { return wallLazyCall("scorePaint", "ensureScorePaint", ensureScorePaint, arguments); }
+    function loadScoreEvidence() { return wallLazyCall("scorePaint", "loadScoreEvidence", loadScoreEvidence, arguments); }
+    function paintScoreVerbs() { return wallLazyCall("scorePaint", "paintScoreVerbs", paintScoreVerbs, arguments); }
+    function selectScoreDesk() { return wallLazyCall("scorePaint", "selectScoreDesk", selectScoreDesk, arguments); }
     /* WALL_UI_DEFAULT_SCORE: scoreDeskRows from domain module */
     /* WALL_UI_DEFAULT_SCORE: thin bridge - module scoreDeskRows(d, span?) */
     function scoreDeskRows(d) {
       return (typeof WallScore !== "undefined" && WallScore.scoreDeskRows)
         ? WallScore.scoreDeskRows(d, (typeof scoreSpan !== "undefined" ? scoreSpan : "24h"))
         : [];
-    }
-    function scoreSpendPulse(d, span) {
-      /* SCORECARDS_TOKEN_DETAIL / TOKENS_EST / WALL_HONEST_EMPTY_VS_DOWN: exact LLM vs est vs mill bytes; never fake LLM 0 */
-      const now = Date.now();
-      const lines = (d.spend_lines && d.spend_lines.length) ? d.spend_lines : (d.spend || []);
-      let exact = null, est = null, millBytes = 0, millRows = 0, cmds = 0, llmRows = 0;
-      lines.forEach(r => {
-        const at = r.at || "";
-        if (at && !scoreInWindow(at, span, now)) return;
-        const src = String(r.source || "mill");
-        if (src === "mill") {
-          millRows += 1;
-          millBytes += Number(r.bytes_out || r.bytes || 0) || 0;
-          if (r.cmds) cmds += Number(r.cmds || 0) || 0;
-          else cmds += 1;
-          return;
-        }
-        llmRows += 1;
-        cmds += 1;
-        if (r.tokens != null && r.tokens !== "") {
-          const tok = Number(r.tokens);
-          if (Number.isFinite(tok)) {
-            if (exact == null) exact = 0;
-            exact += tok;
-            return;
-          }
-        }
-        if (r.tokens_est != null && r.tokens_est !== "") {
-          const e = Number(r.tokens_est);
-          if (Number.isFinite(e)) {
-            if (est == null) est = 0;
-            est += e;
-          }
-        }
-      });
-      return {
-        tokens: exact,
-        tokens_est: est,
-        millBytes: millRows ? millBytes : null,
-        millRows: millRows,
-        cmds: cmds,
-        llmRows: llmRows,
-        exact: exact != null
-      };
-    }
-    function scoreSpendByDesk(d, span) {
-      const now = Date.now();
-      const out = {};
-      const lines = (d.spend_lines && d.spend_lines.length) ? d.spend_lines : (d.spend || []);
-      lines.forEach(r => {
-        const at = r.at || "";
-        if (at && !scoreInWindow(at, span, now)) return;
-        const desk = String(r.owner || r.desk || "").trim();
-        if (!desk) return;
-        const src = String(r.source || "");
-        if (src === "mill") return;
-        if (!out[desk]) out[desk] = { tokens: null, tokens_est: null, exact: false };
-        if (r.tokens != null && r.tokens !== "") {
-          const tok = Number(r.tokens);
-          if (Number.isFinite(tok)) {
-            if (out[desk].tokens == null) out[desk].tokens = 0;
-            out[desk].tokens += tok;
-            out[desk].exact = true;
-            return;
-          }
-        }
-        if (r.tokens_est != null && r.tokens_est !== "") {
-          const e = Number(r.tokens_est);
-          if (Number.isFinite(e)) {
-            if (out[desk].tokens_est == null) out[desk].tokens_est = 0;
-            out[desk].tokens_est += e;
-          }
-        }
-      });
-      return out;
-    }
-    function scoreWaiting(d) {
-      let n = 0;
-      (d.agents || d.live_agents || []).forEach(a => {
-        if (a && String(a.waiting_on || "").trim()) n++;
-      });
-      return n;
-    }
-    function scoreStalledNeeds(d) {
-      const rows = [];
-      (d.needs || []).forEach(n => {
-        if (!n) return;
-        const st = String(n.status || "").toLowerCase();
-        if (st === "done") return;
-        const stale = !!n.stale || !!n.holder_dead;
-        const leftover = String(n.need_id || "") === "leftover" && (n.paused || (d.leftover && d.leftover.paused));
-        if (stale || leftover) rows.push(n);
-      });
-      return rows;
-    }
-    function scoreBottlenecks(d) {
-      const out = [];
-      const now = Date.now();
-      (d.agents || d.live_agents || []).forEach(a => {
-        if (!a) return;
-        const wo = String(a.waiting_on || "").trim();
-        if (!wo) return;
-        const desk = String(a.owner || a.desk || "").trim() || "(desk)";
-        const prog = scoreParseProgress(a.progress || "");
-        const hb = scoreParseAt(a.heartbeat || a.updated_at);
-        const age = hb == null ? "-" : Math.max(0, Math.round((now - hb) / 60000)) + "m";
-        out.push({
-          kind: "waiting_on",
-          desk: desk,
-          target: wo,
-          age: age,
-          progress: prog,
-          job: wallDoingFace(a.doing).now.slice(0, 48),
-        });
-      });
-      scoreStalledNeeds(d).forEach(n => {
-        const desk = String(n.volunteer || n.asker || "").trim() || "(unclaimed)";
-        const prog = scoreParseProgress(n.progress || "");
-        const start = scoreParseAt(n.started_at || n.updated_at || n.asked_at);
-        const age = start == null ? "-" : Math.max(0, Math.round((now - start) / 60000)) + "m";
-        out.push({
-          kind: n.stale ? "stale card" : "stalled",
-          desk: desk,
-          target: String(n.need_id || ""),
-          age: age,
-          progress: prog,
-          job: String(n.doing || n.need_id || "").slice(0, 48),
-        });
-      });
-      return out;
-    }
-    function scoreDeskProgressRows(d) {
-      const tokensBy = scoreSpendByDesk(d, scoreSpan);
-      const by = {};
-      function ensure(desk) {
-        const tb = tokensBy[desk] || null;
-        if (!by[desk]) by[desk] = {
-          desk: desk, open: 0, done: 0, progress: null,
-          tokens: tb && tb.exact ? tb.tokens : null,
-          tokens_est: tb ? tb.tokens_est : null,
-          exact: !!(tb && tb.exact)
-        };
-        return by[desk];
-      }
-      (d.agents || d.live_agents || []).forEach(a => {
-        if (!a) return;
-        const desk = String(a.owner || "").trim();
-        if (!desk) return;
-        const row = ensure(desk);
-        const p = scoreParseProgress(a.progress || "");
-        if (p && p.known) row.progress = p;
-      });
-      (d.needs || []).forEach(n => {
-        if (!n) return;
-        const desk = String(n.volunteer || n.asker || "").trim();
-        if (!desk) return;
-        const row = ensure(desk);
-        const st = String(n.status || "").toLowerCase();
-        if (st === "done") row.done += 1;
-        else row.open += 1;
-        const p = scoreParseProgress(n.progress || "");
-        if (p && p.known) row.progress = p;
-      });
-      Object.keys(tokensBy).forEach(desk => {
-        const row = ensure(desk);
-        const tb = tokensBy[desk];
-        row.exact = !!(tb && tb.exact);
-        row.tokens = tb && tb.exact ? tb.tokens : null;
-        row.tokens_est = tb ? tb.tokens_est : null;
-      });
-      return Object.keys(by).sort().map(k => {
-        const row = by[k];
-        const total = row.open + row.done;
-        if (!row.progress || !row.progress.known) {
-          if (total > 0) {
-            row.progress = { pct: (row.done / total) * 100, label: row.done + "/" + total, known: true };
-          } else {
-            row.progress = { pct: 0, label: "-", known: false };
-          }
-        }
-        if (row.tokens == null) row.tokens = null;
-        return row;
-      });
-    }
-    function scoreTrend(rows) {
-      const hot = rows.filter(r => r.hot).length;
-      const total = rows.length || 1;
-      if (!rows.length) return { word: "flat", cls: "" };
-      if (hot === 0) return { word: "better", cls: "better" };
-      if (hot / total >= 0.5) return { word: "worse", cls: "worse" };
-      return { word: "flat", cls: "" };
-    }
-    function paintScoreChrome() {
-      document.querySelectorAll("#score-span button[data-score-span]").forEach(b => {
-        b.classList.toggle("on", b.getAttribute("data-score-span") === scoreSpan);
-      });
-      document.querySelectorAll("button[data-score-mode]").forEach(b => {
-        b.classList.toggle("on", b.getAttribute("data-score-mode") === scoreMode);
-      });
-      const core = document.getElementById("score-core");
-      const spend = document.getElementById("score-spend-view");
-      const kpi = document.getElementById("score-kpi-detail");
-      if (core) core.hidden = scoreMode === "spend";
-      if (spend) spend.hidden = scoreMode !== "spend";
-      if (kpi) kpi.hidden = true;
-      const span = document.getElementById("score-span");
-      if (span) span.hidden = scoreMode === "spend";
-      const note = document.getElementById("score-note");
-      if (note) note.hidden = scoreMode === "spend";
-      const show = document.getElementById("score-show");
-      if (show) show.hidden = scoreMode === "spend";
-    }
-    function paintScorePulse(d, rows) {
-      const el = document.getElementById("score-pulse");
-      if (!el) return;
-      const sp = scoreSpendPulse(d, scoreSpan);
-      const waiting = scoreWaiting(d);
-      const stalled = scoreStalledNeeds(d).length;
-      const waitStall = waiting + stalled;
-      const staleN = rows.filter(r => r.stale).length;
-      const trend = scoreTrend(rows);
-      const staleWarn = (staleN || stalled) ? " warn" : "";
-      const exact = sp.exact && sp.tokens != null;
-      const estOnly = (!exact) && sp.tokens_est != null;
-      const tok = (typeof wallHonestLlmDisplay === "function")
-        ? wallHonestLlmDisplay(exact ? sp.tokens : null, estOnly ? sp.tokens_est : null)
-        : (exact ? sp.tokens : (estOnly ? sp.tokens_est : "-"));
-      const llmLabel = exact ? ("LLM " + scoreSpan) : (estOnly ? ("LLM est " + scoreSpan) : ("LLM " + scoreSpan));
-      const llmCls = estOnly ? "sp-item est" : "sp-item";
-      const llmTitle = exact
-        ? "Exact model tokens from spend --tokens (wins over tokens_est)"
-        : (estOnly
-          ? "Estimated tokens_est=(chars_in+chars_out)//4; source=est_chars4; not mill bytes"
-          : "Model tokens from spend --tokens; or tokens_est when vendor tokens missing; empty is - not 0");
-      const bytes = (typeof wallHonestMillBytesDisplay === "function")
-        ? wallHonestMillBytesDisplay(sp.millBytes, sp.millRows || 0)
-        : ((sp.millRows && (sp.millBytes || sp.millBytes === 0)) ? sp.millBytes : "-");
-      const filed = scoreFiledList(d);
-      const offT = filed.filter(function (k) {
-        return typeof kpiMiss === "function" && kpiMiss(k.value, k.target);
-      }).length;
-      const onT = Math.max(0, filed.length - offT);
-      el.innerHTML =
-        `<span class="sp-item">On target<b>${esc(String(onT))}</b></span>` +
-        `<span class="sp-item${offT ? " warn" : ""}">Off target<b>${esc(String(offT))}</b></span>` +
-        `<span class="sp-item${waitStall ? " warn" : ""}">Waiting<b>${esc(waitStall)}</b></span>` +
-        `<span class="sp-trend ${offT ? "worse" : trend.cls}">${esc(offT ? "needs eyes" : "ok")}</span>`;
-    }
-    function paintScoreBottlenecks(d) {
-      const el = document.getElementById("score-bottlenecks");
-      if (!el) return;
-      const rows = scoreBottlenecks(d);
-      if (!rows.length) {
-        el.innerHTML = `<h3>BOTTLENECKS</h3><div class="idle">None - no one waiting, no stalled cards.</div>`;
-        return;
-      }
-      el.innerHTML = `<h3>BOTTLENECKS</h3>` + rows.map(r => {
-        const prog = r.progress || { pct: 0, known: false, label: "-" };
-        return `<div class="score-bn-row">` +
-          `<div class="who" title="${esc(r.job || "")}">${esc(r.desk)} | ${esc(r.target)}</div>` +
-          `<div class="meta">${esc(r.kind)} | age ${esc(r.age)}</div>` +
-          `<div class="meta">${esc(prog.label || "-")}</div>` +
-          scoreBarHtml(prog.pct, prog.known) +
-          `</div>`;
-      }).join("");
-    }
-    function paintScoreDeskProgress(d) {
-      const el = document.getElementById("score-desk-progress");
-      if (!el) return;
-      const rows = scoreDeskProgressRows(d);
-      if (!rows.length) {
-        el.innerHTML = `<h3>PROGRESS + TOKENS BY DESK</h3><div class="idle">Honest empty - no desks/needs/spend yet.</div>`;
-        return;
-      }
-      el.innerHTML = `<h3>PROGRESS + TOKENS BY DESK</h3>` + rows.map(r => {
-        const exact = !!r.exact && r.tokens != null;
-        const estOnly = (!exact) && r.tokens_est != null;
-        const tok = exact ? r.tokens : (estOnly ? r.tokens_est : "-");
-        const llmLab = exact ? "LLM" : (estOnly ? "LLM est" : "LLM");
-        const llmDim = estOnly ? "opacity:.72" : "";
-        const prog = r.progress || { pct: 0, known: false, label: "-" };
-        return `<div class="score-desk-row">` +
-          `<div class="who">${esc(r.desk)}</div>` +
-          scoreBarHtml(prog.pct, prog.known) +
-          `<div class="meta">${esc(prog.label || "-")}</div>` +
-          `<div class="meta" style="${llmDim}" title="${exact ? "Exact spend --tokens" : (estOnly ? "tokens_est chars//4" : "LLM tokens")}">${esc(llmLab)} ${esc(tok)}</div>` +
-          `</div>`;
-      }).join("");
-    }
-    function paintScoreHot(rows) {
-      const el = document.getElementById("score-hot");
-      if (!el) return;
-      const list = scoreFilter === "all" ? rows : rows.filter(r => r.hot);
-      if (!list.length) {
-        el.innerHTML = rows.length
-          ? `<div class="idle">${scoreFilter === "needs" ? "No desks need attention." : "No desks."}</div>`
-          : `<div class="idle">no agent_kpi in the records</div>`;
-        return;
-      }
-      el.innerHTML = `<div class="note" style="margin:0 0 .35rem">Hot / Needs attention</div>` + list.map(r => {
-        const sel = r.desk === scoreSelectedDesk ? " sel" : "";
-        const miss = r.miss ? " miss" : "";
-        return `<div class="hot-card${miss}${sel}" data-score-desk="${esc(r.desk)}">` +
-          `<div class="who">${esc(r.desk)}</div>` +
-          `<div class="note">${esc((typeof scoreKpiLabel === "function" ? scoreKpiLabel(r.kpi) : r.kpi) || r.kpi)} | last ${esc(r.last)} | target ${esc(r.target)}</div>` +
-          `<div class="note">${esc((r.reasons || []).join(" | ") || "ok")}</div>` +
-          `</div>`;
-      }).join("");
-    }
-    function paintScoreDetail(row) {
-      const el = document.getElementById("score-detail");
-      if (!el) return;
-      if (!row) {
-        el.innerHTML = `<h3>DETAIL</h3><div class="idle">Pick a desk.</div>`;
-        return;
-      }
-      const rows = (row.kpis || []).map(k => {
-        const miss = kpiMiss(k.value, k.target) ? " class=\"kpi-miss\"" : "";
-        const kn = (typeof scoreKpiLabel === "function") ? scoreKpiLabel(k) : (k.kpi || "");
-        return `<tr${miss}><td title="${esc(k.kpi || "")}">${esc(kn)}</td><td>${esc(k.value)}</td><td>${esc(k.target)}</td>` +
-          `<td>${esc(k.note || "")}</td><td>${esc(dt(k.updated_at))}</td></tr>`;
-      }).join("");
-      el.innerHTML = `<h3>DETAIL | ${esc(row.desk)}</h3>` +
-        `<div class="note">Last vs Target | agent_kpi | ${esc(millGid(row))}</div>` +
-        `<div class="note">published ${esc(dt(row.published))} | ${esc((row.reasons || []).join(" | ") || "ok")}</div>` +
-        (rows
-          ? `<table data-table="score-detail"><thead><tr><th>kpi</th><th>last</th><th>target</th><th>note</th><th>published</th></tr></thead><tbody>${rows}</tbody></table>`
-          : `<div class="idle">no KPIs for this desk</div>`);
     }
     function scoreKpiCell(k) {
       if (!k) return `<span class="score-lt dim">-</span>`;
@@ -9510,21 +7476,6 @@
       const office = names.filter(function (n) { return n !== "system"; });
       office.sort(function (a, b) { return a.localeCompare(b); });
       return ["system"].concat(office);
-    }
-    function scoreRowFor(name, d) {
-      const want = String(name || "").trim();
-      let hit = null;
-      const books = [];
-      if (_officeScores && Array.isArray(_officeScores.kpis)) books.push(_officeScores.kpis);
-      if (d && Array.isArray(d.kpis)) books.push(d.kpis);
-      books.forEach(function (list) {
-        list.forEach(function (k) {
-          if (hereKpiName(k) !== want) return;
-          if (!hit) { hit = k; return; }
-          if (String(k.owner || "") === "Admin" && String(hit.owner || "") !== "Admin") hit = k;
-        });
-      });
-      return hit;
     }
     function scoreShowLabel(name) {
       const raw = String(name || "").trim();
@@ -9606,36 +7557,9 @@
       box.setAttribute("data-sig", sig);
     }
     try { loadScoreShow(); } catch (eShow) {}
-    function paintScoreOfficeTotals(d) {
-      const lbl = (n) => scoreShowLabel(n);
-      const names = scoreCatalog(d);
-      const product = names.filter(n => scoreKpiBucket(n) === "product" && scoreShown(n));
-      const office = names.filter(n => scoreKpiBucket(n) === "office" && scoreShown(n));
-      const totals = typeof scoreOfficeTotals === "function" ? scoreOfficeTotals(d) : {};
-      const chip = (n, fromHost) => {
-        const k = fromHost ? (totals[n] || scoreRowFor(n, d)) : scoreRowFor(n, d);
-        return `<span class="score-office-kpi"><span class="k">${esc(lbl(n))}</span>${scoreKpiCell(k)}</span>`;
-      };
-      const chips = product.map(n => chip(n, true)).join("");
-      const officeChips = office.map(n => chip(n, false)).join("");
-      if (!chips && !officeChips) return "";
-      return `<div class="score-office" aria-label="Scores on this page">` +
-        (chips ? `<div class="score-office-h">the-mill</div>${chips}` : "") +
-        (officeChips ? `<div class="score-office-h">Office</div>${officeChips}` : "") +
-        `</div>`;
-    }
     function scoreEvidenceBase() {
       const q = activitySpanQuery();
       return { key: q.kind + ":" + q.id, kind: q.kind, id: q.id };
-    }
-    function scoreEvidenceUrl(windowName) {
-      const b = scoreEvidenceBase();
-      let url = "/api/activity?scope=" + encodeURIComponent(b.kind) +
-        "&id=" + encodeURIComponent(b.id) +
-        "&window=" + encodeURIComponent(windowName) +
-        "&limit=50";
-      if (b.kind === "project") url += "&project=" + encodeURIComponent(b.id);
-      return url;
     }
     function scoreOwnerKey(raw) {
       let s = String(raw || "").trim();
@@ -9645,231 +7569,6 @@
         if (bare) s = bare;
       } catch (eOwner) {}
       return s;
-    }
-    function scoreRowDesk(row) {
-      if (!row) return "";
-      return scoreOwnerKey(row.owner || row.desk || "");
-    }
-    function scoreSameDesk(row, desk) {
-      const want = scoreOwnerKey(desk).toLowerCase();
-      if (!want) return false;
-      return scoreRowDesk(row).toLowerCase() === want;
-    }
-    function evidenceVerbN(row, verb) {
-      const v = row && row.value;
-      if (!v || typeof v !== "object") return 0;
-      if (!verb || verb === "all") return Number(v.n) || 0;
-      const slot = v[verb];
-      if (!slot || typeof slot !== "object") return 0;
-      return Number(slot.n) || 0;
-    }
-    function scoreLatestDoc(rows, desk) {
-      let best = null;
-      let bestKey = "";
-      (rows || []).forEach(function (row) {
-        if (!scoreSameDesk(row, desk)) return;
-        const key = String((row && (row.timestamp || row.taken)) || "");
-        if (!best || key > bestKey) { best = row; bestKey = key; }
-      });
-      return best;
-    }
-    function scoreVerbNames(row) {
-      const v = row && row.value;
-      if (!v || typeof v !== "object") return [];
-      return Object.keys(v).filter(function (k) {
-        if (k === "n" || k === "bytes") return false;
-        return !!(v[k] && typeof v[k] === "object");
-      }).sort(function (a, b) { return a.localeCompare(b); });
-    }
-    function scoreDocStats(row, verb) {
-      const v = row && row.value;
-      if (!v || typeof v !== "object") return { n: null, ms: null };
-      if (!verb || verb === "all") {
-        let ms = 0;
-        let any = false;
-        Object.keys(v).forEach(function (k) {
-          if (k === "n" || k === "bytes") return;
-          const slot = v[k];
-          if (slot && typeof slot === "object" && slot.ms != null) {
-            ms += Number(slot.ms) || 0;
-            any = true;
-          }
-        });
-        return { n: v.n != null ? Number(v.n) : null, ms: any ? ms : null };
-      }
-      const slot = v[verb];
-      if (!slot || typeof slot !== "object") return { n: null, ms: null };
-      return {
-        n: slot.n != null ? Number(slot.n) : null,
-        ms: slot.ms != null ? Number(slot.ms) : null
-      };
-    }
-    function scoreCountText(n) {
-      if (n == null || !Number.isFinite(Number(n))) return "-";
-      const x = Number(n);
-      if (Math.abs(x - Math.round(x)) < 0.05) return String(Math.round(x));
-      return String(Math.round(x * 10) / 10);
-    }
-    function scoreVerbDetail(stats) {
-      const n = stats && stats.n;
-      const ms = stats && stats.ms;
-      if (n == null && ms == null) return "No count for this verb today.";
-      const bits = [];
-      if (n != null) bits.push(scoreCountText(n) + (Number(n) === 1 ? " time" : " times"));
-      if (ms != null) bits.push(scoreCountText(ms) + " ms");
-      return bits.join(", ");
-    }
-    function scoreTotal(values) {
-      let n = 0;
-      (values || []).forEach(function (v) { n += Number(v) || 0; });
-      return n;
-    }
-    function scoreBars(values, labels, name) {
-      const series = values || [];
-      const n = Math.max(series.length, 1);
-      const W = 320, H = 78, padL = 4, padR = 4, padT = 4, padB = 16;
-      let ymax = 0;
-      series.forEach(function (v) {
-        const x = Number(v) || 0;
-        if (x > ymax) ymax = x;
-      });
-      if (ymax < 1) ymax = 1;
-      const innerW = W - padL - padR;
-      const innerH = H - padT - padB;
-      const slot = innerW / n;
-      const bw = Math.max(0.8, slot * (n > 16 ? 0.72 : 0.62));
-      const bars = series.map(function (v, i) {
-        const val = Number(v) || 0;
-        const h = (val / ymax) * innerH;
-        const x = padL + i * slot + (slot - bw) / 2;
-        const y = padT + innerH - h;
-        const hh = val > 0 ? Math.max(1.2, h) : 0;
-        const track = `<rect class="score-bar-track" x="${x.toFixed(1)}" y="${padT}" width="${bw.toFixed(1)}" height="${innerH.toFixed(1)}"/>`;
-        return track + `<rect class="score-bar-col" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${hh.toFixed(1)}"><title>${esc(String(val))}</title></rect>`;
-      }).join("");
-      const baseY = (padT + innerH).toFixed(1);
-      const base = `<line class="score-bar-base" x1="${padL}" y1="${baseY}" x2="${W - padR}" y2="${baseY}"/>`;
-      const labs = labels || [];
-      const axis = labs.map(function (lab, i) {
-        const count = labs.length;
-        const x = padL + (count <= 1 ? innerW / 2 : (i / (count - 1)) * innerW);
-        const anchor = i === 0 ? "start" : (i === count - 1 ? "end" : "middle");
-        return `<text x="${x.toFixed(1)}" y="${H - 3}" text-anchor="${anchor}">${esc(lab)}</text>`;
-      }).join("");
-      return `<svg class="score-spark" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(name)}">${base}${bars}${axis}</svg>`;
-    }
-    function scoreSeriesActivity(desk) {
-      const step = 60 * 1000;
-      const nB = 15;
-      const start = Math.floor(Date.now() / step) * step - (nB - 1) * step;
-      const values = new Array(nB).fill(0);
-      (_scoreEv.min || []).forEach(function (row) {
-        if (!scoreSameDesk(row, desk)) return;
-        const ts = floorParseTs(row.updated || row.at || row.timestamp);
-        if (!Number.isFinite(ts)) return;
-        const i = Math.floor((ts - start) / step);
-        if (i < 0 || i >= nB) return;
-        values[i] += Number(row.n) || 0;
-      });
-      const lab = function (ms) {
-        const d = new Date(ms);
-        return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
-      };
-      return { values: values, labels: [lab(start), lab(start + (nB - 1) * step)] };
-    }
-    function scoreSeriesHour(desk, verb) {
-      const values = new Array(24).fill(0);
-      (_scoreEv.hourly || []).forEach(function (row) {
-        if (!scoreSameDesk(row, desk)) return;
-        const i = evidenceHour(row);
-        if (i < 0 || i >= 24) return;
-        values[i] = evidenceVerbN(row, verb);
-      });
-      return { values: values, labels: ["0h", "12h", "23h"] };
-    }
-    function scoreSeriesDay(desk, verb) {
-      const nB = 30;
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      start.setDate(start.getDate() - (nB - 1));
-      const keys = [];
-      for (let i = 0; i < nB; i++) {
-        const d = new Date(start.getTime() + i * 86400000);
-        keys.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
-      }
-      const values = new Array(nB).fill(0);
-      (_scoreEv.daily || []).forEach(function (row) {
-        if (!scoreSameDesk(row, desk)) return;
-        const i = keys.indexOf(evidenceDay(row));
-        if (i < 0) return;
-        values[i] = evidenceVerbN(row, verb);
-      });
-      const lab = function (k) {
-        const m = String(k || "").match(/-(\d{2})-(\d{2})$/);
-        return m ? (Number(m[1]) + "/" + Number(m[2])) : k;
-      };
-      return { values: values, labels: [lab(keys[0]), lab(keys[14]), lab(keys[29])] };
-    }
-    function scoreGraphBlock(title, count, note, body) {
-      return `<div class="score-block"><h3>${esc(title)} <b>${esc(scoreCountText(count))}</b></h3><div class="note">${esc(note)}</div>${body}</div>`;
-    }
-    function scoreWindowBody(miss, seriesHtml) {
-      if (miss) return `<div class="idle">This office has no activity span yet.</div>`;
-      return seriesHtml;
-    }
-    async function loadScoreEvidence() {
-      const key = scoreEvidenceBase().key;
-      if (_scoreEvBusy) return;
-      if (_scoreEv.key === key && (Date.now() - _scoreEvAt) < 15000) return;
-      _scoreEvBusy = key;
-      async function pull(windowName) {
-        const rows = [];
-        let url = scoreEvidenceUrl(windowName);
-        try {
-          for (let guard = 0; url && guard < 8; guard++) {
-            const r = await fetch(url, { cache: "no-store" });
-            if (!r.ok) return { rows: [], miss: true };
-            const j = await r.json();
-            (j.rows || []).forEach(function (row) { rows.push(row); });
-            if (!j.next) return { rows: rows, miss: false };
-            url = scoreEvidenceUrl(windowName) + "&cursor=" + encodeURIComponent(j.next);
-          }
-          return { rows: rows, miss: false };
-        } catch (ePull) {
-          return { rows: [], miss: true };
-        }
-      }
-      let min, hourly, daily;
-      try {
-        const got = await Promise.all([pull("min"), pull("hourly"), pull("daily")]);
-        min = got[0];
-        hourly = got[1];
-        daily = got[2];
-      } catch (eEv) {
-        min = { rows: [], miss: true };
-        hourly = { rows: [], miss: true };
-        daily = { rows: [], miss: true };
-      }
-      if (_scoreEvBusy !== key) {
-        _scoreEvBusy = "";
-        return;
-      }
-      _scoreEvBusy = "";
-      if (scoreEvidenceBase().key !== key) {
-        loadScoreEvidence();
-        return;
-      }
-      _scoreEv = {
-        key: key,
-        min: min.rows,
-        hourly: hourly.rows,
-        daily: daily.rows,
-        missMin: !!min.miss,
-        missHour: !!hourly.miss,
-        missDay: !!daily.miss
-      };
-      _scoreEvAt = Date.now();
-      try { paintScoreDeskTable(scoreDeskRows(window._floor || {})); } catch (ePaintEv) {}
     }
     function paintScoreDeskTable(rows) {
       void rows;
@@ -10016,11 +7715,6 @@
     let _scoreGlanceUser = false;
     let _scoreGlanceScroll = 0;
     let _scoreGlanceLock = false;
-    function wallSetScoreScroll(box, top) {
-      _scoreGlanceLock = true;
-      box.scrollTop = top;
-      _scoreGlanceLock = false;
-    }
     function wallWireScoreGlance() {
       const box = document.getElementById("score-human");
       if (!box || box._glanceWired) return;
@@ -10042,121 +7736,6 @@
           try { if (window.markOverflow) window.markOverflow(); } catch (eMore) {}
         });
       });
-    }
-    function paintScoreVerbs(verbsEl, graphsEl, desk, evReady, scoreOn) {
-      if (!verbsEl || !graphsEl) return;
-      if (!desk) {
-        verbsEl.innerHTML = `<div class="idle">Pick a desk.</div>`;
-        graphsEl.innerHTML = `<div class="idle">Pick a verb.</div>`;
-        return;
-      }
-      if (!evReady) {
-        const msg = (scoreOn || _scoreEvBusy) ? "Loading rollups..." : "Rollups load on this tab.";
-        verbsEl.innerHTML = `<div class="score-office-h">Verbs</div><div class="idle" style="padding:.45rem">${esc(msg)}</div>`;
-        graphsEl.innerHTML = `<div class="idle">${esc(msg)}</div>`;
-        return;
-      }
-      const doc = scoreLatestDoc(_scoreEv.daily, desk) || scoreLatestDoc(_scoreEv.hourly, desk);
-      const names = scoreVerbNames(doc);
-      const ids = ["all"].concat(names);
-      if (ids.indexOf(scoreSelectedVerb) < 0) scoreSelectedVerb = names[0] || "all";
-      const verb = scoreSelectedVerb || "all";
-      let maxN = 1;
-      ids.forEach(function (id) {
-        const n = Number(scoreDocStats(doc, id).n) || 0;
-        if (n > maxN) maxN = n;
-      });
-      const rows = ids.map(function (id) {
-        const stats = scoreDocStats(doc, id);
-        const sel = id === verb ? " sel" : "";
-        const label = id === "all" ? "all verbs" : id;
-        const pct = Math.max(0, Math.min(100, Math.round(((Number(stats.n) || 0) / maxN) * 100)));
-        return `<tr class="${sel}" data-score-verb="${esc(id)}">` +
-          `<td><span class="score-verb-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>${esc(label)}</td>` +
-          `<td>${esc(scoreCountText(stats.n))}</td><td>${esc(scoreCountText(stats.ms))}</td></tr>`;
-      }).join("");
-      verbsEl.innerHTML = `<div class="score-office-h">Verbs</div>` +
-        `<table data-table="score-verbs"><thead><tr><th>verb</th><th>n</th><th>ms</th></tr></thead><tbody>${rows}</tbody></table>`;
-      const stats = scoreDocStats(doc, verb);
-      const verbLabel = verb === "all" ? "all verbs" : verb;
-      const activitySeries = scoreSeriesActivity(desk);
-      const hourSeries = scoreSeriesHour(desk, verb);
-      const daySeries = scoreSeriesDay(desk, verb);
-      const activityN = scoreTotal(activitySeries.values);
-      const hourN = scoreTotal(hourSeries.values);
-      const dayN = scoreTotal(daySeries.values);
-      const activity = scoreWindowBody(
-        _scoreEv.missMin,
-        scoreBars(activitySeries.values, activitySeries.labels, "Activity, last 15 minutes, total " + scoreCountText(activityN))
-      );
-      const hour = scoreWindowBody(
-        _scoreEv.missHour,
-        scoreBars(hourSeries.values, hourSeries.labels, "Hour, 24 slots, " + verbLabel + ", total " + scoreCountText(hourN))
-      );
-      const day = scoreWindowBody(
-        _scoreEv.missDay,
-        scoreBars(daySeries.values, daySeries.labels, "Day, 30 midnights, " + verbLabel + ", total " + scoreCountText(dayN))
-      );
-      const detail = scoreVerbDetail(stats);
-      const detailLine = (stats.n == null && stats.ms == null)
-        ? detail
-        : (verbLabel + " today: " + detail);
-      graphsEl.innerHTML =
-        `<div class="note">${esc(detailLine)}</div>` +
-        `<div class="score-charts">` +
-        scoreGraphBlock("Activity", activityN, "15 minutes", activity) +
-        scoreGraphBlock("Hour", hourN, "24 hours, this verb", hour) +
-        scoreGraphBlock("Day", dayN, "30 days, this verb", day) +
-        `</div>`;
-    }
-    function selectScoreDesk(desk, rows) {
-      scoreSelectedDesk = desk || "";
-      try { localStorage.setItem("factory-score-desk", scoreSelectedDesk); } catch (e) {}
-      const row = rows.find(r => r.desk === scoreSelectedDesk) || null;
-      paintScoreHot(rows);
-      paintScoreDeskTable(rows);
-      paintScoreDetail(row);
-    }
-
-    function cards(d) {
-      const rows = scoreDeskRows(d);
-      paintScoreChrome();
-      try { paintScoreShow(d); } catch (eShowCards) {}
-      paintScorePulse(d, rows);
-      paintScoreBottlenecks(d);
-      paintScoreDeskProgress(d);
-      const spendBlock = millSpend(d);
-      const spendView = document.getElementById("score-spend-view");
-      if (spendView) spendView.innerHTML = spendBlock || `<div class="idle">No mill spend in this window.</div>`;
-      const legacy = document.getElementById("cards");
-      if (legacy) {
-        legacy.innerHTML = "";
-        legacy.hidden = true;
-      }
-      if (!scoreSelectedDesk && rows.length) {
-        const prefer = rows.find(r => r.hot) || rows[0];
-        scoreSelectedDesk = prefer.desk;
-      }
-      if (scoreSelectedDesk && !rows.some(r => r.desk === scoreSelectedDesk)) {
-        scoreSelectedDesk = rows[0] ? rows[0].desk : "";
-      }
-      selectScoreDesk(scoreSelectedDesk, rows);
-      if (!rows.length && scoreMode === "kpi") {
-        const hot = document.getElementById("score-hot");
-        const detail = document.getElementById("score-detail");
-        if (hot) hot.innerHTML = `<div class="idle">no agent_kpi in the records</div>`;
-        if (detail) detail.innerHTML = `<h3>DETAIL</h3><div class="idle">Honest empty - nothing to measure yet.</div>`;
-      }
-    }
-    /* SCORE_BOOT_FIX: mirror ensureFloorPaint / ensureMailPaint */
-    function ensureScorePaint() {
-      if (!window._floor) return;
-      try { cards(window._floor); } catch (e) {}
-      try {
-        requestAnimationFrame(function() {
-          try { if (window._floor) cards(window._floor); } catch (e2) {}
-        });
-      } catch (e) {}
     }
     (function wireScorecardsGlance() {
       const chrome = document.getElementById("score-chrome");
@@ -10668,7 +8247,7 @@
           paintFloorView(glance);
         }
       } catch (e) {}
-      if (clock) clock.textContent = new Date().toISOString().slice(11, 19);
+      if (clock) clock.textContent = wallClockLine(d);
       enhanceTables(document);
       markOverflow();
     }
@@ -10729,10 +8308,14 @@
       host.dataset.sig = html;
       host.innerHTML = html;
     }
+    /* Last rail read (ms). Rail counts change slowly; a read this fresh is reused. */
+    let _railBookAt = 0;
+    const WALL_RAIL_FRESH_MS = 5000;
     async function loadRailBook() {
       const root = document.getElementById("rail-book");
       if (!root || root.dataset.busy === "1") return;
       root.dataset.busy = "1";
+      _railBookAt = Date.now();
       /* wow139: spinner until each POV part lands; fetch desks/projects/roles in parallel. */
       try {
         ["rail-desks", "rail-roster"].forEach(function (id) {
@@ -10954,7 +8537,8 @@
         if (!wallTickGenAlive(tickGen) && !_wallReuseInflight) return;
         if (railPick) return;
       }
-      loadRailBook();
+      /* The restore tick and the tick its rail pick starts land together: one rail read, not two. */
+      if (Date.now() - _railBookAt > WALL_RAIL_FRESH_MS) loadRailBook();
       const clock = document.getElementById("clock");
       const scope = floorScope();
       const projectKey = scope.key;
@@ -11109,7 +8693,8 @@
         const pickKey = railPick ? (railPick.kind + ":" + railPick.id) : "";
         if (h === _floorHash && pickKey === _railPickApplied && pickKey === _hereDomPick) {
           const cl = document.getElementById("clock");
-          if (cl) cl.textContent = new Date().toISOString().slice(11, 19);
+          /* Same version, node and local zone as every other paint (no bare UTC). */
+          if (cl) cl.textContent = wallClockLine(raw);
           /* wow148: fp same / hash same - keep last result; drop checking overlay. */
           try { wallRestoreActivePaneFromFloor(); } catch (eRest0) {}
           try { wallPreserveThemeChrome(); } catch (eTh0) {}

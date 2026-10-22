@@ -271,7 +271,9 @@ def test_whomay_pass_shipped_to_done_refuses_third_desk():
     c._cn = MagicMock()
     with patch("agent_coord.server.records.todo.find", return_value=_named_hit("shipped")), patch(
         "agent_coord.server.records.todo.update"
-    ) as upd, patch("agent_coord.server.api.mill.rpc._poke"):
+    ) as upd, patch("agent_coord.server.api.mill.rpc._poke"), patch(
+        "agent_coord.server.admin.guard.is_role_admin", return_value=False
+    ):
         with pytest.raises(CoordError) as ei:
             rpc._h_pass(c, {"need": "63", "step": "done"}, "office", "intruder")
     assert "shipped->done is the asker" in str(ei.value)

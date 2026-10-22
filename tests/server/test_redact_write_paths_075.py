@@ -94,6 +94,10 @@ def test_wall_desk_post_is_redacted(monkeypatch):
     tok = fake_token()
     seen = {}
     monkeypatch.setattr(human.door, "check", lambda t: True)
+    monkeypatch.setattr(
+        "agent_coord.server.records.join.desk_for_token_hash",
+        lambda cn, digest: "desk-b",
+    )
 
     def insert(cn, project, src, dst, body, **k):
         seen["body"] = body

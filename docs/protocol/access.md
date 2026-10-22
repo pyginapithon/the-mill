@@ -35,17 +35,20 @@ Teaching names below match skill.md day-one speech. Wall path may still say `/op
 5. **Name compares are typed.** A name is its type plus the bare string (`desk`, `project`, `role`, `label`, `res`, `tree`). `slug` validates the token. The session file and the `/ws` room use that desk name. *(pytest: `tests/server/test_mill_access.py`)*
 
 
-## Wall browse vs agent commands (Host GO trust matrix)
+## Reads: collaboration by default (S-3)
 
-| trust | Wall (human) | Agent commands |
-|---|---|---|
-| **limited** | membership only (room cast) | membership only (room cast) |
-| **high** (default) | may browse book | membership-scoped |
-| **Admin** (`Admin`) | everything | everything |
+Minted access reads everything in its office; private mail is out of scope (use another tool).
 
-- **Agent** `mail-thread`: sync key = **room cast** (root sender U root mail_tos). Mid-thread omit does not hide the TREE from a root-cast desk. Admin bypasses.
-- **Wall** `GET /api/v1/rooms`: payload stamps `trust`. Pass `?desk=<deskId>` when limited (or `?scope=membership`) so Builder filters to room cast. high without scope = full project rooms. Remaining glass wiring (cookie desk -> query) = wall-ui.
-- Chart: [admin.md](../requirements/admin.md). Contract: [WALL-CONTRACT-trust-wall-browse.md](../claims/WALL-CONTRACT-trust-wall-browse.md).
+| trust | Wall (human) | Agent reads | Agent writes |
+|---|---|---|---|
+| **limited** | every room and letter | every room and letter | trust-gated (Admin for others' membership, assign) |
+| **high** (default) | every room and letter | every room and letter | open |
+| **Admin** (`Admin`) | everything | everything | everything |
+
+- **Agent** `mail-thread`, `trail`, `trail --label`: any desk holding minted access to the office reads every letter and room there, on it or not, direct letters included. A read adds no participant, no inbox row and no wake. Bodies are redacted on store and again on read (S-6).
+- **Wall** `GET /api/v1/rooms`: every room at every trust level. `?desk=` and `?scope=membership` are accepted and ignored.
+- **Writes** keep their gates: sender binding, `add`/`remove mail:ID` for another desk (sender, recipient, room participant, or Admin), Admin-only commands. A caller with no minted access to the office gets nothing.
+- Chart: [admin.md](../requirements/admin.md).
 
 ## Tests
 
