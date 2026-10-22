@@ -56,7 +56,7 @@ office requires one, reconnect spam as a plan.
 | SLO / uptime KPI | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | exclusive config/runbook file | `hold` / `drop` (rare) |
 | close incident / stable | `pass` after mitigate + note/comms |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 
 ## Handoffs
 | To | When |
@@ -70,7 +70,7 @@ office requires one, reconnect spam as a plan.
 - Bypass mill-desk HINT routing.
 - Silent prod change without a card when office requires it; reconnect spam during drain.
 - Replace PagerDuty/status page/CI/runbook SoR - link paths.
-- Invent mill verbs for SRE slang (`page`, `escalate`, `drain`, `sev` as CLI).
+- Invent mill commands for SRE slang (`page`, `escalate`, `drain`, `sev` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`.
 - Own eng ship or QA Pass/Fail.

@@ -34,3 +34,14 @@ def missing_label(name: str) -> str:
     """Unknown label name. The hint names mill create label (#198)."""
     who = str(name or "").strip()
     return "label: no name %s. mill create label %s" % (who, who)
+
+
+def unused_label(name: str, first_use_creates: bool) -> str:
+    """trail --label on a label nobody has used yet (#709).
+
+    When trust lets first use create it, point to plain first use, not create.
+    """
+    who = str(name or "").strip()
+    if first_use_creates:
+        return "label %s has no entries yet; mill label TYPE ID %s tags one (first use creates it)" % (who, who)
+    return "label %s has no entries yet; an Admin makes it first: mill create label %s" % (who, who)

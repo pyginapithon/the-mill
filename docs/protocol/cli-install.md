@@ -1,12 +1,12 @@
 # mill CLI: install
 
-Part of the mill CLI (command line interface). This page lists the verbs that join a desk to an office and set up a machine or host. Daily desk verbs are in [cli-desk.md](cli-desk.md). Names, seats and trust are in [cli-admin.md](cli-admin.md).
+Part of the mill CLI (command line interface). This page lists the commands that join a desk to an office and set up a machine or host. Daily desk commands are in [cli-desk.md](cli-desk.md). Names, seats and trust are in [cli-admin.md](cli-admin.md).
 
-Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
+Every command takes `--office ALIAS` (before or after the command) and `-h`.
 
 ## Join an office
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `join` | `mill join --link-file PATH` or `mill join --link-stdin` | The seat welcome link from a file (`--link-file PATH`, the owner-only file `mill invite` writes) or stdin (`--link-stdin`), never on the command line: it carries the seat secret, so a link as an argument is refused and never echoed (F69). No `--url`, no `--office` needed: the office alias is the link's host and becomes the default office. `--office <alias>` picks another local name. HTTP only. The link is `https://<wall>/welcome?desk=&seat=&project=&pem=`. Stores the seat token and CA, then prints the next line to run: `bash -c 'mill connect <desk> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'`. The invite-key `/?invite=KEY` is the human Wall door, not a join argument. Delivery (#618): add `--webhook-url URL` or `--webhook-url-file PATH`, plus the key from `--webhook-key-file PATH`, `--webhook-key-env NAME` or `--webhook-key-stdin`, never as an argument. The wall then POSTs a wake while the desk's connect is down. It test-fires once and prints `{"kind": "wake", "webhook": "armed", "host", "test"}`. A seated desk changes its delivery with `mill join DESK --webhook-...`, or switches back with `mill join DESK --websocket`, using its own seat and no new link. `--wake-on addressed|all` (#628, with the webhook options only; default `all`) picks which items POST: with `addressed`, a letter the desk gets only as a room member does not POST and waits for its next connect. See [connect.md](connect.md#webhook-wake). |
 | `local` | `mill local` | List the offices on this machine and their aliases. |
@@ -15,13 +15,13 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 
 ## This machine
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `route` | `mill route list | add KEY -- PROGRAM | rm KEY` | This desk's HINT redirector chain. See [route.md](route.md). |
 
 ## Host setup
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `install` | `mill install {server,client,book,records,wall,desk,check,cloud,glance-tap} [--apply] [--dry-run] [--http H] [--book B] [--provider P] [--bind B] [--port N] [--dest D] [--lan-only] [--public] [--agent] [--tap T] [--generate [N]] [--link-file PATH]` | server = records + wall (admin); client = mill CLI; check = preflight; cloud = runbook. `--dry-run` mutates nothing. Desks do not run install. See [HOST.md](../install/HOST.md). |
 | `uninstall` | `mill uninstall [--apply] [--dest] [--packages] [--dry-run] [--json] [--agent]` | Remove what install placed. |

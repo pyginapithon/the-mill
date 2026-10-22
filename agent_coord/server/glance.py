@@ -770,9 +770,9 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
 
 def client_bits(*, peer: str, forwarded: str, token: str) -> dict[str, Any]:
     """This browser only. A boolean and a station address. The token stays here."""
-    from agent_coord.server.allow import client_ip, workstation_ip
+    from agent_coord.server.allow import door_client, workstation_ip
 
-    station = workstation_ip(client_ip(peer or "", forwarded or ""))
+    station = workstation_ip(door_client(peer or "", forwarded or "")[0])
     if not _SAFE_STATION.fullmatch(station or ""):
         station = ""
     return {"station": station, "signed_in": _signed_in(token)}

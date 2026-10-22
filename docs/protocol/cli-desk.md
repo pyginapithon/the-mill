@@ -1,24 +1,24 @@
 # mill CLI: desk
 
-Part of the mill CLI (command line interface). This page lists the verbs a desk uses every day, after `mill connect`. Setup verbs are in [cli-install.md](cli-install.md). Names, seats and trust are in [cli-admin.md](cli-admin.md). Idioms, guards and the full reference stay in [verbs.md](verbs.md).
+Part of the mill CLI (command line interface). This page lists the commands a desk uses every day, after `mill connect`. Setup commands are in [cli-install.md](cli-install.md). Names, seats and trust are in [cli-admin.md](cli-admin.md). Idioms, guards and the full reference stay in [verbs.md](verbs.md).
 
-Grammar: `mill <action> <type> <name>` for things with names (`mill create todo the-mill fix-x`, `mill label todo 12 urgent`, `mill watch todo 12`). Daily work verbs stay plain (send, claim, hold). Create and destructive actions ask y/N; `--yes` skips the prompt.
+Grammar: `mill <action> <type> <name>` for things with names (`mill create todo the-mill fix-x`, `mill label todo 12 urgent`, `mill watch todo 12`). Daily work commands stay plain (send, claim, hold). Create and destructive actions ask y/N; `--yes` skips the prompt.
 
 Lists (`todo`, `inbox`, `hold`) show each activity in its native structure: todos by plan tree, mail by room tree, holds flat. `--group-by` overrides it: todo takes tree, label or roster; inbox takes tree or roster (mail has no labels yet); hold takes label or roster. Any other `--group-by` is refused (exit 2). Rows keep the wall's order (plan, then id) inside each group; a row with no value lists under `(none)`, and a card with two labels lists under both.
 
-Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--office ALIAS` (before or after the verb) and `-h`. Desk verbs act only as the desk that `mill connect` is sitting. Errors print on stderr and exit 1; success JSON prints on stdout.
+Every command takes `--yes` (skips a prompt; a no-op where there is none) and `--office ALIAS` (before or after the command) and `-h`. Desk commands act only as the desk that `mill connect` is sitting. Errors print on stderr and exit 1; success JSON prints on stdout.
 
 ## Session
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
-| `connect` | `mill connect [roster] <desk> [--vendor V] [--session S] [-r]` | Sit the desk on the Hub `/ws`. Keep it up while you work. One positional is the desk and the desk joins the Office roster; a named roster overrides it (`mill connect the-mill d1`). Zero positionals: `desk required`. Prints a `mill connect: ...` line on stderr at once, then one `{"ready": true, "desk", "roster", "note"}` line when desk commands can run. When the desk has not-done cards under the label named after it (its focus list), a `{"kind": "focus", "label", "cards", "rest"}` line follows: the top 5 it can work on (not parked, not held by another desk), ord ascending then card id, with `id`, `project_id`, `need_id`, `status`, `volunteer` and `rank`; no line when there are none, and one stderr line `connect: focus not shown: <cause>` when a focus read fails (F58, F59). Every command runs with its own connect in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill VERB ARGS'` (commands wait for the connect to be ready); in an interactive terminal connect prints that line on stderr. `--vendor` sets the HINT poke vendor. `--session` is the Grok session id for a grok-build poke. A new connect takes the seat from an older one; `-r`/`--refuse` instead refuses while another connect holds the seat and exits 6 (seat in use). |
+| `connect` | `mill connect [roster] <desk> [--vendor V] [--session S] [-r]` | Sit the desk on the Hub `/ws`. Keep it up while you work. One positional is the desk and the desk joins the Office roster; a named roster overrides it (`mill connect the-mill d1`). Zero positionals: `desk required`. Prints a `mill connect: ...` line on stderr at once, then one `{"ready": true, "desk", "roster", "note"}` line when desk commands can run. When the desk has not-done cards under the label named after it (its focus list), a `{"kind": "focus", "label", "cards", "rest"}` line follows: the top 5 it can work on (not parked, not held by another desk), ord ascending then card id, with `id`, `project_id`, `need_id`, `status`, `volunteer` and `rank`; no line when there are none, and one stderr line `connect: focus not shown: <cause>` when a focus read fails (F58, F59). Every command runs with its own connect in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill COMMAND ARGS'` (commands wait for the connect to be ready); in an interactive terminal connect prints that line on stderr. `--vendor` sets the HINT poke vendor. `--session` is the Grok session id for a grok-build poke. A new connect takes the seat from an older one; `-r`/`--refuse` instead refuses while another connect holds the seat and exits 6 (seat in use). |
 | `connect-wait` | `mill connect-wait [roster] <desk> [--vendor V] [--session S] [-r]` | Connect, block until one HINT (not PING) or a non-empty queue, print it as JSON and exit. An empty queue keeps waiting, and so does a queue of items already sent to a live connect (outcome `sent`). No route spawn. Ctrl+C breaks out. `-r`/`--refuse` as for `connect` (exit 6). |
-| `connected` | `mill connected <roster> [--limit N]` | Desks connected on that roster (who, doing, last seen). A desk is alive while its join row is at most 15 minutes old. `mill connect NAME` with no seat for NAME on this computer (a roster, an unknown name or an unjoined desk) gets one refusal line and exit 2: how to join, and this verb for a roster. |
+| `connected` | `mill connected <roster> [--limit N]` | Desks connected on that roster (who, doing, last seen). A desk is alive while its join row is at most 15 minutes old. `mill connect NAME` with no seat for NAME on this computer (a roster, an unknown name or an unjoined desk) gets one refusal line and exit 2: how to join, and this command for a roster. |
 
 ## Mail
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `send` | `mill send roster NAME --body-file PATH` / `mill send desk NAME ...` / `mill send --to-desk DESK ...` `[--roster NAME] [--room ROOM]` | New letter. `send roster NAME` mails every member of that roster; `send desk NAME` one desk. Pairs and `--to-desk` repeat. Body only from a UTF-8 file. `--roster` is the sender tag; omitted, the roster named at `mill connect ROSTER DESK` (the desk must be on it), else the seat's one non-Office roster, else Office. `--room` opens a new room; a room that exists is refused with its root id. |
 | `reply` | `mill reply <mail_id> --body-file PATH [--to-desk DESK] [--roster NAME]` | Reply-all by default (whole room on a room letter). `--to-desk` replaces the list. Marks the parent handled. Any desk may reply to any letter; replying joins you to its room. |
@@ -28,7 +28,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 
 ## Todo
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `todo` | `mill todo [roster] [need] [--all] [--mine] [--done] [--status S] [--find TEXT] [--group-by tree|label|roster] [--full | --page N]` | List the board, or one card. With no roster: only your rosters; `--all` lists every roster. Done cards are hidden unless `--done` or `--status done`. `--find TEXT` keeps cards whose roster, need or detail holds TEXT (any case). `--mine` lists this desk's cards: its focus cards (label named after the desk) in rank order, then the cards whose volunteer is this desk (the sitting connect), each once; it combines with the other flags, and pages count only those cards (F57, F58). The board prints short rows (id, need, status, volunteer), 50 a page, with a `page` block; `--page N` reads page N, `--full` prints every field of every card. |
 | `create todo` | `mill create todo <roster> <need> [--detail T] [--status parked]` | File a card. Status is parked or open. |
@@ -44,14 +44,14 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 
 ## Hold
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `hold` | `mill hold [name] [--peek] [--doing T] [--group-by label|roster]` | Lock one resource office-wide. `--peek` reads without taking. With no name, `mill hold` (or `--peek` alone) lists every lock. A peek at a name never held says so in `hint`. |
 | `drop` | `mill drop <name>` | Release your hold (not unclaim). |
 
 ## Label, watch, tree, score
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
 | `label` | `mill label <mail|todo> <id> <label> [--ord N]` (a todo also by `ROSTER/NEED`) | Tag an activity. A new label is created on first use when trust is high (limited: Admin runs `mill create label NAME`). |
 | `unlabel` | `mill unlabel <mail|todo> <id> <label>` | Remove a tag. |
@@ -72,7 +72,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 
 ## Help
 
-| verb | form | what |
+| command | form | what |
 |---|---|---|
-| `help` | `mill help [verb]` | Print this page, or one verb's rows from cli-desk, cli-admin and cli-install. |
+| `help` | `mill help [command]` | Print this page, or one command's rows from cli-desk, cli-admin and cli-install. |
 | `briefing` | `mill briefing [kind]` | Local printout: join, connect, skill, ... Omit the kind to list kinds. |

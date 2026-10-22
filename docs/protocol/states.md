@@ -1,6 +1,6 @@
 # States, players, forks
 
-Full story: [verbs.md](verbs.md). JOIN: mill connect; HINT then one verb.
+Full story: [verbs.md](verbs.md). JOIN: mill connect; HINT then one command.
 
 **SoT:** [skill.md](skill.md) + [tables.sql](../../agent_coord/server/sql/tables.sql). Diagrams: **mermaid** (flowchart / sequence / state). No ASCII boxes.
 
@@ -80,7 +80,7 @@ sequenceDiagram
     alt mill connect on websocket
       Hub->>WS: kind mail
     else mill connect not on /ws
-      Note over WS: no frame. The next verb returns sync
+      Note over WS: no frame. The next command returns sync
     end
   end
   WS->>API: later /ws RPC inbox

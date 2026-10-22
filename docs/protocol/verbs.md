@@ -5,7 +5,7 @@ Collaboration middleware for **desks** (human + Bot). Cheap JSON. Desk-acting ve
 Access (who may mutate): [access.md](access.md).
 
 **Fold:** [JOIN.md](../JOIN.md) | [AGENTS.md](../dev/AGENTS.md) (mill-dev only) | [README.md](../../README.md).  
-`mill help` / `mill help VERB` prints this file.
+`mill help` prints [cli-desk.md](cli-desk.md); `mill help COMMAND` prints that command's rows.
 
 The mill CLI (command line interface) verbs are split by who uses them: [cli-desk.md](cli-desk.md) (daily desk verbs), [cli-install.md](cli-install.md) (join and host setup), [cli-admin.md](cli-admin.md) (members, seats, names, trust). This file keeps the idioms, guards and full reference.
 
@@ -76,8 +76,8 @@ mill create label <name> --yes
 - A desk's holds, one resource's lock, the held list, the project check before hold/drop/label, and the send offline check each read the rows they answer by index, not the whole hold table, name catalog or seat list; the replies are unchanged. Regression row F23 (direct-lookups).
 - Hints: the desk whose verb changed a card, hold, score or tree node gets no hint for its own change; every other watcher still does. A label change stamps the hint time when the label changed, not the card's last write. Regression row F26 (hint-self-skip).
 - `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's `pass --done` moves shipped to done; `pass --back` steps a card back one stage (done to shipped, shipped to claimed). A step that does not fit the card is refused and changes nothing (F67).
-- `todo <project> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
-- The board list (`todo`, `todo <project>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
+- `todo <roster> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
+- The board list (`todo`, `todo <roster>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
 - `todo --mine` lists this desk's cards, the desk of the sitting connect: first its focus cards (the cards wearing the label named after the desk, skipping parked ones unless `--status parked` and ones another desk holds) in rank order, each with `focus` set to its `--ord`, then the cards whose `volunteer` is this desk (exact name; a desk whose name merely contains yours does not match), each card once. Without `--group-by` the list stays flat so the rank order holds. It is built before `--find` and paging, so the `page` block counts only these cards, and the note says how many of each. It combines with `--status`, `--done`, `--all`, `--find`, `--full`, `--page` and `--raw`; it lists only cards the board lists, so without `--done` done cards stay hidden. A one-card peek with `--mine` is refused. The wall sends only the cards this desk holds or that wear its label (the read carries `mine`), so the read costs this desk's cards, not the whole board; an older wall sends the board and the CLI trims it the same way. Pick your next card with `todo --mine`, not by reading the board. Regression rows F57 (todo-mine), F58 (desk-focus) and F83 (todo-mine-wire).
 - Desk focus: the label whose name is a desk id is that desk's priority list. Anyone ranks a card for a desk with `label todo <id> <desk> --ord N` (0 pinned, 65535 unplaced). Nothing creates that label for you: the first `label todo` that uses the desk's name creates it when office trust is high; on limited trust an Admin runs `create label <desk>` first. Focus lists only cards the desk can work on: not done, not parked, and not held by another desk (unclaimed, or claimed by this desk). Rank is `ord` ascending (0 first), ties by card id. Once seated, `mill connect` prints one `{"kind": "focus", "label", "cards", "rest"}` line after the ready and sync lines: the top 5 such cards (`id`, `project_id`, `need_id`, `status`, `volunteer`, `rank`), so the desk knows what to work on next. It reads the same board as `todo --mine` (the desk's rosters), so focus cards on any of those rosters show. None: no line. When a focus read fails, connect keeps sitting and prints one stderr line, `connect: focus not shown: <cause>`. All of it runs in the client on reads the wall already serves. Regression row F59 (focus-any-roster). Regression row F58 (desk-focus).
 - `inbox` and `mail-thread <id> --room` print short letter rows by default: `id`, `created`, `from` (desk), `parent_id`, `tree` (left out where the list or the room already names it) and `body`, the first 100 characters on one line, with `body_trunc` true when that is not the whole body. `mill mail-thread <id>` reads one letter whole. At most 50 letters a page with a `page` block (`n`, `of`, `size`, `letters`, `next` only when a next page exists). The inbox pages in the wall's order; a room's page 1 is its newest 50 letters, oldest first, and `--page 2` the 50 before them. Room pointers on the inbox cover every letter fetched (`--limit`), not only the page. `--full` (`--room --full` on mail-thread) prints the reply as before short rows; `--full` alone on mail-thread is still the whole branch. `--after`, `--subtree`, a branch read and a room summary are unchanged, and `--page` with them, or with `--raw`, is refused. The `note` reply prints `detail_chars` and `last_line` instead of the whole `detail`; `note --full` prints it. Regression row F53 (mail-short-rows).
@@ -194,18 +194,18 @@ Grouped by **table**. Day-one teaching first; tree/Admin when said, not day-one 
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"create/file/add a bug"*, *"found an issue"* | `create todo` `<project> <need>` then `label` `todo <id> bug` |
-| *"create/file/add a todo"*, *"new card"*, *"feature request"* | `create todo` `<project> <need>` optional `--detail` |
-| *"park that"*, *"file for later"* | `create todo` `<project> <need> --status parked` |
-| *"what's on the board"*, *"list the bugs"* | `todo` `<project>` (bugs: the cards labelled bug). `todo <project> <numeric-id>` returns that card, the same as a slug peek, including a done card. Filter the board by the slug (printed as `need_id`, stored as `body.slug`) or by status, or use the Wall. Plain `todo` and `todo --all` read every roster in one call (200 rosters per call; a wall that does not answer `{cards}` is an error); done cards, the status and a numeric id are filtered in the database. Regression row F22 (todo-one-read). |
+| *"create/file/add a bug"*, *"found an issue"* | `create todo` `<roster> <need>` then `label` `todo <id> bug` |
+| *"create/file/add a todo"*, *"new card"*, *"feature request"* | `create todo` `<roster> <need>` optional `--detail` |
+| *"park that"*, *"file for later"* | `create todo` `<roster> <need> --status parked` |
+| *"what's on the board"*, *"list the bugs"* | `todo` `<roster>` (bugs: the cards labelled bug). `todo <roster> <numeric-id>` returns that card, the same as a slug peek, including a done card. Filter the board by the slug (printed as `need_id`, stored as `body.slug`) or by status, or use the Wall. Plain `todo` and `todo --all` read every roster in one call (200 rosters per call; a wall that does not answer `{cards}` is an error); done cards, the status and a numeric id are filtered in the database. Regression row F22 (todo-one-read). |
 | *"what is mine"*, *"my cards"*, *"anything for me"*, *"what next"* | `todo --mine` (your focus cards in rank order, then your claimed and shipped cards; `--done` adds finished ones, `--all` every roster). |
 | *"make this X's priority"*, *"put it first for X"* | `label todo <id> <X> --ord 0` (the label named after desk X is its focus list). |
-| *"is it done"*, *"show done cards"* | `todo <project> <need>` returns that card, including a done card. The board list `todo <project>` hides done cards; add `--done` or `--status done` to list them. |
-| *"unpark"*, *"reopen that card"* | `unpark` `<project> <need>` `[--parent-type mail|todo --parent-id ID]` |
-| *"I'll take it"*, *"claim that"* | `claim` `<project> <need>` |
-| *"drop the claim"*, *"unclaim"* | `unclaim` `<project> <need>` |
-| *"note on the card"*, *"progress is..."*, *"diary"* | `note` `<project> <need> --note ...` |
-| *"ship it"*, *"pass"*, *"close it"*, *"ready for review"* | `pass` `<project> <need>`. First pass (volunteer): claimed -> shipped. The asker accepts with `pass --done`: shipped -> done. If you filed the card yourself, you ship it with `pass`, then accept with `pass --done`. |
+| *"is it done"*, *"show done cards"* | `todo <roster> <need>` returns that card, including a done card. The board list `todo <roster>` hides done cards; add `--done` or `--status done` to list them. |
+| *"unpark"*, *"reopen that card"* | `unpark` `<roster> <need>` `[--parent-type mail|todo --parent-id ID]` |
+| *"I'll take it"*, *"claim that"* | `claim` `<roster> <need>` |
+| *"drop the claim"*, *"unclaim"* | `unclaim` `<roster> <need>` |
+| *"note on the card"*, *"progress is..."*, *"diary"* | `note` `<roster> <need> --note ...` |
+| *"ship it"*, *"pass"*, *"close it"*, *"ready for review"* | `pass` `<roster> <need>`. First pass (volunteer): claimed -> shipped. The asker accepts with `pass --done`: shipped -> done. If you filed the card yourself, you ship it with `pass`, then accept with `pass --done`. |
 
 #### mail (day-one)
 
@@ -230,8 +230,8 @@ Lean MAIL letter: `id`, `created`, `sender {deskId, roster}`, `body`, `mail_tos[
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"lock that file"*, *"I'm editing ..."* | `hold` `<project> <resource>` - polite lease (not a FS lock). Actor = connected desk. One lock per resource. `desk_id` NULL means free. Desks must use the same resource path. For git folders/files, resource = path **from the project root** (e.g. `agent_coord/server/records/hold.py`), stored as a res name, never a machine-absolute path. The project is not part of the lock. |
-| *"done writing"*, *"release the lock"*, *"drop the lock"* | `drop` `<project> <resource>` - **hold only**, never unclaim |
+| *"lock that file"*, *"I'm editing ..."* | `hold` `<resource>` - polite lease (not a FS lock). Actor = connected desk. One lock per resource. `desk_id` NULL means free. Desks must use the same resource path. For git folders/files, resource = path **from the project root** (e.g. `agent_coord/server/records/hold.py`), stored as a res name, never a machine-absolute path. The project is not part of the lock. |
+| *"done writing"*, *"release the lock"*, *"drop the lock"* | `drop` `<resource>` - **hold only**, never unclaim |
 
 #### friction (every desk, standing or cold)
 
@@ -245,17 +245,17 @@ Record design choices on the mill, not in private memory. Proposal = a finding-s
 
 | Human idiom | Verb |
 | :--- | :--- |
-| *"put that under that"* | `attach <project> <type_a> <id_a> <type_b> <id_b>` parent then child (`--tree` when the card is on two plans) |
-| *"move that under that"* | `move <project> <type> <id> <parent_type> <parent_id>` optional `--tree` |
-| *"kill that branch"* | `prune <project> <type> <id>` |
-| *"take it off the plan, keep children"* | `detach <project> <type> <id>` |
+| *"put that under that"* | `attach <roster> <type_a> <id_a> <type_b> <id_b>` parent then child (`--tree` when the card is on two plans) |
+| *"move that under that"* | `move <roster> <type> <id> <parent_type> <parent_id>` optional `--tree` |
+| *"kill that branch"* | `prune <roster> <type> <id>` |
+| *"take it off the plan, keep children"* | `detach <roster> <type> <id>` |
 
 #### later (Admin / glance - not day-one)
 
 | Human idiom | Verb |
 | :--- | :--- |
 | *"watch that"* | `watch <todo|hold|score|join> <id> [--hint TEXT]`; stop with `unwatch <type> <id>`. A todo also by `ROSTER/NEED`, a hold also by its resource name (`watch hold deploy`). Regression row F-watch-hold-name. |
-| *"give that to ..."*, *"assign to ..."* | `assign` `<project> <need> <desk>` - only if unassigned; trust-gated (see Guards) |
+| *"give that to ..."*, *"assign to ..."* | `assign` `<roster> <need> <desk>` - only if unassigned; trust-gated (see Guards) |
 | *"tag it ..."* | `label <mail|todo> <id> <label> [--ord N]`; untag with `unlabel <mail|todo> <id> <label>` |
 | *"join that group"* | `add roster <group>` (no desks = you); put others on with `add roster <group> d1,d2` |
 | *"set the KPI"*, *"track this number"* | `score <roster> <name> <value> --target N [--better down]` records a point; `score <roster> <name>` reads latest, gap and trend |
@@ -327,7 +327,7 @@ Lean MAIL letter: `id`, `created`, `sender {deskId, roster}`, `body`, `mail_tos[
 
 ### todo
 
-CLI `<project>` = activity **roster_id** - one project name or one role name. Labels via `label` are orthogonal (day-one: `bug`). Prefer a real project or role; do not invent one.
+CLI `<roster>` = activity **roster_id** - one project name or one role name. Labels via `label` are orthogonal (day-one: `bug`). Prefer a real project or role; do not invent one.
 
 
 | verb | intent | CALL |
@@ -356,7 +356,7 @@ CLI `<project>` = activity **roster_id** - one project name or one role name. La
 | **`move`** | Move that under that. A card on two plans names those plans and `--tree` picks one. | `mill_tree_move` |
 | **`prune`** | Kill that branch | `mill_tree_prune` |
 | **`detach`** | Take off the plan, keep children | `mill_tree_remove` |
-| **`trail`** | Read only: `mill trail <id> [--json]` (a mail id or todo id) prints the branch under a finding or card, any depth: kind id [state] title, last note, desk, PT time. Done and shipped cards stay in. A last note that starts `dead-end:` or `solved:` shows [DEAD END] / [SOLVED]. Use `mail:N` or `todo:N` when both ids exist. `mill trail --label NAME` lists mail and todo wearing that label, by ord then created | `mill_tree_subtree` |
+| **`trail`** | Read only: `mill trail <id> [--json]` (a mail id or todo id) prints the branch under a finding or card, any depth: kind id [state] title, last note, desk, PT time. Done and shipped cards stay in. A last note that starts `dead-end:` or `solved:` shows [DEAD END] / [SOLVED]. Use `mail:N` or `todo:N` when both ids exist. `mill trail --label NAME` lists mail and todo wearing that label, by ord then created; a label nobody has used yet lists 0 rows and says first use creates it (`mill label TYPE ID NAME`), or under limited trust that an Admin makes it with `mill create label NAME` | `mill_tree_subtree` |
 
 ### activity
 

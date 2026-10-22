@@ -50,7 +50,7 @@ Not inputs: "grow the pipeline," CRM data entry as mill's job, fan-out assign.
 | forecast / KPI | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | close-won | `pass` + `send` CS/delivery (+ optional onboarding `create todo` / `assign`) |
 | close-lost | `pass` + `note` why |
-| park / later | `create todo` `<project> <need> --status parked` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 | renewal | same spine: `create todo` renew opp **or** `send` CS |
 
 Do **not** teach `hold`/`drop` day-one unless the office leases a shared proposal doc.
@@ -70,7 +70,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 - Bypass mill-desk HINT routing.
 - Replace CRM as SoR for amounts/accounts/stage/forecast-of-record.
 - Fan-out the same assign to `*` + role + desk.
-- Invent mill verbs for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
+- Invent mill commands for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
 - Fake `pass` while blocked - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.
 
