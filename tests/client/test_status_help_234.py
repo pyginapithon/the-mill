@@ -24,8 +24,6 @@ _LOCAL = frozenset(
         "connect",
         "route",
         "watch",
-        "mcp",
-        "mcp-config",
         "wall-check",
         "wall-src",
         "local",
@@ -72,3 +70,28 @@ def test_help_wall_verbs_are_handlers() -> None:
         if canon not in HANDLERS or canon not in WALL:
             missing.append("%s -> %s" % (name, canon))
     assert missing == []
+
+
+def test_help_has_no_mcp_verbs_666() -> None:
+    """#666: the mill is a shell CLI; `mill mcp` and `mill mcp-config` are gone."""
+    names = _help_verbs()
+    assert "hold" in names
+    assert "mcp" not in names
+    assert "mcp-config" not in names
+    for verb in ("mcp", "mcp-config"):
+        try:
+            main([verb])
+        except SystemExit as exc:
+            assert exc.code == 2
+        else:
+            raise AssertionError("mill %s still parses" % verb)
+
+
+def test_no_mill_mcp_console_script_666() -> None:
+    """#666: the wheel installs no `mill-mcp` launcher and ships no mcp_mill module."""
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[2]
+    assert "mill-mcp" not in (root / "pyproject.toml").read_text(encoding="utf-8")
+    assert importlib.util.find_spec("agent_coord.server.mcp_mill") is None

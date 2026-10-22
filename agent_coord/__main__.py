@@ -1027,14 +1027,6 @@ def _build_parser() -> MillArgumentParser:
     lrm.add_argument("id", metavar="ID|ROSTER/NEED", help="activity id; a todo also by ROSTER/NEED")
     lrm.add_argument("label")
 
-    mcp = sub.add_parser("mcp", help="MCP stdio server (Grok/Claude mill_wait). Any cwd; mill on PATH.")
-    mcp_cfg = sub.add_parser(
-        "mcp-config",
-        help="print Grok [mcp_servers.mill] toml (pip mill mcp, any folder)",
-    )
-
-    mcp_cfg.add_argument("--vendor", default="", help="AGENT_COORD_VENDOR (default grok-build)")
-
     do = sub.add_parser(
         "doing",
         help=argparse.SUPPRESS,
@@ -1630,18 +1622,6 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 parse_roots(args.roots or None),
                 api_only=bool(getattr(args, "api_only", False)),
             )
-            return 0
-        if args.cmd == "mcp":
-            from agent_coord.server.mcp_mill import main as mcp_main
-
-            return mcp_main()
-        if args.cmd == "mcp-config":
-            from agent_coord.server.mcp_mill import mcp_config_for
-
-            from agent_coord.client.tokens import resolve_desk_owner
-            owner = resolve_desk_owner("")
-            vendor = (args.vendor or os.environ.get("AGENT_COORD_VENDOR") or "grok-build").strip()
-            print(mcp_config_for(owner, vendor), end="")
             return 0
             print("mill watch: list|add|rm", file=sys.stderr, flush=True)
             return 1

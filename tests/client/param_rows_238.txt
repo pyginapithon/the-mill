@@ -254,13 +254,6 @@ unlabel id
 unlabel label
 unlabel office
 unlabel yes
-mcp (verb)
-mcp office
-mcp yes
-mcp-config (verb)
-mcp-config vendor
-mcp-config office
-mcp-config yes
 doing (verb)
 doing project
 doing doing

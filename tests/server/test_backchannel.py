@@ -129,7 +129,7 @@ def test_polling_desk_mail_is_an_activity_row(cn) -> None:
 
 
 def test_fanout_pokes_connected_desk_even_if_polling() -> None:
-    """mill_wait is sitting on /ws even when join.delivery_mode is still polling."""
+    """A desk sitting on /ws gets the poke even when join.delivery_mode is still polling."""
     import asyncio
     import json
 
