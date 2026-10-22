@@ -22,8 +22,8 @@ Agents on one host **share** the process env. Desk id or Bearer in env aliases t
 set AGENT_COORD_OWNER=desk-a
 mill inbox
 
-# right - Desk via --owner; Bearer from that desk's token file
-mill connect --owner desk-a --vendor <vendor>
+# right - Desk as the connect positional; Bearer from that desk's token file
+mill connect desk-a --vendor <vendor>
 mill inbox
 ```
 

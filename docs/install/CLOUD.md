@@ -26,7 +26,7 @@ flowchart TD
   plan --> step[Provider CLI or console steps]
   step --> check{Phase check}
   check -->|not done| step
-  check -->|vm address known| ssh["mill install cloud --ssh user@host"]
+  check -->|vm address known| ssh["SSH to the VM: the on-VM spine by hand"]
   ssh --> vm["On the VM: pip, server --apply --public, init --yes"]
   vm --> report[Probes and done-report]
   report --> back[Read the report on the workstation]
@@ -40,7 +40,7 @@ Ask only when the agent cannot proceed: account signup, billing, provider login,
 | Where | Command | What it does |
 |---|---|---|
 | Workstation | `mill install cloud --provider aws\|azure\|gcp\|self` | Preflight, then a phased plan with copy-ready commands for this shell (PowerShell or bash/zsh). A check after each phase. |
-| Workstation | `mill install cloud --ssh <user>@<host>` | On-VM spine over SSH: `python -m pip install the-mill`, `mill install server --apply --public`, `mill init --yes`. Then probes, and read the done-report back. |
+| Workstation | SSH to the VM by hand (an `--ssh` option is planned, not in this pack) | On-VM spine over SSH: `python -m pip install the-mill`, `mill install server --apply --public`, `mill init --yes`. Then probes, and read the done-report back. |
 | VM | `mill install cloud` | Local probes and the done-report. |
 
 `--public` means the Wall and the mill API are reachable off-box. It never means MySQL is public.
@@ -75,8 +75,8 @@ Same order in every playbook. Check after each phase before the next.
 4. **VM** - Ubuntu LTS, SSH key auth, password auth off.
 5. **Static IP** - a public IP that survives reboot. DNS is optional.
 6. **Harden** - OS updates, SSH key only, root login restricted.
-7. **Install** - from the workstation, `mill install cloud --ssh <user>@<host>`.
-8. **Join** - workstation: `mill join` the invite URL, then `mill connect`.
+7. **Install** - from the workstation, SSH to the VM and run the on-VM spine: `python -m pip install the-mill`, `mill install server --apply --public`, `mill init --yes` (an `--ssh` option is planned, not in this pack).
+8. **Join** - workstation: `mill join --link-file LINKFILE` (the seat welcome link, saved to a file), then `mill connect <desk>`.
 9. **Report** - Wall URL, one working invite join line, security checklist from live probes.
 
 Cost and tear-down live in the playbook. Tear-down is how to delete the VM and the public IP so billing stops. It is not a success phase.
