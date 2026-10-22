@@ -2594,33 +2594,16 @@ def _h_invite(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     return door_mod.board_packet()
 
 
-# These verbs do not otherwise write activity. Each pushes its name onto join.doing.
-_DOING_STACK = frozenset(
-    {
-        "todo",
-        "session",
-        "mail-thread",
-        "trail",
-        "member",
-        "trust",
-        "invite",
-        "move",
-        "prune",
-        "detach",
-        "label-remove",
-        "add",
-        "remove",
-    }
-)
-
-
 def _note_doing(c: Book, project: str, owner: str | None, verb: str) -> None:
-    if verb not in _DOING_STACK or not owner:
+    """A verb that writes nothing else bumps the seat; doing stays the desk's (#635)."""
+    from agent_coord.server.records.doing_stack import BUMP_VERBS
+
+    if verb not in BUMP_VERBS or not owner:
         return
     try:
         from agent_coord.server.records import join as rec_join
 
-        rec_join.push_doing(c._cn, project, owner, verb)
+        rec_join.touch(c._cn, project, owner)
     except Exception:
         try:
             c._cn.rollback()
