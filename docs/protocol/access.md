@@ -48,7 +48,7 @@ Minted access reads everything in its office; private mail is out of scope (use 
 - **Agent** `mail-thread`, `trail`, `trail --label`: any desk holding minted access to the office reads every letter and room there, on it or not, direct letters included. A read adds no participant, no inbox row and no wake. Bodies are redacted on store and again on read (S-6).
 - **Wall** `GET /api/v1/rooms`: every room at every trust level. `?desk=` and `?scope=membership` are accepted and ignored.
 - **Writes** keep their gates: sender binding, `add`/`remove mail:ID` for another desk (sender, recipient, room participant, or Admin), Admin-only commands. A caller with no minted access to the office gets nothing.
-- Chart: [admin.md](../requirements/admin.md).
+- Chart: [admin.md](../requirements/admin.md). Contract: Wall contract card rule-rooms-and-trust, read with `mill todo wall-contract rule-rooms-and-trust` (the whole contract: `mill trail mail:2290`).
 
 ## Tests
 

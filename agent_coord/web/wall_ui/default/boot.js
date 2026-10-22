@@ -2077,7 +2077,7 @@
     }
 
 
-    /* Floor v1 part isolates (Builder WALL-CONTRACT-floor-v1-parts) + wow139 progressive paint.
+    /* Floor v1 part isolates (Wall contract card rule-routes: mill todo wall-contract rule-routes) + wow139 progressive paint.
      * MAIL Rooms -> /api/v1/rooms + mailbox + tree-mail
      *   Fetch stagger (wow143 Loop-3 cold-SQL): phase A rooms+tree-mail parallel; phase B mailbox after A.
      *   Phase 1 paint: tree-mail (or rooms) paints left rail + nest structure; do NOT wait mailbox.
@@ -2137,10 +2137,10 @@
       return _wallTrust;
     }
     function wallRoomsMembershipQuery() {
-      /* WALL-CONTRACT-trust-wall-browse: limited + seated desk => membership filter;
-       * high => omit desk (browse book). Admin: server is_role_admin bypass (glass still
-       * may pass desk when limited; no client Admin invent). Cold unknown: desk only
-       * (no scope) so limited filters and high still browses. */
+      /* Wall contract card rule-rooms-and-trust: mill todo wall-contract rule-rooms-and-trust.
+       * Every trust level reads every room; the server accepts and ignores ?desk= and
+       * ?scope=membership, so these args no longer filter anything. Kept as sent today
+       * (limited: desk + scope, unknown: desk, high: none) until a glass cleanup drops them. */
       const t = wallTrust();
       if (t === "high") return "";
       let desk = "";
@@ -2729,7 +2729,7 @@
       /* The scope query already limited the book and kept seats with no roster. */
       return rowPasses(row, Object.assign({}, f, { projects: [] }));
     }
-    /* Loop-3 floor part fingerprints (Builder WALL-CONTRACT / mill_fp).
+    /* Loop-3 floor part fingerprints (Wall contract card rule-fingerprints: mill todo wall-contract rule-fingerprints).
      * Store only server-echoed fps, keyed by floorScope().key + parts=.
      * Empty part + unchanged fp => keep prior slice keys; skip paint for that part.
      * Empty part + new fp => real empty (trees wipe allowed).
@@ -8907,7 +8907,7 @@
         }
       }
     }
-    /* wow144 lean list + detail-on-open (WALL-CONTRACT-lean-mailbox-todos).
+    /* wow144 lean list + detail-on-open (Wall contract card rule-lean-rows: mill todo wall-contract rule-lean-rows).
      * List/poll paints snippets (body/doing/detail <=256 + *_trunc flags).
      * On human open of a truncated mail/todo: GET detail, merge into local
      * _floor row (drop trunc flags), re-paint that surface. GET-only. */
@@ -9056,9 +9056,9 @@
      * wow148 fp-before-paint: opaque Checking overlay; no DOM overwrite until fp confirms.
      * wow147 tab-switch generation guard (stale tick/early-paint no-op; never blank).
      * wow146 keep prior pane+theme on subtab leave/return (never blank).
-     * wow145 limit+cursor infinite scroll (WALL-CONTRACT-v1-limit-cursor).
+     * wow145 limit+cursor infinite scroll (Wall contract card rule-paging: mill todo wall-contract rule-paging).
      * First poll: ?limit=50. Near-bottom: if next, fetch ?limit=50&cursor=, append, keep trunc. */
-    /* wow154/153: floor parts + /api/activity + events infinite scroll (WALL-CONTRACT-v1-limit-cursor).
+    /* wow154/153: floor parts + /api/activity + events infinite scroll (Wall contract card rule-paging: mill todo wall-contract rule-paging).
      * Kinds: mailbox, todos (v1), agents, scores, holds, watchers, activity, events.
      * wow165: tree-mail / tree-todo + parent_id expand.
      * First poll: ?limit=50. Near-bottom: ?limit=50&cursor=, append, keep trunc / last-good. */
@@ -9546,7 +9546,7 @@
     });
     /* dual-read: Wall open/view -> party=human (soft). Does not clear agent-unread.
      * wow144 lean: on open, if body_trunc / doing_trunc / detail_trunc, fetch detail
-     * and merge into local _floor then re-paint (WALL-CONTRACT-lean-mailbox-todos). */
+     * and merge into local _floor then re-paint (Wall contract card rule-lean-rows: mill todo wall-contract rule-lean-rows). */
     document.addEventListener("click", ev => {
       const tr = ev.target.closest("#mail tr[data-mail-id]");
       if (tr) {
