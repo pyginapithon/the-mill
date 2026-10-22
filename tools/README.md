@@ -28,6 +28,16 @@ python -m tools.git_changes --names
 
 TTY -> pretty table. Pipe/redirect -> `--names` (no color). Override with `--pretty` / `--patch` / `--stat`.
 
+## check_pr_text.py
+
+Scan PR and issue text with the commit-message hygiene rules (address, home path, email). CI runs it from `.github/workflows/pr_text.yml` on every PR, issue, comment and review, and once a day over all of them. Run `file` on a body before you post it: GitHub keeps every revision of a body in its edit history.
+
+```bash
+python tools/check_pr_text.py file body.md
+```
+
+Exit 1 on a hit; the report names the field, line and kind, never the text.
+
 ## check_sql.py
 
 Compare the pack's routines to the live book. Run it on the wall host. It reads mill config, skips `wipe.sql` and `tables.sql`, and prints names only. The match is case-sensitive.
