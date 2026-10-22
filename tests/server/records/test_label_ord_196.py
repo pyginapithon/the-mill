@@ -297,13 +297,10 @@ def test_trail_label_order_access_deleted_and_bound(cn, monkeypatch) -> None:
         assert got["hint"] == ""
         return [(str(r["type"]), int(r["id"])) for r in got["rows"]]
 
-    # a sent both letters. b is a dest of both. d is only a room participant of room.
-    assert ("mail", secret) in _ids("a")
-    assert ("mail", secret) in _ids("b")
-    assert ("mail", secret) not in _ids("c")
-    assert ("mail", secret) not in _ids("d")
-    assert ("mail", room) in _ids("d")
-    assert ("mail", room) not in _ids("c")
+    # #672 S-3: every desk in the office reads every labelled letter, on it or not.
+    for desk in ("a", "b", "c", "d"):
+        assert ("mail", secret) in _ids(desk), desk
+        assert ("mail", room) in _ids(desk), desk
     sender = rpc._h_trail(book, {"label": "pack"}, "unit", "a")
     assert [(r["type"], r["id"]) for r in sender["rows"]] == [
         ("todo", early),

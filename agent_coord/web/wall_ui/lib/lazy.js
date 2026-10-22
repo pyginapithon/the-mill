@@ -66,7 +66,8 @@
     mail: {
       js: "/mail/mail.js?v=wow285",
       css: "/mail/mail.css?v=wow238",
-      marker: "WALL_UI_DEFAULT_MAIL"
+      marker: "WALL_UI_DEFAULT_MAIL",
+      modules: ["mailPaint"]
     },
     score: {
       js: "/score/score.js?v=wow182",
@@ -87,7 +88,9 @@
       ? Promise.resolve()
       : loadScript(d.js);
     var cssP = loadCss(d.css).catch(function () { /* CSS missing is non-fatal */ });
-    return Promise.all([jsP, cssP]).then(function () { return d.marker; });
+    /* #710: the pane's paint code (split out of boot.js) loads with the pane. */
+    var modP = (d.modules || []).map(function (m) { return ensureModule(m); });
+    return Promise.all([jsP, cssP].concat(modP)).then(function () { return d.marker; });
   }
 
 
@@ -104,6 +107,11 @@
     adminInvite: {
       js: "/admin/invite.js?v=wow280",
       marker: "WALL_UI_DEFAULT_ADMIN_INVITE"
+    },
+    mailPaint: {
+      js: "/mail/mail-paint.js?v=wow292",
+      marker: "WALL_UI_DEFAULT_MAIL_PAINT",
+      domain: "mail"
     }
   };
 
@@ -114,7 +122,28 @@
     return loadScript(m.js).then(function () { return m.marker; });
   }
 
+  /* #710 pane paint split: boot.js keeps a stub per entry of a split pane.
+   * The first call loads the module; its top-level function declarations
+   * replace the stubs as globals, and the call is replayed on the real one.
+   * A module with a domain is pane code that needs its domain file (mail.js),
+   * so the whole domain loads first. Resolves with the real return value; a
+   * load failure warns and resolves. */
+  function lazyCall(mod, name, stub, args) {
+    var m = MODULES[String(mod || "")];
+    var load = (m && m.domain) ? ensureDomain(m.domain) : ensureModule(mod);
+    return load.then(function () {
+      var real = global[name];
+      if (typeof real !== "function" || real === stub) {
+        throw new Error("wallLazyCall: " + name + " not defined by " + mod);
+      }
+      return real.apply(global, args);
+    }).catch(function (e) {
+      try { console.warn("wallLazyCall " + mod + "." + name + ": " + ((e && e.message) || e)); } catch (eW) {}
+    });
+  }
+
   global.wallLoadScript = loadScript;
+  global.wallLazyCall = lazyCall;
   global.wallLoadCss = loadCss;
   global.wallEnsureDomain = ensureDomain;
   global.wallEnsureModule = ensureModule;

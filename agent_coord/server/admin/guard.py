@@ -10,9 +10,12 @@ from agent_coord.server.records import member as rec_member
 _LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost", "::ffff:127.0.0.1"})
 
 
-def mark_host(data: dict, peer: str) -> None:
+def mark_host(data: dict, peer: str, *, forwarded: bool = False) -> None:
+    """host=True only for a direct loopback peer. A request carrying
+    X-Forwarded-For came through a proxy (the nginx edge proxies from
+    loopback), so it is never the office host (#730)."""
     data.pop("host", None)
-    if (peer or "") in _LOOPBACK:
+    if not forwarded and (peer or "") in _LOOPBACK:
         data["host"] = True
 
 
