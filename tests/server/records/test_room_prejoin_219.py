@@ -1,11 +1,10 @@
-"""F12: a late joiner's room read shows pre-join room letters (#219)."""
+"""F12 then #672 (S-3): every desk reads the whole room, pre-join letters included."""
 from __future__ import annotations
 
 import pytest
 
 pytestmark = pytest.mark.sql
 
-from agent_coord.helpers.errors import CoordError
 from agent_coord.server.api.mill import rpc
 from tests.server.records.conftest import seed_names
 
@@ -19,7 +18,7 @@ def _ids(got: dict) -> set[int]:
     return {int(m["id"]) for m in got["chain"]}
 
 
-def test_late_joiner_sees_prejoin_room_letters_not_private(cn) -> None:
+def test_every_desk_reads_whole_room_672(cn) -> None:
     seed_names(
         cn,
         ("unit", "roster"),
@@ -48,22 +47,14 @@ def test_late_joiner_sees_prejoin_room_letters_not_private(cn) -> None:
     )
     bid, cid, jid, sid = int(pre_b["id"]), int(pre_c["id"]), int(joined["id"]), int(secret["id"])
 
-    got = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "late")
-    assert _ids(got) == {rid, bid, cid, jid}
-    assert sid not in _ids(got)
-    assert got["room_letters"] == len(_ids(got))
-    assert got["latest_id"] == max(rid, bid, cid, jid)
+    every = {rid, bid, cid, jid, sid}
+    # #672: the side letter that left c and late off is readable too; an
+    # outsider reads the same room and is not made a participant.
+    for desk in ("late", "c", "a", "out"):
+        got = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", desk)
+        assert _ids(got) == every, desk
+        assert got["room_letters"] == len(every)
+        assert got["latest_id"] == max(every)
+    from agent_coord.server.records import mail as rec_mail
 
-    original = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "c")
-    assert _ids(original) == {rid, bid, cid, jid}
-    assert original["room_letters"] == 4
-    assert sid not in _ids(original)
-
-    whole = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "a")
-    assert _ids(whole) == {rid, bid, cid, jid, sid}
-    assert whole["room_letters"] == len(_ids(whole))
-    assert whole["latest_id"] == max(rid, bid, cid, jid, sid)
-
-    with pytest.raises(CoordError) as ei:
-        rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "out")
-    assert "not a participant" in str(ei.value).lower()
+    assert "out" not in rec_mail.room_participants(cn, rid)

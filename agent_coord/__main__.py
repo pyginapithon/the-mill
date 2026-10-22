@@ -48,10 +48,26 @@ def normalize_seat_argv(argv: list[str]) -> list[str]:
     return out
 
 
+BODY_FILE_FIX = "write the body to a UTF-8 file and pass --body-file PATH (a body in the command line is not read)"
+_BODY_VERBS = ("reply", "send")
+
+
 class MillArgumentParser(argparse.ArgumentParser):
+    _verb = ""
+
+    def parse_known_args(self, args=None, namespace=None):
+        words = list(sys.argv[1:] if args is None else args)
+        self._verb = next((w for w in words if not str(w).startswith("-")), "")
+        return super().parse_known_args(args, namespace)
+
     def error(self, message: str) -> None:
         if "--seat" in message and "expected one argument" in message:
             message = message + "; if the value starts with '-', use --seat=VALUE"
+        elif "required: --body-file" in message or (
+            "unrecognized arguments" in message and self._verb in _BODY_VERBS
+        ):
+            # #638: one line that names the fix, not just the missing flag.
+            message = message + "; " + BODY_FILE_FIX
         super().error(message)
 
 
@@ -735,7 +751,7 @@ def _build_parser() -> MillArgumentParser:
     kp.add_argument("name", nargs="?", default="", metavar="NAME")
     kp.add_argument("value", nargs="?", default="", metavar="VALUE")
     kp.add_argument("--target", default="", help="the number to reach (gap and met are read against it); alone, sets it without a point")
-    kp.add_argument("--note", default="", help="what this try changed (one line, kept with the point)")
+    kp.add_argument("--note", default="", help="what this try changed (one line, at most 200 characters, kept with the point)")
     kp.add_argument("--better", default="", choices=("", "up", "down"), help="up (default) or down, e.g. tokens")
     kp.add_argument("--unit", default="", help="unit shown with the points, e.g. ms, bytes, tokens")
     kp.add_argument("--limit", type=int, default=0, help="points to show on a read (default 10)")
@@ -1027,14 +1043,6 @@ def _build_parser() -> MillArgumentParser:
     lrm.add_argument("id", metavar="ID|ROSTER/NEED", help="activity id; a todo also by ROSTER/NEED")
     lrm.add_argument("label")
 
-    mcp = sub.add_parser("mcp", help="MCP stdio server (Grok/Claude mill_wait). Any cwd; mill on PATH.")
-    mcp_cfg = sub.add_parser(
-        "mcp-config",
-        help="print Grok [mcp_servers.mill] toml (pip mill mcp, any folder)",
-    )
-
-    mcp_cfg.add_argument("--vendor", default="", help="AGENT_COORD_VENDOR (default grok-build)")
-
     do = sub.add_parser(
         "doing",
         help=argparse.SUPPRESS,
@@ -1289,9 +1297,9 @@ def _build_parser() -> MillArgumentParser:
     )
     att.add_argument("project")
     att.add_argument("type_a", nargs="?", default="")
-    att.add_argument("id_a", nargs="?", type=int, default=None)
+    att.add_argument("id_a", nargs="?", default=None, help="parent id; a todo also by ROSTER/NEED")
     att.add_argument("type_b", nargs="?", default="")
-    att.add_argument("id_b", nargs="?", type=int, default=None)
+    att.add_argument("id_b", nargs="?", default=None, help="child id; a todo also by ROSTER/NEED")
     att.add_argument("--tree", default="", help="plan name when the card is on more than one plan")
 
     mv = sub.add_parser(
@@ -1300,21 +1308,21 @@ def _build_parser() -> MillArgumentParser:
     )
     mv.add_argument("project")
     mv.add_argument("type", nargs="?", default="")
-    mv.add_argument("id", nargs="?", type=int, default=None)
+    mv.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     mv.add_argument("parent_type", nargs="?", default="")
-    mv.add_argument("parent_id", nargs="?", type=int, default=None)
+    mv.add_argument("parent_id", nargs="?", default=None, help="parent id; a todo also by ROSTER/NEED")
     mv.add_argument("--tree", default="")
 
     prn = sub.add_parser("prune", help="kill that branch")
     prn.add_argument("project")
     prn.add_argument("type", nargs="?", default="")
-    prn.add_argument("id", nargs="?", type=int, default=None)
+    prn.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     prn.add_argument("--tree", default="")
 
     det = sub.add_parser("detach", help="take off the plan, keep children")
     det.add_argument("project")
     det.add_argument("type", nargs="?", default="")
-    det.add_argument("id", nargs="?", type=int, default=None)
+    det.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     det.add_argument("--tree", default="")
 
     wchk = sub.add_parser(
@@ -1630,18 +1638,6 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
                 parse_roots(args.roots or None),
                 api_only=bool(getattr(args, "api_only", False)),
             )
-            return 0
-        if args.cmd == "mcp":
-            from agent_coord.server.mcp_mill import main as mcp_main
-
-            return mcp_main()
-        if args.cmd == "mcp-config":
-            from agent_coord.server.mcp_mill import mcp_config_for
-
-            from agent_coord.client.tokens import resolve_desk_owner
-            owner = resolve_desk_owner("")
-            vendor = (args.vendor or os.environ.get("AGENT_COORD_VENDOR") or "grok-build").strip()
-            print(mcp_config_for(owner, vendor), end="")
             return 0
             print("mill watch: list|add|rm", file=sys.stderr, flush=True)
             return 1

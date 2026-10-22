@@ -18,8 +18,6 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 | verb | form | what |
 |---|---|---|
 | `route` | `mill route list | add KEY -- PROGRAM | rm KEY` | This desk's HINT redirector chain. See [route.md](route.md). |
-| `mcp` | `mill mcp` | Run the mill MCP server. |
-| `mcp-config` | `mill mcp-config [--vendor V]` | Print MCP config for a vendor. |
 
 ## Host setup
 
@@ -29,6 +27,6 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 | `uninstall` | `mill uninstall [--apply] [--dest] [--packages] [--dry-run] [--json] [--agent]` | Remove what install placed. |
 | `init` | `mill init [--yes] [--host] [--port] [--user] [--password] [--database] [--node] [--bind] [--dashboard-port] [--lan] [--config] [--link-file PATH]` | Write the records config. Pass secrets by prompt, not in shared scripts. The Wall invite link and host seat welcome link it mints go to an owner-only file (`--link-file PATH`, default under `~/.mill/invites`), named as `link_file`; never printed (F64). |
 | `wall` | `mill wall [--bind] [--port] [--roots] [--api-only]` | Run the Wall (HTML + `/api` + `/ws`). |
-| `wall-check` | `mill wall-check [--base] [--filter PROJECT] [--expect-empty]` | Check a running Wall. |
+| `wall-check` | `mill wall-check [--base URL] [--filter PROJECT] [--expect-empty]` | Check a running Wall. |
 | `wall-src` | `mill wall-src [src] [--apply] [--git-root] [--dest]` | Point the Wall at pip or git source. |
 | `score-tick` | `mill score-tick [--once] [--loop] [--every N] [--window N] [--register]` | Scorecard ticker for the host. |

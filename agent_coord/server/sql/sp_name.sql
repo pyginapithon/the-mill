@@ -66,6 +66,16 @@ BEGIN
   IF v_del IS NOT NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name retired: mill reclaim first';
   END IF;
+  -- #722: Admin (id 2) keeps its name. Office (id 1) may be renamed by an
+  -- Admin; code reaches it by id 1, and the name Office stays its alias, so no
+  -- other roster may take that name.
+  IF v_id = 2 THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'cannot rename Admin';
+  END IF;
+  IF p_type = 'roster' AND v_id <> 1
+     AND TRIM(p_new) COLLATE utf8mb4_0900_ai_ci = 'Office' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'name in use: Office names roster id 1';
+  END IF;
   SELECT id INTO v_hit
     FROM name WHERE type = p_type AND name = TRIM(p_new) LIMIT 1;
   IF v_hit IS NOT NULL THEN
