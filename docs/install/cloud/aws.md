@@ -32,7 +32,7 @@ Skeleton. Commands for this phase are not written yet.
 
 ## Install over SSH
 
-Skeleton. From the workstation: `mill install cloud --ssh <user>@<host>`. The flag is the contract in [CLOUD.md](../CLOUD.md).
+Skeleton. From the workstation: `mill install cloud --ssh <user>@<host>` (planned, not in this pack). The flag is the contract in [CLOUD.md](../CLOUD.md).
 
 ## Join
 

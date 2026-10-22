@@ -68,7 +68,7 @@ PowerShell: `$c = Start-Process mill -ArgumentList 'connect','your-desk','--vend
 
 | ID | Kind | Create | Rename | Retire (`deleted`) | Reclaim |
 |---|---|---|---|---|---|
-| N1 | **Desk** (type `desk`) | `mill connect` (hash minted) | **`mill rename`** - only the desk whose **hash** matches `` `join`.token_hash `` | that desk (hash) | Admin `mill reclaim` / `mill reset`. Name **twice** + `--yes`. Name must be retired **and not in use** (no token_hash). Else Admin `mill reset <project> <desk>`, then `mill join`. Lost seat: `mill join` or that reset. |
+| N1 | **Desk** (type `desk`) | `mill connect` (hash minted) | **`mill rename`** - only the desk whose **hash** matches `` `join`.token_hash `` | that desk (hash) | Admin `mill reclaim` / `mill reset`. Name **twice** + `--yes`. Name must be retired **and not in use** (no token_hash). Else Admin `mill reset seat <desk>`, then `mill join`. Lost seat: `mill join` or that reset. |
 | N2 | **Roster** (type `roster`) | high: any seated desk `mill create roster NAME`; limited: Admin only | Admin. Not desk `mill rename`. | Admin | Admin reclaim; no live join in that roster |
 | N4 | **Office** id=1, project `Office` | mill install seed | Admin `mill rename` (id **stays 1**) | **never** | **never** |
 | N5 | **Admin** id=2, `Admin` | mill install seed | **never** (`cannot rename Admin`, #722) | **never** | **never** |
