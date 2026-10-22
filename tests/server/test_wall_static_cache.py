@@ -66,3 +66,14 @@ def test_http_page_and_unpinned_short_with_etag(client) -> None:
     assert again.headers["etag"] == etag
     stale = client.get("/gutter.js", headers={"If-None-Match": '"stale"'})
     assert stale.status_code == 200
+
+
+def test_read_static_refuses_outside_roots(tmp_path) -> None:
+    from agent_coord.server.middleware import _read_static, _safe_static
+
+    outside = tmp_path / "x.js"
+    outside.write_text("x", encoding="utf-8")
+    assert _read_static(outside) is None
+    found = _safe_static("gutter.js")
+    assert found is not None
+    assert _read_static(found) == found.read_bytes()

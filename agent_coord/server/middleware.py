@@ -16,6 +16,7 @@ import hashlib
 import html
 import re
 import json
+import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -308,6 +309,21 @@ def _static_cache_control(path_with_query: str, _ctype: str) -> str:
     if len(pins) == 1 and _PIN_RE.fullmatch(pins[0]):
         return STATIC_CACHE_PINNED
     return STATIC_CACHE_SHORT
+
+
+def _static_roots() -> tuple[str, ...]:
+    """Real directory prefixes a static file may be read from (see _safe_static)."""
+    dirs = (WALL_UI_DIR, STATIC_DIR, _PKG.parent / "docs" / "protocol")
+    return tuple(os.path.join(os.path.realpath(d), "") for d in dirs)
+
+
+def _read_static(found: Path) -> bytes | None:
+    """Read a file _safe_static found, only when it really sits under a static root."""
+    real = os.path.realpath(found)
+    if not real.startswith(_static_roots()):
+        return None
+    with open(real, "rb") as fh:
+        return fh.read()
 
 
 def _static_etag(body: bytes) -> str:
@@ -1152,9 +1168,9 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                 rel = path.lstrip("/")
                 if rel:
                     found = _safe_static(rel)
-                    if found is not None:
+                    body = _read_static(found) if found is not None else None
+                    if found is not None and body is not None:
                         ctype = _STATIC_TYPES.get(found.suffix.lower(), "application/octet-stream")
-                        body = found.read_bytes()
                         etag = _static_etag(body)
                         extra = [
                             ("Cache-Control", _static_cache_control(self.path, ctype)),
