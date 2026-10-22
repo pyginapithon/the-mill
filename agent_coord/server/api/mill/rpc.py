@@ -489,9 +489,24 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
     return card
 
 
-def _todo_many(c: Book, body: dict[str, Any], want_st: str, with_done: bool, show_fix: bool) -> dict:
+def _mine_cards(cards: list[dict], owner: str | None) -> list[dict]:
+    """todo --mine (#667): the cards the desk holds or that wear its focus label.
+
+    The client still ranks and trims them (focus.order_mine); the wall only stops
+    sending every other card on the board.
+    """
+    desk = _stored(owner or "")
+    if not desk:
+        return []
+    return [r for r in cards if r.get("volunteer") == desk or desk in (r.get("labels") or [])]
+
+
+def _todo_many(
+    c: Book, body: dict[str, Any], want_st: str, with_done: bool, show_fix: bool, owner: str | None = None
+) -> dict:
     """Board for several rosters in one read: the cards each per-roster `todo` call
-    would list, in the given roster order. {"cards": [...], "rosters": n}."""
+    would list, in the given roster order. {"cards": [...], "rosters": n}.
+    With mine, only the sitting desk's cards (#667)."""
     from agent_coord.lib.observe import is_fixture_project
     from agent_coord.server.records import todo as rec_todo
 
@@ -517,6 +532,8 @@ def _todo_many(c: Book, body: dict[str, Any], want_st: str, with_done: bool, sho
         st = r.get("status") or "open"
         fields = rec_todo.unpack(r.get("body") or "", r.get("id"))
         cards.append(_todo_card(r, _stored(r.get("roster") or ""), st, fields))
+    if _truthy(body.get("mine")):
+        cards = _mine_cards(cards, owner)
     return {"cards": cards, "rosters": len(names)}
 
 
@@ -536,7 +553,7 @@ def _h_todo(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     show_fix = _truthy(body.get("fixtures"))
     if "rosters" in body and not raw_need:
         # One read for `mill todo` and `mill todo --all` (was one call per roster).
-        return _todo_many(c, body, want_st, with_done, show_fix)
+        return _todo_many(c, body, want_st, with_done, show_fix, owner)
     out = []
 
     def _visible(rows: list[dict]) -> list[dict]:
@@ -600,6 +617,8 @@ def _h_todo(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         if number is not None:
             raise CoordError("todo: no card %s in %s" % (number, project))
         raise CoordError("todo: no card %s in %s" % (raw_need, project))
+    if _truthy(body.get("mine")) and not raw_need:
+        out = _mine_cards(out, owner)
     return out
 
 
