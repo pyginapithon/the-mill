@@ -2210,7 +2210,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                 from agent_coord.server.admin.human import desk_post
 
                 with _office() as c:
-                    row = desk_post(c._cn, data)
+                    row = desk_post(c._cn, data, session=_token)
                 self._send(200, _json(row), "application/json; charset=utf-8")
             except CoordError as e:
                 self._send(400, _json({"error": str(e)}), "application/json; charset=utf-8")
