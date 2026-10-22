@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Wall human-readonly gate: hide/inert write chrome; GET polls stay."""
+"""Wall human-readonly: humans only read on the Wall, with no escape (#770)."""
 from __future__ import annotations
 
 from agent_coord.web.wall_logic.packs import wall_ui_root
@@ -8,16 +8,11 @@ from ._wall_src import boot_source
 
 ROOT = wall_ui_root()
 BOARD = ROOT / "default" / "board.html"
-BOOT = ROOT / "default" / "boot.js"
 CSS = ROOT / "default" / "board.css"
 
 
 def _boot() -> str:
     return boot_source()
-
-
-def _css() -> str:
-    return CSS.read_text(encoding="utf-8")
 
 
 def test_marker_and_helpers():
@@ -26,29 +21,36 @@ def test_marker_and_helpers():
     assert "function wallHumanReadonly()" in src
     assert "function wallApplyHumanReadonly()" in src
     assert "wall-human-readonly" in src
-    assert "factory-human-readonly" in src
-    assert "human_write" in src
 
 
-def test_default_on_with_escape():
+def test_readonly_has_no_escape():
     src = _boot()
     fn = src.split("function wallHumanReadonly()", 1)[1].split(
         "function wallApplyHumanReadonly()", 1
     )[0]
     assert "return true" in fn
-    assert 'localStorage.getItem("factory-human-readonly")' in fn
-    assert 'q.get("human_write")' in fn
+    assert "return false" not in fn
+    assert "factory-human-readonly" not in src
+    assert "human_write" not in src
 
 
-def test_write_paths_gated():
+def test_human_write_paths_are_gone():
     src = _boot()
-    assert "if (on && wallHumanReadonly()) return" in src
-    assert "if (wallHumanReadonly()) return false; /* WALL_HUMAN_READONLY */" in src
-    assert "Wall is human-readonly; agents mill send / mill reply" in src
-    assert "if (wallHumanReadonly()) return Promise.resolve(null)" in src
-    assert 'wallHumanReadonly() ? "" : `<button type="button" class="mail-rooms-reply"' in src
-    assert 'throw new Error("Wall is human-readonly")' in src
-    assert "if (wallHumanReadonly()) return; /* WALL_HUMAN_READONLY */" in src
+    for gone in (
+        "function markMailReadHuman(",
+        "function ackMailHuman(",
+        "function openMailPopup(",
+        "function setCompose(",
+        "function planPost(",
+        "function persistPlanOrder(",
+        "function collectBadge(",
+        "mail-ack-human",
+        "mail-rooms-reply",
+        'class="sg-mail"',
+        "data-plan-act",
+        'draggable="true"',
+    ):
+        assert gone not in src, gone
 
 
 def test_get_polls_still_present():
@@ -57,18 +59,15 @@ def test_get_polls_still_present():
     assert "/api/v1/" in src
     assert "/api/floor" not in src
     assert "wallStartFloorPoll" in src
-    assert 'method: "POST"' in src
 
 
-def test_css_hides_write_chrome():
-    css = _css()
-    assert "html.wall-human-readonly #mail-compose" in css
-    assert "html.wall-human-readonly #compose-overlay" in css
-    assert "html.wall-human-readonly .mail-rooms-reply" in css
+def test_css_keeps_admin_hidden():
+    css = CSS.read_text(encoding="utf-8")
     assert "html.wall-human-readonly #admin-mint" in css
+    assert "html.wall-human-readonly #mail-compose" not in css
 
 
-def test_compose_marked_human_write():
+def test_board_has_no_compose_sheet():
     html = BOARD.read_text(encoding="utf-8")
-    assert 'id="mail-compose"' in html
-    assert 'data-human-write="1"' in html
+    for gone in ('id="mail-compose"', 'id="compose-overlay"', 'id="desk-form"', 'data-human-write="1"'):
+        assert gone not in html, gone

@@ -753,14 +753,7 @@
       const pulled = (r.pulled_need_id || "").trim();
       const snip = r.detail ? `<div class="note">${esc(r.detail)}</div>` : "";
       const cls = esc(st) + (pulled ? " pulled" : "");
-      const actions =
-        `<div class="plan-actions">` +
-          `<button type="button" data-plan-act="edit" data-id="${esc(String(r.id))}" title="Edit title, detail, cut, label">Edit</button>` +
-          `<button type="button" data-plan-act="pull" data-id="${esc(String(r.id))}" title="Pull to floor - open mill JOB">${pulled ? "Pulled" : "Pull to floor"}</button>` +
-          `<button type="button" data-plan-act="up" data-id="${esc(String(r.id))}" title="Earlier in cut">^</button>` +
-          `<button type="button" data-plan-act="down" data-id="${esc(String(r.id))}" title="Later in cut">v</button>` +
-        `</div>`;
-      return `<div class="plan-card ${cls}" draggable="true" data-id="${esc(String(r.id))}" data-sort="${esc(String(r.sort_order || 0))}">` +
+      return `<div class="plan-card ${cls}" data-id="${esc(String(r.id))}" data-sort="${esc(String(r.sort_order || 0))}">` +
         `<div class="plan-title">${esc(r.title || "")}</div>` +
         `<div class="plan-meta">` +
           (label ? `<span>label <b>${esc(label)}</b></span>` : "") +
@@ -769,7 +762,7 @@
           (pulled ? `<span>pulled <b>${esc(pulled)}</b></span>` : "") +
           (by ? `<span>by <b>${esc(by)}</b></span>` : "") +
           (when ? `<span>${esc(dt(when))}</span>` : "") +
-        `</div>${snip}${actions}</div>`;
+        `</div>${snip}</div>`;
     }
     function issues(d) {
       const listEl = document.getElementById("issue-list");
@@ -799,36 +792,5 @@
         return;
       }
       listEl.innerHTML = rows.map(issueCard).join("");
-      bindPlanCardDnD(listEl);
-    }
-    function bindPlanCardDnD(listEl) {
-      let dragId = null;
-      listEl.querySelectorAll(".plan-card[draggable]").forEach(card => {
-        card.addEventListener("dragstart", ev => {
-          dragId = card.dataset.id;
-          try { ev.dataTransfer.setData("text/plain", dragId); } catch (e) {}
-          ev.dataTransfer.effectAllowed = "move";
-        });
-        card.addEventListener("dragover", ev => {
-          ev.preventDefault();
-          card.classList.add("drag-over");
-        });
-        card.addEventListener("dragleave", () => card.classList.remove("drag-over"));
-        card.addEventListener("drop", async ev => {
-          ev.preventDefault();
-          card.classList.remove("drag-over");
-          const from = dragId || (ev.dataTransfer && ev.dataTransfer.getData("text/plain"));
-          const to = card.dataset.id;
-          if (!from || !to || from === to) return;
-          const ids = visiblePlanIds();
-          const fi = ids.indexOf(String(from));
-          const ti = ids.indexOf(String(to));
-          if (fi < 0 || ti < 0) return;
-          ids.splice(fi, 1);
-          ids.splice(ti, 0, String(from));
-          try { await persistPlanOrder(ids.map(Number)); }
-          catch (e) { toast(String(e.message || e)); }
-        });
-      });
     }
 var WALL_UI_DEFAULT_TODO_PAINT = "WALL_UI_DEFAULT_TODO_PAINT";

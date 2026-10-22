@@ -434,7 +434,7 @@
         const pills = members.map(m => {
           const unreadM = Math.max(0, Number(((g.desks || []).find(x => x.owner === m) || {}).unread || ((window._floor || {}).desk_unread || {})[m] || 0) | 0);
           const badgeM = unreadM > 0 ? `<span class="fd-unread" data-n="${unreadM}">${unreadM > 99 ? "99+" : unreadM}</span>` : "";
-          return `<button type="button" class="sg-mail" data-mail-to="${esc(m)}" title="Mail ${esc(m)}">${esc(m)}${badgeM}</button>`;
+          return `<span class="chip">${esc(m)}${badgeM}</span>`;
         }).join(" ");
         detail.innerHTML = `<div class="floor-detail-head"><h3>WORKSTATION | ${esc(owner)}</h3></div>` +
           `<span class="chip">${esc(desk.rollup_state || "")}</span>` +
@@ -455,10 +455,9 @@
       const badge = unread > 0
         ? `<span class="fd-unread" data-n="${unread}" title="${unread} agent-unread">${unread > 99 ? "99+" : unread}</span>`
         : `<span class="fd-unread mute" data-n="0" hidden></span>`;
-      const mailBit = `<button type="button" class="sg-mail" data-mail-to="${esc(owner)}" aria-label="Mail ${esc(owner)}${unread ? (", " + unread + " unread") : ""}" title="Mail ${esc(owner)}${unread ? (" | " + unread + " unread") : ""}"><svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2 3.5h12v9H2z"/><path fill="none" stroke="currentColor" stroke-width="1.4" d="M2.5 4l5.5 4.2L13.5 4"/></svg></button>`;
       const tok = desk.tokens != null ? desk.tokens : (lane ? lane.tokens : 0);
       const done = desk.jobs_done != null ? desk.jobs_done : (lane ? lane.jobs_done : 0);
-      detail.innerHTML = `<div class="floor-detail-head"><h3>DESK | ${esc(owner)}</h3>${mailBit}${badge}</div>` +
+      detail.innerHTML = `<div class="floor-detail-head"><h3>DESK | ${esc(owner)}</h3>${badge}</div>` +
         `<span class="chip">${esc(glance.state || (lane && lane.now_state) || "")}</span>` +
         `<span class="chip">tok ${esc(tok || 0)}</span>` +
         `<span class="chip">usd ${esc(desk.usd || (lane && lane.usd) || 0)}</span>` +
