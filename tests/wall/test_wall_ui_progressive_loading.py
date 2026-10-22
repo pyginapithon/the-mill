@@ -6,6 +6,8 @@ import re
 
 from agent_coord.web.wall_logic.packs import wall_ui_root
 
+from ._wall_src import boot_source
+
 ROOT = wall_ui_root()
 BOARD = ROOT / "default" / "board.html"
 BOOT = ROOT / "default" / "boot.js"
@@ -133,13 +135,13 @@ def test_strip_paint_clears_loading_when_ready():
 
 
 def test_mail_structure_only_and_todos_early():
-    src = _boot()
+    src = boot_source()
     assert "structureOnly" in src
     assert "function wallPaintTodosEarly" in src
     assert "function wallPaintFloorPartEarly" in src
     assert "function wallFetchFloorParts" in src
     assert "Loading mailbox" in src or "Loading mailbox\\u2026" in src
-    paint = src.split("function paintMailRooms", 1)[1]
+    paint = (ROOT / "default" / "mail" / "mail-paint.js").read_text(encoding="utf-8").split("function paintMailRooms", 1)[1]
     assert "structureOnly" in paint
     assert "wallShowLoading" in paint or "wallLoadingHtml" in paint
 
