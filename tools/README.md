@@ -28,6 +28,16 @@ python -m tools.git_changes --names
 
 TTY -> pretty table. Pipe/redirect -> `--names` (no color). Override with `--pretty` / `--patch` / `--stat`.
 
+## check_pr_text.py
+
+Scan PR and issue text with the commit-message hygiene rules (address, home path, email). CI runs it from `.github/workflows/pr_text.yml` on every PR, issue, comment and review, and once a day over all of them. Run `file` on a body before you post it: GitHub keeps every revision of a body in its edit history.
+
+```bash
+python tools/check_pr_text.py file body.md
+```
+
+Exit 1 on a hit; the report names the field, line and kind, never the text.
+
 ## check_sql.py
 
 Compare the pack's routines to the live book. Run it on the wall host. It reads mill config, skips `wipe.sql` and `tables.sql`, and prints names only. The match is case-sensitive.
@@ -38,6 +48,17 @@ python tools/check_sql.py --sql path/to/agent_coord/server/sql
 ```
 
 Exit 1 when a pack routine is missing. Extra live routines are listed and do not fail the check. It does not apply SQL.
+
+## check_doc_commands.py
+
+Hold the docs to the CLI. It builds the mill parser (the one `mill VERB --help` prints from) and reads every `mill ...` command in the code spans and code blocks of README.md, docs/*.md, docs/protocol, docs/dev, docs/install, docs/requirements and the office skills. It fails on a command that is gone (`mill mail`), a flag the command does not take, a code-block command short of its positionals (`mill connected` with no roster), a literal outside a positional's choices, a `<project>` where the command takes a roster, a retired word (`mill_wait`), the same drift in the parser's own help text, and a command or flag `mill -h` lists that no doc names. Hidden commands and flags are not owed a doc. A line that names a form only to say it does not exist passes when it says so (no, not, never, retired); otherwise mark it `<!-- doc-commands: skip -->`.
+
+```bash
+python tools/check_doc_commands.py          # exit 0 clean, 1 on any mismatch
+python tools/check_doc_commands.py --list   # every command, its positional count and flags
+```
+
+CI runs it in the `mill_cli_smoke` job (F90).
 
 ## check_repro.py
 
