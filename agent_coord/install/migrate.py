@@ -357,6 +357,37 @@ def _ensure_sp_full(cn) -> list[str]:
     return applied
 
 
+# #722: functions an existing book refreshes from tip (Office alias of roster id 1).
+_FN_REFRESH: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("fn_name.sql", ("mill_name_get", "mill_name_put")),
+)
+
+
+def _ensure_fn_refresh(cn) -> list[str]:
+    """Refresh the named stored functions from tip (no tables, no wipe)."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        for path_name, keep in _FN_REFRESH:
+            sp = sql_dir() / path_name
+            if not sp.is_file():
+                continue
+            blob = sp.read_text(encoding="utf-8-sig")
+            for stmt in split_script(blob):
+                low = stmt.strip().lower()
+                m = re.match(r"(?:drop|create)\s+function\s+(?:if\s+exists\s+)?`?(\w+)", low)
+                if m and m.group(1) in keep:
+                    _apply_stmt(cur, stmt)
+            applied.append(path_name + ":functions")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 def _ensure_activity_soft_delete(cn) -> list[str]:
     """Alpha additive: activity.deleted + soft-delete *_delete + mill_activity_select/mill_between state."""
     applied: list[str] = []
@@ -412,7 +443,8 @@ def _ensure_activity_soft_delete(cn) -> list[str]:
             ("sp_hold.sql", ("mill_hold_delete",)),
             ("sp_name.sql", ("mill_name_reclaim",)),
             ("sp_floor_scope.sql", ("mill_floor_part",)),  # perf: JOIN mill_floor_desk, mail dests
-            ("sp_activity.sql", ("mill_activity_select", "mill_activity_get", "mill_between")),  # state any type (#91)
+            # state any type (#91); mill_span reads Office by id 1 (#722).
+            ("sp_activity.sql", ("mill_activity_select", "mill_activity_get", "mill_between", "mill_span")),
         ):
             sp = sql_dir() / path_name
             if not sp.is_file():
@@ -739,7 +771,7 @@ def _ensure_score_one_name(cn) -> list[str]:
             "         AND r.kpi = s.kpi) AS has_def"
             " FROM score s"
             " JOIN name dn ON dn.id = s.desk_id AND dn.type = 'desk'"
-            " JOIN name rn ON rn.id = s.roster_id AND rn.name <> 'Office'"
+            " JOIN name rn ON rn.id = s.roster_id AND rn.id <> 1"  # #722: Office by id
             " JOIN activity a ON a.type = 'score' AND a.id = s.id AND a.deleted IS NULL"
             " ORDER BY s.roster_id, s.kpi, s.updated DESC, s.id DESC"
         )
@@ -987,6 +1019,7 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))
+            applied.extend(_ensure_fn_refresh(cn))
             applied.extend(_ensure_sp_full(cn))
             applied.extend(_ensure_mail_sp(cn))
             applied.extend(_ensure_push_expired(cn))

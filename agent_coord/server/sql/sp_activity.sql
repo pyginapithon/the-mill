@@ -222,7 +222,7 @@ BEGIN
 
   SET v_name = NULL;
   SET v_office = NULL;
-  SELECT id INTO v_office FROM name WHERE type = 'roster' AND name = 'Office' AND deleted IS NULL LIMIT 1;
+  SELECT id INTO v_office FROM name WHERE id = 1 AND type = 'roster' AND deleted IS NULL LIMIT 1;  -- #722: Office by id
   IF v_kind = 'project' THEN
     SELECT id INTO v_name FROM name WHERE type = 'roster' AND name = p_id AND deleted IS NULL LIMIT 1;
   ELSEIF v_kind = 'role' THEN
