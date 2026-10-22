@@ -468,6 +468,7 @@ SDIST_ROOT_FILES = frozenset(
         "PKG-INFO",
         "setup.cfg",
         "MANIFEST.in",
+        "build_backend/mill_build.py",
     }
 )
 
@@ -932,7 +933,7 @@ def _allowlisted(member: str, kind: str) -> bool:
     rest = m.group(1)
     if rest is None or rest == "":
         return True
-    if rest in SDIST_ROOT_FILES:
+    if rest in SDIST_ROOT_FILES or rest == "build_backend":
         return True
     if rest.startswith("agent_coord/") or rest == "agent_coord":
         return True

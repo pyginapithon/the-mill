@@ -10,7 +10,7 @@ office so a checker can confirm the whole path.
 Only rows that pass every check below. The office checks before it writes.
 
 - Type is `todo` or `score`.
-- The row's project is a fixture project named `t-<8 hex>`.
+- The row's roster is a fixture roster named `t-<8 hex>`.
 - The calling desk made the row (card creator, score desk).
 
 Anything else is refused with `probe-delete: ... refused` and nothing changes.
@@ -28,12 +28,16 @@ Run it as a child of the shell that started `mill connect`, with the python
 that has the mill pack installed. From a fresh shell:
 
 ```bash
-bash -c 'mill --office ALIAS connect the-mill DESK >/tmp/c.log 2>&1 & CP=$!; sleep 8;
+bash -c 'mill --office ALIAS connect DESK >/tmp/c.log 2>&1 & CP=$!; sleep 8;
   python tools/probe_deleted_rows.py run; kill $CP'
 ```
 
-`run` makes a fresh fixture project, opens one card and writes one score in
-it, probe-deletes both, then reads the card back with `trail`. It prints one
+`run` makes a fresh fixture roster `t-<8 hex>` (0.7 rosters must exist before
+a card or score can use them), opens one card and writes one score in it,
+probe-deletes both, reads the card back with `trail`, then retires the
+roster. The roster is retired after a refusal too. Making and retiring it
+needs an Admin desk on a limited-trust office. `run --project t-<8 hex>` uses a
+roster you made (`mill create roster t-<8 hex> --yes`) and leaves it alone. It prints one
 JSON object with the project, both ids, their state, and the checks to do by
 hand. Exit 0 when both rows read back as deleted, 1 when the office refused or
 a row did not go deleted, 2 for bad arguments.
@@ -47,13 +51,13 @@ python tools/probe_deleted_rows.py delete --type score --id N
 
 ## Checks after a run
 
-1. `/api/v1/events?project=t-XXXXXXXX`: the todo and score rows carry
-   `"state": "deleted"`.
-2. Activity between: `mill_between` lists each member desk's newest rows,
-   whatever project they belong to. The fixture project has no members, so
-   read between for a real project your desk sits in (for example
-   `the-mill`). Both rows show `state` deleted.
-3. Wall Wire and History: both rows show the deleted pill.
+1. `trail_state` in the output is `deleted`: the tool read the card back
+   with `mill trail todo:ID` over your connect.
+2. Wall Wire, from a signed-in Wall: the event feed lists the todo and score
+   rows with the deleted pill. The Wall reads that feed for you; an anonymous
+   read of the Wall's event route on a cloud office answers 404, so check it
+   on the board, not with curl.
+3. Wall History: both rows show the deleted pill.
 
 Fixture rows are hidden from `mill todo` unless you pass `--fixtures`.
 
@@ -61,5 +65,5 @@ Fixture rows are hidden from `mill todo` unless you pass `--fixtures`.
 
 | Row | Do | Pass when |
 | --- | --- | --- |
-| deleted-rows-live | On a 0.6.30+ office, `probe_deleted_rows.py run` from a connected desk | exit 0; events, between and the Wall pill show both rows deleted |
+| deleted-rows-live | On a 0.6.30+ office, `probe_deleted_rows.py run` from a connected desk | exit 0; `trail_state` deleted, the roster retired, and the signed-in Wall Wire pill shows both rows deleted |
 | probe-refuses-real | `probe_deleted_rows.py delete --type todo --id <a real card id>` | exit 1, `not in a fixture project`; the card is unchanged |

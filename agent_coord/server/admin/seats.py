@@ -111,13 +111,21 @@ def resolve_seat_roster(cn, desk: str, wanted: str = "") -> str:
     from agent_coord.helpers.errors import CoordError
     from agent_coord.server.api.mill.rpc import _require_live_project, _seat_roster
 
+    from agent_coord.server.admin.guard import is_admin_roster
+
     who = (wanted or "").strip()
     if who:
-        if who == CONST_OFFICE:
+        if who.casefold() == CONST_OFFICE.casefold():
             raise CoordError("invite-seat: Office is not a seat roster; name another roster")
+        # #674: a seat never lands on Admin; Admin is member-add on the office host.
+        if is_admin_roster(cn, who):
+            raise CoordError(
+                "invite-seat: Admin is not a seat roster; Admin is granted only by "
+                "member-add on the office host"
+            )
         return _require_live_project(cn, who, "invite-seat")
     seated = _seat_roster(cn, desk)
-    if not seated or seated == CONST_OFFICE:
+    if not seated or seated == CONST_OFFICE or is_admin_roster(cn, seated):
         raise CoordError("invite-seat: roster required")
     return _require_live_project(cn, seated, "invite-seat")
 

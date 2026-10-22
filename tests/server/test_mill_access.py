@@ -413,7 +413,7 @@ def test_loopback_grants_admin_to_any_desk():
     c = MagicMock(spec=Book)
     c._cn = MagicMock()
     with patch("agent_coord.server.admin.guard.is_role_admin", return_value=False), patch(
-        "agent_coord.server.records.member.put", return_value=[{"ok": True}]
+        "agent_coord.server.records.member.put_admin", return_value=[{"ok": True}]
     ) as put, patch("agent_coord.server.api.mill.rpc._poke"), patch(
         "agent_coord.server.api.mill.rpc._h_send", return_value={"id": 1}
     ) as mail:
@@ -456,7 +456,7 @@ def test_role_admin_remove_mails_the_desk():
     c = MagicMock(spec=Book)
     c._cn = MagicMock()
     with patch("agent_coord.server.admin.guard.is_role_admin", return_value=True), patch(
-        "agent_coord.server.records.member.delete", return_value=[{"ok": True}]
+        "agent_coord.server.records.member.delete_admin", return_value=[{"ok": True}]
     ), patch("agent_coord.server.api.mill.rpc._h_send", return_value={"id": 2}) as mail:
         rpc._h_member(
             c,
