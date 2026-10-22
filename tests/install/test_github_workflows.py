@@ -120,3 +120,159 @@ def test_tree_hygiene_runs_wherever_check_pack_runs() -> None:
     for name, job in (("ci check_pack", ci), ("release verify", verify)):
         assert "python tools/check_pack.py dist" in job, name
         assert "python tools/precommit_hygiene.py tree" in job, name
+
+
+# #634: no PyPI vector. Everything CI installs from an index is hash-checked,
+# so a CA or mirror compromise cannot swap a package into a run that release.yml
+# gates on, and the publish job is the only one that can mint an OIDC token.
+LOCK = ROOT / "tools" / "ci-lock"
+PIP_BOOTSTRAP_RE = re.compile(
+    r'^python -m pip install "pip @ https://files\.pythonhosted\.org/packages/[0-9a-f/]+/'
+    r'pip-[0-9.]+-py3-none-any\.whl#sha256=[0-9a-f]{64}"$'
+)
+LOCAL_DIST_RE = re.compile(r"^python -m pip install --no-deps --no-build-isolation dist/the_mill-\*\.(tar\.gz|whl)$")
+LOCK_INSTALL_RE = re.compile(r"^python -m pip install --require-hashes( --no-deps)? -r tools/ci-lock/([\w-]+\.txt)$")
+
+
+def _run_lines(p: Path) -> list[str]:
+    """Shell lines of every run: step, with backslash continuations joined."""
+    out: list[str] = []
+    lines = _code(p).splitlines()
+    i = 0
+    while i < len(lines):
+        m = re.match(r"^(\s*)(?:- )?run: ?(.*)$", lines[i])
+        if not m:
+            i += 1
+            continue
+        indent, rest = len(m.group(1)), m.group(2).strip()
+        body: list[str] = []
+        if rest in ("|", ">", "|-", ">-"):
+            i += 1
+            while i < len(lines) and (not lines[i].strip() or len(lines[i]) - len(lines[i].lstrip()) > indent):
+                body.append(lines[i].strip())
+                i += 1
+        else:
+            body.append(rest)
+            i += 1
+        joined, cur = [], ""
+        for ln in body:
+            if ln.endswith("\\"):
+                cur += ln[:-1].strip() + " "
+                continue
+            joined.append((cur + ln).strip())
+            cur = ""
+        out.extend(x for x in joined if x)
+    return out
+
+
+def _lock_reqs(path: Path) -> list[str]:
+    """Requirement entries of a lock file, continuations joined."""
+    entries, cur = [], ""
+    for ln in path.read_text(encoding="utf-8").splitlines():
+        s = ln.strip()
+        if not s or s.startswith("#"):
+            continue
+        cur += s.rstrip("\\").strip() + " "
+        if not s.endswith("\\"):
+            entries.append(cur.strip())
+            cur = ""
+    return entries
+
+
+def test_every_pip_install_in_workflows_is_hash_checked() -> None:
+    """Only three install shapes: the hash-pinned pip wheel, a hashed lock, a local dist."""
+    bad, seen_locks = [], set()
+    for p in _workflows():
+        for line in _run_lines(p):
+            if re.search(r"\b(pip3?|uv|pipx|easy_install)\b.*\binstall\b", line):
+                m = LOCK_INSTALL_RE.match(line)
+                if m:
+                    seen_locks.add(m.group(2))
+                elif not (PIP_BOOTSTRAP_RE.match(line) or LOCAL_DIST_RE.match(line)):
+                    bad.append(f"{p.name}: {line}")
+            if re.search(r"\bpython -m build\b", line) and "--no-isolation" not in line:
+                bad.append(f"{p.name}: isolated build fetches an unhashed backend: {line}")
+    assert not bad, bad
+    for name in seen_locks:
+        assert (LOCK / name).is_file(), name
+
+
+def test_ci_locks_are_fully_hashed_and_pinned() -> None:
+    locks = sorted(LOCK.glob("*.txt"))
+    assert {p.name for p in locks} >= {"build.txt", "ci.txt", "desk.txt"}, locks
+    for p in locks:
+        reqs = _lock_reqs(p)
+        assert reqs, p.name
+        for r in reqs:
+            assert re.match(r"^[A-Za-z0-9._-]+(\[[\w,-]+\])?==[\w.+!-]+ ", r), (p.name, r)
+            assert re.search(r"--hash=sha256:[0-9a-f]{64}", r), (p.name, r)
+
+
+def test_ci_lock_runtime_lines_match_pyproject() -> None:
+    """ci.in carries the pack's runtime deps verbatim, so CI tests what users resolve."""
+    import tomllib
+
+    deps = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
+    lines = [ln.strip() for ln in (LOCK / "ci.in").read_text(encoding="utf-8").splitlines()]
+    lines = [ln for ln in lines if ln and not ln.startswith("#")]
+    assert lines[: len(deps)] == deps, (lines, deps)
+
+
+def test_runtime_dependencies_have_floors() -> None:
+    """Every runtime dep names a >= floor; CI audits those floors (pack-floors.txt)."""
+    import tomllib
+
+    deps = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["dependencies"]
+    for d in deps:
+        assert re.match(r"^[A-Za-z0-9._-]+(\[[\w,-]+\])?>=[0-9][\w.]*$", d), d
+    ci = _job((WF / "ci.yml").read_text(encoding="utf-8"), "check_pack")
+    assert "pip-audit --disable-pip --no-deps -r pack-floors.txt" in ci, ci
+    assert "pip-audit --disable-pip --require-hashes -r tools/ci-lock/ci.txt" in ci, ci
+
+
+def test_build_is_hash_locked_and_dated_by_commit() -> None:
+    build = _job((WF / "ci.yml").read_text(encoding="utf-8"), "build_pack")
+    assert "python -m pip install --require-hashes -r tools/ci-lock/build.txt" in build, build
+    assert "--no-isolation" in build and "SOURCE_DATE_EPOCH" in build, build
+
+
+def _perm_block(text: str) -> dict[str, str]:
+    """permissions: mapping right under the given text start (or {} for the inline form)."""
+    m = re.search(r"^( *)permissions:(.*)$", text, re.M)
+    if not m:
+        return {"<missing>": "<missing>"}
+    if m.group(2).strip() == "{}":
+        return {}
+    if m.group(2).strip():
+        return {"<scalar>": m.group(2).strip()}
+    ind, out = len(m.group(1)), {}
+    for ln in text[m.end():].splitlines()[1:]:
+        if not ln.strip():
+            continue
+        if len(ln) - len(ln.lstrip()) <= ind:
+            break
+        k, _, v = ln.strip().partition(":")
+        out[k.strip()] = v.strip()
+    return out
+
+
+def test_permissions_are_minimal() -> None:
+    """Top level read-only (release: none); id-token: write only in publish_pypi."""
+    allowed_write = {("release.yml", "publish_pypi"): {"id-token": "write"},
+                     ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"}}
+    for p in _workflows():
+        text = _code(p)
+        top = _perm_block(text.split("\njobs:\n", 1)[0])
+        assert top == ({} if p.name == "release.yml" else {"contents": "read"}), (p.name, top)
+        body = text.split("\njobs:\n", 1)[1]
+        for job in re.findall(r"^  ([\w-]+):\n", body, re.M):
+            jb = _job("\n" + body, job)
+            perms = _perm_block(jb) if re.search(r"^    permissions:", jb, re.M) else None
+            want = allowed_write.get((p.name, job))
+            if want is not None:
+                assert perms == want, (p.name, job, perms)
+            elif perms is not None:
+                assert perms == {"contents": "read"}, (p.name, job, perms)
+        if p.name != "release.yml":
+            assert "id-token" not in text, p.name
+    assert _code(WF / "release.yml").count("id-token: write") == 1

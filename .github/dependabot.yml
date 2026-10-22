@@ -6,6 +6,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+  # The hashed CI locks (#634); regenerate with the command in each header.
+  - package-ecosystem: pip
+    directory: /tools/ci-lock
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: /
     schedule:

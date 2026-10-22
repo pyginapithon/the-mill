@@ -1,0 +1,4 @@
+# The build env for python -m build --no-isolation (build_pack, ci.yml).
+# setuptools must satisfy [build-system] requires in pyproject.toml.
+build
+setuptools>=61
