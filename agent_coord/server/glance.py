@@ -32,6 +32,7 @@ from agent_coord.const import (
     CONST_TODO,
     CONST_WATCH_NAME,
 )
+from agent_coord.server.admin.guard import ADMIN_ROSTER_ID, OFFICE_ROSTER_ID
 
 TAP_RE = re.compile(r"^[A-Za-z0-9]{10}$")
 GLANCE_COOKIE = "mill-glance"
@@ -367,7 +368,7 @@ def office_config(*, api_only: bool) -> dict[str, Any]:
         "one_process": True,
         "api_only": bool(api_only),
         "serves_glass": not api_only,
-        "static_cache": "public, max-age=60",
+        "static_cache": "pinned ?v=: public, max-age=31536000, immutable; else public, max-age=60 + ETag",
         "api_cache": "no-store",
         "mysql_host": str(s.get("host") or "")[:255],
         "mysql_database": str(s.get("database") or "")[:64],
@@ -410,8 +411,7 @@ def _office_scores(cn) -> dict[str, tuple]:
         "FROM score s "
         "JOIN name a ON a.id = s.roster_id "
         "JOIN name d ON d.id = s.desk_id "
-        f"WHERE a.type = '{CONST_ROSTER}' AND a.name = '{CONST_OFFICE}' "
-        f"AND d.type = '{CONST_ROSTER}' AND d.name = '{CONST_ADMIN}' "
+        f"WHERE a.id = {OFFICE_ROSTER_ID} AND d.id = {ADMIN_ROSTER_ID} "
         "/* glance:office-scores */",
     )
     out: dict[str, tuple] = {}
@@ -500,7 +500,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
         "SELECT d.name, s.value FROM score s "
         "JOIN name d ON d.id = s.desk_id "
         "JOIN name a ON a.id = s.roster_id "
-        f"WHERE s.kpi = 'system' AND a.type = '{CONST_ROSTER}' AND a.name = '{CONST_OFFICE}' "
+        f"WHERE s.kpi = 'system' AND a.id = {OFFICE_ROSTER_ID} "
         "/* glance:system-scores */",
     )
     verbs = 0
@@ -533,8 +533,7 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
         "JOIN score_evidence e ON e.score_id = s.id "
         "JOIN name a ON a.id = s.roster_id "
         "JOIN name d ON d.id = s.desk_id "
-        f"WHERE s.kpi = 'wall' AND a.type = '{CONST_ROSTER}' AND a.name = '{CONST_OFFICE}' "
-        f"AND d.type = '{CONST_ROSTER}' AND d.name = '{CONST_OFFICE}' "
+        f"WHERE s.kpi = 'wall' AND a.id = {OFFICE_ROSTER_ID} AND d.id = {OFFICE_ROSTER_ID} "
         "AND e.`timestamp` = STR_TO_DATE("
         "CONCAT('1970-01-01 ', LPAD(HOUR(NOW()), 2, '0'), ':00:00'), '%Y-%m-%d %H:%i:%s') "
         "AND e.taken = CURDATE() "
@@ -580,9 +579,8 @@ def build(cn, *, api_only: bool = False) -> dict[str, Any]:
 
     seed_rows = _q(
         cn,
-        "SELECT type, name, deleted IS NULL FROM name "
-        f"WHERE (type = '{CONST_ROSTER}' AND name = '{CONST_OFFICE}') "
-        f"OR (type = '{CONST_ROSTER}' AND name = '{CONST_ADMIN}') /* glance:seeds */",
+        f"SELECT type, IF(id = {OFFICE_ROSTER_ID}, '{CONST_OFFICE}', '{CONST_ADMIN}'), deleted IS NULL FROM name "
+        f"WHERE id IN ({OFFICE_ROSTER_ID}, {ADMIN_ROSTER_ID}) /* glance:seeds */",
     )
     seeds = [
         {"type": CONST_ROSTER, "name": CONST_OFFICE, "present": False, "retired": False},

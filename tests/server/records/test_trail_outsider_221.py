@@ -1,4 +1,4 @@
-"""#221: an outsider trail of a mail names the room and how to join."""
+"""#221 then #672 (S-3): an outsider trails any mail; reading never joins it."""
 from __future__ import annotations
 
 import os
@@ -85,29 +85,25 @@ def _room(cn):
     return book, rid, fid, int(card["id"])
 
 
-def test_outsider_mail_names_the_room_and_the_join(cn) -> None:
-    book, rid, fid, _card = _room(cn)
-    with pytest.raises(CoordError) as ei:
-        rpc._h_trail(book, {"node": f"mail:{fid}"}, "unit", "outsider")
-    msg = str(ei.value)
-    assert "not a participant" in msg
-    assert f"mill reply {rid}" in msg
-    assert "mill add" in msg
-    assert "sender or recipient" not in msg
+def test_outsider_trails_a_room_mail(cn) -> None:
+    book, rid, fid, card = _room(cn)
+    out = rpc._h_trail(book, {"node": f"mail:{fid}"}, "unit", "outsider")
+    nodes = {(n["kind"], n["id"]): n for n in out["nodes"]}
+    assert nodes[("mail", fid)]["title"] == "verb: trail"
+    assert nodes[("mail", fid)]["state"] == "sent"
+    assert ("todo", card) in nodes
+    from agent_coord.server.records import mail as rec_mail
+
+    assert "outsider" not in rec_mail.room_participants(cn, rid)
 
 
-def test_outsider_plain_letter_is_private_no_open_join(cn) -> None:
-    # #sec S-3: a plain (off-tree) letter is private; it has no reply-to-join.
-    # The refusal names it private and points at mill add, not mill reply.
+def test_outsider_trails_a_direct_letter(cn) -> None:
+    # #672 S-3: a direct (off-tree) letter is readable too; nothing is private.
     book = _Book(cn)
     sent = rpc._h_send(book, {"src": "asker", "dst": "tester", "body": "plain"}, "unit", "asker")
     mid = int(sent["id"])
-    with pytest.raises(CoordError) as ei:
-        rpc._h_trail(book, {"node": f"mail:{mid}"}, "unit", "outsider")
-    msg = str(ei.value)
-    assert f"mail {mid} is private" in msg
-    assert "mill add" in msg
-    assert f"mill reply {mid}" not in msg
+    out = rpc._h_trail(book, {"node": f"mail:{mid}"}, "unit", "outsider")
+    assert out["nodes"][0]["title"] == "plain"
 
 
 def test_participant_mail_trail_still_reads(cn) -> None:

@@ -385,8 +385,8 @@ def test_v1_envelope_parts() -> None:
     assert env.get("trust") in ("high", "limited")
 
 
-def test_build_rooms_membership_desk_filter(monkeypatch) -> None:
-    """limited / scope=membership: keep only roots whose room cast includes desk."""
+def test_build_rooms_lists_every_room_672(monkeypatch) -> None:
+    """#672 S-3: every room at every trust level; ?desk=/scope=membership no longer filter."""
     monkeypatch.setattr(
         "agent_coord.server.records.tree.mail_room_root_rows",
         lambda cn, aff: [
@@ -398,19 +398,15 @@ def test_build_rooms_membership_desk_filter(monkeypatch) -> None:
         "agent_coord.server.records.name.select",
         lambda cn, **k: [{"id": 1, "name": "PROJ_demo"}],
     )
-    monkeypatch.setattr(
-        "agent_coord.server.records.floor._room_casts",
-        lambda cn, ids: {
-            int(i): ({"alice", "bob"} if int(i) == 10 else {"carol"}) for i in ids
-        },
-    )
-    trees = build_rooms(object(), want={"demo"}, membership_desk="alice")
-    names = {t["name"] for t in trees}
-    assert "TREE_in" in names
-    assert "TREE_out" not in names
-    # no membership_desk => browse book (both)
-    all_trees = build_rooms(object(), want={"demo"})
-    assert {t["name"] for t in all_trees} >= {"TREE_in", "TREE_out"}
+    from agent_coord.server.records import floor
+
+    assert {t["name"] for t in build_rooms(object(), want={"demo"})} >= {"TREE_in", "TREE_out"}
+    for trust in ("limited", "high"):
+        monkeypatch.setattr("agent_coord.config.mill_trust", lambda t=trust: t)
+        for scope in (None, "membership"):
+            out = floor.v1_rooms(object(), projects=["demo"], desk="alice", scope=scope)
+            assert {t["name"] for t in out["trees"]} >= {"TREE_in", "TREE_out"}, (trust, scope)
+            assert "scope" not in out
 
 
 def test_multi_project_scope() -> None:

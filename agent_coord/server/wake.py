@@ -9,7 +9,9 @@ it resolves to must be public. Redirects are never followed.
 A POST is a doorbell: one per desk until that desk connects or WAKE_WINDOW_S
 passes. Every hint and letter stays in the desk's push queue as missed either
 way, so the woken desk's mill connect sync hands over all of them and its
-redirector chain walks each one there (the same walk as a /ws hint).
+redirector chain walks each one there (the same walk as a /ws hint). Items
+held back by the window ring once more at its end when the desk has still not
+connected (#669, the trailing POST), so a burst is never left asleep.
 """
 from __future__ import annotations
 
@@ -50,18 +52,11 @@ def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None,
         return
 
 
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """A wake POST never follows a redirect: the allowlist checked the first URL only."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
-        return None
-
-
 def _open(req, timeout: float):
-    """One request through an opener that refuses redirects (a 3xx is a failure)."""
-    import urllib.request
+    """One request through the shared opener that refuses redirects (a 3xx is a failure, #654)."""
+    from agent_coord.helpers.nofollow import open_no_redirect
 
-    return urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout)
+    return open_no_redirect(req, timeout=timeout)
 
 
 def _post_status(
@@ -404,7 +399,11 @@ def wake_body(
 
     body: dict[str, Any] = {k: frame[k] for k in FRAME_KEYS if frame.get(k) not in (None, "")}
     if test:
-        body = {"kind": "wake-test"}
+        # #669: a join test POST has its own id, so a receiver can log and dedupe it.
+        # It never takes or counts toward the window (test_fire posts directly).
+        import uuid
+
+        body = {"kind": "wake-test", "id": f"wake-test-{uuid.uuid4().hex[:12]}"}
     body["desk"] = desk
     body["roster"] = str(roster or "") or None
     body["wake"] = {
@@ -472,6 +471,9 @@ def test_fire(url: str, key: str, desk: str, *, roster: str = "") -> dict[str, A
 
 _GATE: dict[str, float] = {}
 _GATE_LOCK = threading.Lock()
+# #669: desk -> the window its coalesced items belong to (the gate time) and the
+# latest of them, for the one trailing POST at that window's end.
+_TRAIL: dict[str, dict[str, Any]] = {}
 
 
 def _gate_take(desk: str, now: float) -> bool:
@@ -493,8 +495,76 @@ def _gate_open(desk: str, now: float) -> bool:
 
 def gate_clear(desk: str) -> None:
     """The desk connected: its sync has the queue, so the next hint may wake it again."""
+    d = str(desk or "").strip()
     with _GATE_LOCK:
-        _GATE.pop(str(desk or "").strip(), None)
+        _GATE.pop(d, None)
+        _TRAIL.pop(d, None)
+
+
+def _schedule(delay: float, fn, *args) -> None:
+    """Run fn(*args) once after delay seconds on a daemon timer thread."""
+    t = threading.Timer(max(0.0, float(delay)), fn, args=args)
+    t.daemon = True
+    t.start()
+
+
+def _book():
+    """A book connection of the timer's own (the caller's has gone by window end)."""
+    from agent_coord.server.records.db import connect
+
+    return connect()
+
+
+def _coalesced(desk: str, frame: dict[str, Any], hint_id: int | None, reason: str, room: str | None) -> None:
+    """Remember an item the window held back. The first one in a window schedules
+    the window-end check (#669); later ones only update the latest item."""
+    import time
+
+    with _GATE_LOCK:
+        at = _GATE.get(desk)
+        if at is None:
+            return
+        t = _TRAIL.get(desk)
+        first = t is None or t.get("at") != at
+        if first:
+            t = _TRAIL[desk] = {"at": at, "reason": reason}
+        elif reason == ADDRESSED:
+            t["reason"] = ADDRESSED  # #627: the burst is addressed when any item is
+        t.update(frame=dict(frame), hint_id=hint_id, room=room)
+    if first:
+        _schedule(at + WAKE_WINDOW_S - time.monotonic(), trail, desk, at)
+
+
+def trail(desk: str, at: float) -> str:
+    """Window end (#669): one trailing POST when items were coalesced in the window
+    that started at `at` and the desk has not connected since. sent | error | none.
+
+    none: the desk connected (gate_clear dropped the window), or a later POST
+    already took a new window and woke it. The trailing POST takes a window of
+    its own, so items after it coalesce and get at most one more POST.
+    """
+    with _GATE_LOCK:
+        t = _TRAIL.get(desk)
+        if t is None or t.get("at") != at:
+            return "none"
+        _TRAIL.pop(desk, None)
+        if _GATE.get(desk) != at:
+            return "none"
+        _GATE.pop(desk, None)  # this window is over; post_desk takes the next one
+    cn = None
+    try:
+        cn = _book()
+        return post_desk(cn, desk, t["frame"], hint_id=t.get("hint_id"),
+                         reason=t.get("reason") or ADDRESSED, room=t.get("room"), trailing=True)
+    except Exception as e:
+        _wake_log(desk, t.get("frame") or {}, t.get("hint_id"), f"fail err={type(e).__name__} reason=trailing")
+        return "error"
+    finally:
+        if cn is not None:
+            try:
+                cn.close()
+            except Exception:
+                pass
 
 
 def _wake_log(desk: str, frame: dict[str, Any], hint_id: int | None, outcome: str) -> None:
@@ -519,8 +589,13 @@ def post_desk(
     hint_id: int | None = None,
     reason: str = ADDRESSED,
     room: str | None = None,
+    trailing: bool = False,
 ) -> str:
     """Wake an armed desk that is not sitting. sent | coalesced | skipped | error | off.
+
+    trailing (#669): the window-end POST for items this window held back; every
+    item is already in the queue, so pending is the queue size, and the log line
+    ends reason=trailing.
 
     skipped (#628): a room-only item for a desk armed with --wake-on addressed.
 
@@ -545,6 +620,7 @@ def post_desk(
     if not _gate_open(desk, time.monotonic()):
         # A wake already went out in this window: skip the checks and the DNS lookup.
         _wake_log(desk, frame, hint_id, "coalesced reason=window")
+        _coalesced(desk, frame, hint_id, reason, room)
         return "coalesced"
     try:
         url, host = check_url(url)
@@ -559,19 +635,22 @@ def post_desk(
     # Taken here (not peeked) so two threads racing past the peek send one POST.
     if not _gate_take(desk, time.monotonic()):
         _wake_log(desk, frame, hint_id, "coalesced reason=window")
+        _coalesced(desk, frame, hint_id, reason, room)
         return "coalesced"
     from agent_coord.server.records import push as rec_push
 
-    pending = rec_push.pending(cn, desk) + 1
+    # A live item is queued after this call; a trailing POST's items are all queued.
+    pending = rec_push.pending(cn, desk) + (0 if trailing else 1)
     # #627: a coalesced burst is addressed when any waiting item is addressed.
     if reason != ADDRESSED and rec_push.pending_addressed(cn, desk):
         reason = ADDRESSED
     body = wake_body(desk, frame, pending=pending, roster=desk_roster(cn, desk), reason=reason, room=room)
     status, err = _fire(url, body,
                         timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id, quiet=True)
+    tag = " reason=trailing" if trailing else ""
     if status is not None and 200 <= status <= 299:
-        _wake_log(desk, frame, hint_id, f"sent status={status}")
+        _wake_log(desk, frame, hint_id, f"sent status={status}{tag}")
         return "sent"
     why = f"status={status}" if status is not None else f"err={err or 'Exception'}"
-    _wake_log(desk, frame, hint_id, f"fail {why}")
+    _wake_log(desk, frame, hint_id, f"fail {why}{tag}")
     return "error"

@@ -22,7 +22,7 @@ flowchart TB
 
 ## State diagram
 
-Clock in: **host** `mill connect` (desk **name** + token hash). **Other PCs:** invite URL (pending) -> host `mill invite --enable` -> `mill join` -> `mill connect`. Same name is yours while you hold the hash. Lost seat: `mill join`, or Admin `mill reset <project> <desk>`, then `mill join` and `mill connect <project> <desk>`. No pid.
+Clock in: **host** `mill connect` (desk **name** + token hash). **Other PCs:** invite URL (pending) -> host `mill invite --enable` -> `mill join` -> `mill connect`. Same name is yours while you hold the hash. Lost seat: `mill join`, or Admin `mill reset seat <desk>`, then `mill join` and `mill connect <roster> <desk>`. No pid.
 
 Then the desk **waits** on `/ws`. A dropped socket reconnects. `sync` on that connect is the catch-up.
 

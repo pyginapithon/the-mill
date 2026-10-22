@@ -7,7 +7,6 @@ import pytest
 
 pytestmark = pytest.mark.sql
 
-from agent_coord.helpers.errors import CoordError
 from agent_coord.server.admin.guard import is_role_admin
 from agent_coord.server.api.mill import rpc
 from agent_coord.server.records import mail as rec_mail
@@ -81,23 +80,22 @@ def test_mail_thread_reads_the_tree_once(cn, room):
     assert len(calls) == 1
 
 
-def test_outsider_refusal_text_unchanged(cn, room):
-    with pytest.raises(CoordError) as ei:
-        rpc._h_mail_thread(room["book"], {"scope": "room", "mail_id": room["ids"][3]}, "ro", "ro_out")
-    assert str(ei.value) == (
-        "mail-thread: not a participant in this room; "
-        f"run mill reply {room['ids'][0]} <body> to join, "
-        "or ask a participant to mill add you at a letter of it"
-    )
+def test_outsider_reads_room_without_joining(cn, room):
+    # #672 S-3: every desk in the office reads every room, whole; the read
+    # does not make it a participant.
+    got = rpc._h_mail_thread(room["book"], {"scope": "room", "mail_id": room["ids"][3]}, "ro", "ro_out")
+    assert {int(m["id"]) for m in got["chain"]} == set(room["ids"])
+    assert got["room_letters"] == len(room["ids"])
+    assert "ro_out" not in rec_mail.room_participants(cn, room["ids"][0])
 
 
 def test_admin_exists(cn, room):
-    rec_member.put(cn, "Admin", "ro_a")
+    rec_member.put_admin(cn, "ro_a")
     assert is_role_admin(cn, "ro_a")
     assert not is_role_admin(cn, "ro_b")
     assert not is_role_admin(cn, "")
     assert not is_role_admin(cn, "Admin")
     got = rpc._h_mail_thread(room["book"], {"scope": "room", "mail_id": room["ids"][3]}, "ro", "ro_a")
     assert {int(m["id"]) for m in got["chain"]} == set(room["ids"])
-    rec_member.delete(cn, "Admin", "ro_a")
+    rec_member.delete_admin(cn, "ro_a")
     assert not is_role_admin(cn, "ro_a")

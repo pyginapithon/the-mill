@@ -236,3 +236,12 @@ def test_shell_critical_finished_chrome_layout():
     ):
         assert needle in css, needle
     assert len(css.encode("utf-8")) < 16_000
+
+
+def test_shell_hourglass_not_mojibake():
+    """The painted shell shows the hourglass, not its UTF-8 bytes read as cp1252."""
+    html = BOARD.read_text(encoding="utf-8")
+    assert "\u00e2\u0152\u203a" not in html
+    assert html.count('<span class="wall-loading-ico" aria-hidden="true">&#x231B;</span>') >= 7
+    assert 'aria-label="roster glance"' in html
+    assert "project glance" not in html

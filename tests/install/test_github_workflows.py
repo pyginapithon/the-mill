@@ -259,7 +259,8 @@ def _perm_block(text: str) -> dict[str, str]:
 def test_permissions_are_minimal() -> None:
     """Top level read-only (release: none); id-token: write only in publish_pypi."""
     allowed_write = {("release.yml", "publish_pypi"): {"id-token": "write"},
-                     ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"}}
+                     ("codeql.yml", "analyze"): {"contents": "read", "security-events": "write"},
+                     ("pr_text.yml", "sweep"): {"contents": "read", "issues": "read", "pull-requests": "read"}}
     for p in _workflows():
         text = _code(p)
         top = _perm_block(text.split("\njobs:\n", 1)[0])
@@ -276,3 +277,52 @@ def test_permissions_are_minimal() -> None:
         if p.name != "release.yml":
             assert "id-token" not in text, p.name
     assert _code(WF / "release.yml").count("id-token: write") == 1
+
+
+def test_pack_rebuilds_byte_identical_in_ci_and_release() -> None:
+    """F78: CI and release verify rebuild the commit and compare sha256 with dist/."""
+    ci = _job((WF / "ci.yml").read_text(encoding="utf-8"), "build_pack")
+    assert ci.index("python -m build --no-isolation") < ci.index("python tools/check_repro.py dist"), ci
+    assert ci.index("python tools/check_repro.py dist") < ci.index("actions/upload-artifact@"), ci
+    verify = _job((WF / "release.yml").read_text(encoding="utf-8"), "verify")
+    for name, job in (("ci build_pack", ci), ("release verify", verify)):
+        assert "python tools/check_repro.py dist" in job, name
+    # verify rebuilds in the ci.txt env, so it must pin the build tools build.txt pins.
+    build = {e.split(" ")[0] for e in _lock_reqs(LOCK / "build.txt")}
+    ci_pins = {e.split(" ")[0] for e in _lock_reqs(LOCK / "ci.txt")}
+    assert build <= ci_pins, build - ci_pins
+
+
+def test_pack_uses_the_reproducible_backend_and_spdx_license() -> None:
+    """F78: the in-tree backend normalizes both archives; the license is SPDX."""
+    import tomllib
+
+    py = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert py["build-system"]["build-backend"] == "mill_build"
+    assert py["build-system"]["backend-path"] == ["build_backend"]
+    assert py["project"]["license"] == "MIT"
+    assert py["project"]["license-files"] == ["LICENSE"]
+    assert "include build_backend/mill_build.py" in (ROOT / "MANIFEST.in").read_text(encoding="utf-8")
+
+
+def test_no_expression_in_any_run_line() -> None:
+    """F94: event text (PR title, body, comments) is untrusted. No run: line in
+    any workflow expands a ${{ }} expression; values reach a shell only by env."""
+    bad = [f"{p.name}: {ln}" for p in _workflows() for ln in _run_lines(p) if "${{" in ln]
+    assert not bad, bad
+
+
+def test_pr_text_scans_every_posted_text_read_only() -> None:
+    """F94: PR and issue title, body and comments are scanned when posted and daily."""
+    text = (WF / "pr_text.yml").read_text(encoding="utf-8")
+    on = _on(text)
+    assert "pull_request:\n    types: [opened, edited, synchronize, reopened]" in on, on
+    for ev in ("issues:", "issue_comment:", "pull_request_review_comment:", "pull_request_review:",
+               "schedule:", "workflow_dispatch:"):
+        assert f"\n  {ev}" in on, ev
+    code = _code(WF / "pr_text.yml")
+    assert "secrets." not in code and "write" not in code
+    assert re.search(r"github\.event\.[\w.]*(title|body)", code) is None
+    assert "python3 tools/check_pr_text.py event" in _job(code, "event")
+    assert "python3 tools/check_pr_text.py sweep" in _job(code, "sweep")
+    assert "pip" not in code

@@ -43,7 +43,7 @@ BOOT = ROOT / "default" / "boot.js"
 
 # Immutable for a year once the browser has them. Change a file, change its pin here.
 HTML_PINS = {
-    "boot.js": "wow285",
+    "boot.js": "wow286",
     "board.css": "wow283",
     "lazy.js": "wow285",
     "shell.css": "wow269",
