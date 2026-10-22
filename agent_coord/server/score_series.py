@@ -28,6 +28,7 @@ from typing import Any
 FLAT_PCT = 0.02
 WINDOW = 3
 TREND_POINTS = 2 * WINDOW
+NOTE_MAX = 200  # sp_score p_note VARCHAR(200) (#707)
 
 
 _AGO = re.compile(r"[0-9]{1,6}[mhd]")

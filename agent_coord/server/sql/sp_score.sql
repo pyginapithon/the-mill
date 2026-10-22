@@ -90,7 +90,7 @@ BEGIN
   END;
   START TRANSACTION;
   SET v_ts = MILL_NOW();
-  SET v_office = MILL_NAME_GET('roster', 'Office');
+  SET v_office = (SELECT id FROM name WHERE id = 1 AND type = 'roster');  -- #722: Office by id
   SET v_admin = MILL_NAME_GET('roster', 'Admin');
   IF v_office IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'no Office roster (MILL_NAME_GET)';
@@ -526,7 +526,7 @@ BEGIN
   START TRANSACTION;
   SET v_ts = MILL_NOW();
   SET v_now = IFNULL(p_now, v_ts);
-  SET v_proj = MILL_NAME_GET('roster', 'Office');
+  SET v_proj = (SELECT id FROM name WHERE id = 1 AND type = 'roster');  -- #722: Office by id
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   IF v_proj IS NOT NULL AND v_desk IS NOT NULL AND p_verb IS NOT NULL AND CHAR_LENGTH(p_verb) > 0 THEN
     SET v_id = (
@@ -633,7 +633,7 @@ BEGIN
   START TRANSACTION;
   SET v_ts = MILL_NOW();
   SET v_now = IFNULL(p_now, v_ts);
-  SET v_office = MILL_NAME_GET('roster', 'Office');
+  SET v_office = (SELECT id FROM name WHERE id = 1 AND type = 'roster');  -- #722: Office by id
   IF v_office IS NOT NULL AND p_route IS NOT NULL AND CHAR_LENGTH(p_route) > 0 THEN
     SET v_id = (
       SELECT id FROM score
