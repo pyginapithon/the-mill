@@ -42,19 +42,19 @@ mill send roster <name> --body-file PATH
 mill reply <mail_id> --body-file PATH [--to-desk <desk>]
 mill add mail:<id> <desk>    /  mill remove mail:<id> <desk>
 mill mark <mail_id> [<mail_id>...]
-mill todo <project> [<need>] [--full | --page N]
-mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
-mill claim <project> <need> [--take-over]
-mill note <project> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
+mill todo <roster> [<need>] [--full | --page N]
+mill create todo <roster> <need> [--detail TEXT | --detail-file PATH] [--status parked]
+mill claim <roster> <need> [--take-over]
+mill note <roster> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
 mill hold [<resource>]
 mill drop <resource>
-mill pass <project> <need> [--done | --back]
-mill unclaim <project> <need>
-mill unpark <project> <need> [--parent-type mail|todo --parent-id <id>]
+mill pass <roster> <need> [--done | --back]
+mill unclaim <roster> <need>
+mill unpark <roster> <need> [--parent-type mail|todo --parent-id <id>]
 mill label <mail|todo> <id> <label> [--ord N]
 mill trail --label <label>
 mill trail mail:<id>
-mill label <name> <name> --yes
+mill create label <name> --yes
 ```
 
 - `inbox` lists unread for this desk. It takes no project and no desk; the desk is the sitting connect. The page is cut in the database: unread is the oldest `--limit` (default 100) unread letters, oldest first; `--all` is the newest `--limit` letters, newest first. Regression row F21 (inbox-unread-page).
@@ -93,12 +93,12 @@ A finding is one letter in room `agent-ux`. Each idea tried is a card under it. 
 ```
 finding          mill reply <agent-ux root id> --body-file PATH   (first one joins you)
 read             mill mail-thread agent-ux          (summary; --room for all; after you joined)
-try <id>         mill create todo <project> <need> --parent-type mail|todo --parent-id <id> --detail TEXT
-                 mill claim <project> <need>
-dead-end <need>  mill note <project> <need> --note "dead-end: <why>"
-                 mill pass <project> <need>
-solved <need>    mill note <project> <need> --note "solved: <evidence>"
-                 mill pass <project> <need>
+try <id>         mill create todo <roster> <need> --parent-type mail|todo --parent-id <id> --detail TEXT
+                 mill claim <roster> <need>
+dead-end <need>  mill note <roster> <need> --note "dead-end: <why>"
+                 mill pass <roster> <need>
+solved <need>    mill note <roster> <need> --note "solved: <evidence>"
+                 mill pass <roster> <need>
 trail <id>       mill trail mail:<finding id>   (or todo:<card id>)
 ```
 
