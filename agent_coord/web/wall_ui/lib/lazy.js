@@ -118,14 +118,21 @@
       js: "/score/score-paint.js?v=wow294",
       marker: "WALL_UI_DEFAULT_SCORE_PAINT",
       domain: "score"
+    },
+    floorPaint: {
+      js: "/floor/floor-paint.js?v=wow307",
+      marker: "WALL_UI_DEFAULT_FLOOR_PAINT",
+      with: ["floorMap"]
     }
   };
 
   function ensureModule(name) {
     var m = MODULES[String(name || "")];
     if (!m) return Promise.resolve(null);
-    if (global[m.marker]) return Promise.resolve(m.marker);
-    return loadScript(m.js).then(function () { return m.marker; });
+    /* #710: a module's "with" list loads alongside it (one round trip, not two). */
+    var withP = (m.with || []).map(function (w) { return ensureModule(w); });
+    if (global[m.marker]) return Promise.all(withP).then(function () { return m.marker; });
+    return Promise.all([loadScript(m.js)].concat(withP)).then(function () { return m.marker; });
   }
 
   /* #710 pane paint split: boot.js keeps a stub per entry of a split pane.
