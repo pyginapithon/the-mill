@@ -48,7 +48,7 @@ python tools/check_doc_verbs.py          # exit 0 clean, 1 on any mismatch
 python tools/check_doc_verbs.py --list   # every verb, its positional count and flags
 ```
 
-CI runs it in the `mill_cli_smoke` job (F83).
+CI runs it in the `mill_cli_smoke` job (F90).
 
 ## check_repro.py
 
