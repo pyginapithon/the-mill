@@ -349,3 +349,31 @@
       }
       .mail-browser:not([data-mail-view="rooms"]) > .pane-toggle { display: none !important; }
     }
+    /* #716: phone width. Three side-by-side columns leave Rooms about 30 px wide and clip
+       Party, so stack them: the Rooms list on top, the thread under it, and Party folded
+       behind its toggle (shut by default). The rooms toggle is not needed when stacked. */
+    @media (max-width: 600px) {
+      #mail-browser[data-mail-view="rooms"],
+      #mail-browser[data-mail-view="rooms"].dst-open,
+      #mail-browser[data-mail-view="rooms"].src-open,
+      #mail-browser[data-mail-view="rooms"].dst-open.src-open {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(12rem, 1fr) auto auto;
+        grid-template-areas: "rooms" "thread" "party-toggle" "party";
+        overflow: hidden auto;
+      }
+      #mail-browser[data-mail-view="rooms"] > #mail-dst-toggle { display: none !important; }
+      #mail-browser[data-mail-view="rooms"] > #mail-dst-col,
+      #mail-browser[data-mail-view="rooms"]:not(.dst-open) > #mail-dst-col {
+        grid-area: rooms; max-height: 34vh; overflow: auto; padding-top: 0;
+      }
+      #mail-browser[data-mail-view="rooms"] > #mail-msg-col { grid-area: thread; min-height: 0; overflow: auto; }
+      #mail-browser[data-mail-view="rooms"] > #mail-src-toggle {
+        grid-area: party-toggle; position: static; justify-self: start;
+      }
+      #mail-browser[data-mail-view="rooms"] > #mail-src-toggle::after { content: " party"; }
+      #mail-browser[data-mail-view="rooms"].src-open > #mail-src-col {
+        grid-area: party; max-height: 30vh; overflow: auto; padding-top: 0;
+      }
+      #mail-browser[data-mail-view="rooms"]:not(.src-open) > #mail-src-col { display: none; }
+    }

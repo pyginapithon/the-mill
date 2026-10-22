@@ -65,7 +65,7 @@
   var DOMAINS = {
     mail: {
       js: "/mail/mail.js?v=wow285",
-      css: "/mail/mail.css?v=wow238",
+      css: "/mail/mail.css?v=wow316",
       marker: "WALL_UI_DEFAULT_MAIL",
       modules: ["mailPaint"]
     },
