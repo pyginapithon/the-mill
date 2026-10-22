@@ -14,7 +14,7 @@ stateDiagram-v2
   Shipped --> Done: pass (asker)
 ```
 
-| Verb | Who may |
+| Command | Who may |
 |---|---|
 | **claim** on `open` | any Bearer desk |
 | **claim** on `claimed` (other volunteer) | **refuse** |

@@ -37,6 +37,6 @@
 | Gate | A | B |
 |---|---|---|
 | Inputs before produce | | |
-| Day-one verbs only | | |
+| Day-one commands only | | |
 | Product Done matches skill | | |
 | STOP after one job | | |

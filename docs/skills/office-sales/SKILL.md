@@ -70,7 +70,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 - Bypass mill-desk HINT routing.
 - Replace CRM as SoR for amounts/accounts/stage/forecast-of-record.
 - Fan-out the same assign to `*` + role + desk.
-- Invent mill verbs for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
+- Invent mill commands for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
 - Fake `pass` while blocked - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.
 

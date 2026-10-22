@@ -30,9 +30,9 @@ The host key is a DNS name or an IP from the invite URL. Port 443 is omitted. An
 
 The CA is once per host. The token file holds the bearer token. The book stores the SHA-256 of that token. With an office or host selected, that desk's route, want, spawn, grok-session, and hint log sit in the desk directory. With no office selected they stay in `session/`.
 
-## Verbs
+## Commands
 
-Verb names do not change. `--office <alias>` may appear before or after the verb.
+Command names do not change. `--office <alias>` may appear before or after the command.
 
 | Command | What it uses |
 |---|---|

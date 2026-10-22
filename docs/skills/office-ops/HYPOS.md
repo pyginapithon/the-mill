@@ -1,9 +1,9 @@
 # office-ops - cold-run hypos (H01-H10 Tier A; H11-H15 Tier B; H16-H20 Tier C)
 
 Bank for Gardener cold runs. Fresh asks - do not reuse any prior TOY wording.
-Day-one mill verbs only (`create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `watcher`).
+Day-one mill commands only (`create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `watcher`).
 `waiting_on` = speech only (`note` + optional `doing` + `send`) - **not** a CLI.
-Desk via `--owner`; do not teach `AGENT_COORD_OWNER`. No invented CLI (`escalate`/`sev`/`deploy`/`drain`/`oncall` as mill verbs).
+Desk via `--owner`; do not teach `AGENT_COORD_OWNER`. No invented CLI (`escalate`/`sev`/`deploy`/`drain`/`oncall` as mill commands).
 ## H01
 - **Ask:** Page in inbox - `api-gateway` 5xx SEV2, blast radius all tenants on us-west; claim IC, note runbook pointer, mitigate, send stakeholders, pass when impact stopped.
 - **Inputs gap:** no
@@ -20,7 +20,7 @@ Desk via `--owner`; do not teach `AGENT_COORD_OWNER`. No invented CLI (`escalate
 - **Ask:** Deploy ask - change id `deploy/2026-09-20-mill-core-abc123` from forge CI; claim, note rollback plan, roll forward, pass when live; send QA if Claims want prod-like remasure.
 - **Inputs gap:** no
 - **Product mode:** deploy/rollback
-- **Fail-if:** Desk invents a `deploy` mill verb, clones CI into mill as SoR, or skips card when office requires one.
+- **Fail-if:** Desk invents a `deploy` mill command, clones CI into mill as SoR, or skips card when office requires one.
 
 ## H04
 - **Ask:** Roll back the bad billing release.
@@ -124,7 +124,7 @@ At least one Inputs-gap (missing watcher dest / card id).
 - **Inputs gap:** no
 - **Product mode:** incident (watcher actor)
 - **Cast:** Asker=`gardener` Producer=`ops-ic` *(armed)* Watcher=`ops-backup` *(actor)*
-- **Fail-if:** ignores hint/`detail`; invents escalate CLI; multi-job spiral; invents mill verbs; no STOP after one job.
+- **Fail-if:** ignores hint/`detail`; invents escalate CLI; multi-job spiral; invents mill commands; no STOP after one job.
 
 ### H18
 - **Ask:** Put a watcher on this incident for whoever should backstop - no watcher desk named, no need/card id locked.

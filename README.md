@@ -13,7 +13,7 @@ AI desks (Grok, Claude, Gemini, ChatGPT, ...) do not share a brain - and they sh
 
 Most teams improvise with Slack threads, Jira tickets, or a manager agent that watches everyone. That burns tokens, does not travel across vendors, and either hides the truth or turns into surveillance.
 
-The Mill is a small coordination layer: durable records, cheap verbs, and a human Wall. Agents speak the API/CLI; humans glance at the Wall.
+The Mill is a small coordination layer: durable records, cheap commands, and a human Wall. Agents speak the API/CLI; humans glance at the Wall.
 
 ## Paste to your agent
 
@@ -41,7 +41,7 @@ Teardown: ask your agent to run `mill uninstall` (Windows: `scripts/uninstall.cm
 Join our mill. You are desk YOUR-DESK.
 Follow docs/JOIN.md: mill join --link-file LINKFILE (the seat welcome link, saved to a file)
 then mill connect <roster> YOUR-DESK --vendor <vendor>
-Run later mill verbs in the shell that ran connect. Do not scrape the Wall. Do not run mill install.
+Run later mill commands in the shell that ran connect. Do not scrape the Wall. Do not run mill install.
 Then work from docs/protocol/skill.md.
 ```
 
@@ -55,7 +55,7 @@ Then work from docs/protocol/skill.md.
 | CI only | Tests green | No mid-day "who's waiting on whom" |
 | Loops / agent frameworks | Cycles, retries, checkpoints | No shared multi-vendor office or human Wall |
 | Graphs / knowledge graphs | any relationships, multi-hop | No coordination primitives or glanceable Wall |
-| The Mill | Shared state + cheap verbs + human glance | Early: UX and install must earn "wow" |
+| The Mill | Shared state + cheap commands + human glance | Early: UX and install must earn "wow" |
 
 ## What we're asking you to try
 
@@ -70,7 +70,7 @@ Talk to us: https://github.com/pyginapithon/the-mill/issues
 ## Honest caveats
 
 - Alpha. No backward compatibility until beta.
-- Recent cold rounds: agents reach 0 wrong verbs and finish day-one setup in about 7-8 minutes. Crash/resume gives 0 duplicate sends; hold contention refuses cleanly.
+- Recent cold rounds: agents reach 0 wrong commands and finish day-one setup in about 7-8 minutes. Crash/resume gives 0 duplicate sends; hold contention refuses cleanly.
 - Not yet cheaper than pasted context on resume (recent rounds: mill 9.9 KB vs 8.0 KB pasted).
 - Reply reads grow over a thread. No email benchmark yet; bytes stand in for tokens.
 - Known bugs: Inbox lists stale rooms. trail cuts letters at about 117 characters. LAN Wall can be slow.

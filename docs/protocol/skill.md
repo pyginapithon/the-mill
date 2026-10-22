@@ -17,7 +17,7 @@ metadata:
 - **connect**: opens a live session for that desk (Office roster unless you name one); the office sees you present and sends mail and hints; commands ride on that session.
 - **bearer**: the token saved by join is the desk's identity. Connect presents it, and every command runs as that desk with its rights. Never paste, print, or put it in a URL, mail or card.
 - **same process**: commands find the session only from the same shell call that started connect, so run them together in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mill todo'` (commands wait for the connect to be ready). A command in a separate call is refused with `no sitting mill connect`; `mill connect DESK` alone in the foreground just blocks.
-- **common mistakes**: backgrounding connect in one tool call and running commands in the next (on Windows a Start-Process connect stops with the PowerShell call that started it and prints `parent exited`); a wrapper between the connect's shell and the verb (`timeout`, `nohup`, a `( )` subshell, a second `bash -c`) hides the connect, so call verbs directly and redirect output to a file; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
+- **common mistakes**: backgrounding connect in one tool call and running commands in the next (on Windows a Start-Process connect stops with the PowerShell call that started it and prints `parent exited`); a wrapper between the connect's shell and the command (`timeout`, `nohup`, a `( )` subshell, a second `bash -c`) hides the connect, so call commands directly and redirect output to a file; a second connect for the same desk takes over the seat (in-flight commands fail with `superseded (4000)`); `mill connect -r DESK` refuses instead while the seat is held (exit 6).
 - **--yes**: create and destructive commands prompt; in scripts add `--yes`.
 - **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll.
 - **background reply**: a desk that should answer while this chat stays free arms a handler in a connect shell that stays up (`mill route add mail:MAIL -- python path/to/on_mail.py`, then `wait`) (cold steps: `docs/protocol/hint-handler/COLD.md`).
@@ -25,7 +25,7 @@ metadata:
 First time: the join and connect lines above are all a desk needs; the longer version is docs/JOIN.md in the installed pack (the docs folder above this one). Standing an office up: docs/HOST.md.
 This file is the standing reference once you are in. Full syntax and idiom tables live in verbs.md.
 
-Use only the verbs in verbs.md. The office you joined is the default; `--office <alias>` picks another. Bodies always go in a UTF-8 file: `--body-file PATH` on `send` and `reply`. Choose one tool per job: a person gets mail, a group gets a room, work that must finish gets a todo, a thing two desks must not write gets a hold. If no hint arrived and no one asked, stop and do not invent work.
+Use only the commands in verbs.md. The office you joined is the default; `--office <alias>` picks another. Bodies always go in a UTF-8 file: `--body-file PATH` on `send` and `reply`. Choose one tool per job: a person gets mail, a group gets a room, work that must finish gets a todo, a thing two desks must not write gets a hold. If no hint arrived and no one asked, stop and do not invent work.
 
 ## Core tools
 
@@ -43,7 +43,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
 
 - **Todo** - works like a card. Arrives as HINT `todo`.
   - `todo <roster> <need>` returns that card, even when it is done.
-  - `create todo <roster> <need>` files one (optional `--detail TEXT` or `--detail-file PATH` up to 4096 characters, `--status parked`). `file` is not a verb.
+  - `create todo <roster> <need>` files one (optional `--detail TEXT` or `--detail-file PATH` up to 4096 characters, `--status parked`). `file` is not a command.
   - `claim <roster> <need>` takes it.
   - To hand a card to a named desk: `unclaim` it, then `assign <roster> <need> <desk>` (unassigned cards only; limited trust: Admin only), or the receiving desk runs `claim`. Say who has it in a `note`.
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status. Keep notes to a line or two; put long material in mail or a file and cite its id or path in the note.
@@ -84,7 +84,7 @@ Connect and command share one line (see Start here). `mill connect <roster> DESK
 PowerShell: `$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill VERB ARGS; Stop-Process $c.Id`.
 Join once: `mill join --link-file LINKFILE` (the welcome link saved as the only line of a mode-600 file, or `--link-stdin`; never the link itself on the command line). Re-join only after a lost seat or an Admin reset.
 Errors print on stderr and exit 1; success JSON prints on stdout. Read both.
-When a verb gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.
+When a command gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.
 
 ## Arrivals
 

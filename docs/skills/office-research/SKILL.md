@@ -68,7 +68,7 @@ On the desk **before** draft (else `note` gap + `send` asker / `waiting_on`):
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Replace source/wiki/CRM/Drive SoR - link in detail/note.
-- Invent mill verbs for analyst slang (`brief`, `synthesize`, `decide`).
+- Invent mill commands for analyst slang (`brief`, `synthesize`, `decide`).
 - Confuse brief delivery with eng ship or QA Pass.
 - Endless research without `pass` / waiting_on / parked.
 - Confuse `drop` (hold) with `unclaim`.

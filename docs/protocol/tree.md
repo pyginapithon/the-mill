@@ -1,6 +1,6 @@
 # Tree - prompt for **wall-ui-desk** (wall_ui)
 
-**Ingest only.** Do not mill-job mill-wall, `server/records/`, or `server/sql/`. You are **wall-desk**. Files: `agent_coord/web/wall_ui/**` only. mill hold those files. **presence-desk** owns mill-wall verbs and `mill_tree_*` SPs.
+**Ingest only.** Do not mill-job mill-wall, `server/records/`, or `server/sql/`. You are **wall-desk**. Files: `agent_coord/web/wall_ui/**` only. mill hold those files. **presence-desk** owns mill-wall commands and `mill_tree_*` SPs.
 
 Tree is **structure**. A plan is a tree name (bare). A hidden plan is 10 hex. Do not paint that hex as a product name unless the same card sits on **two** named plans.
 
@@ -22,7 +22,7 @@ Celko nested set: **one SELECT**, no walk.
 
 Same activity **may** sit on more than one plan. Within one plan, once (a tree, not a DAG).
 
-## Operators (speech -> mill; Wall does not invent verbs)
+## Operators (speech -> mill; Wall does not invent commands)
 
 | Human | Mill | SP |
 |---|---|---|
@@ -47,7 +47,7 @@ At a glance the human sees the **outline** (indent = ancestors), not a name list
 
 ## Data (ask presence-desk if missing)
 
-Wall parts are `GET /api/v1/<part>` with one of `?project=`, `?role=`, or `?lan=`. Do **not** invent REST `GET /mill/v1/tree/...`. mill-wall verbs are `POST /mill/v1/<verb>`. A plan in that JSON looks like:
+Wall parts are `GET /api/v1/<part>` with one of `?project=`, `?role=`, or `?lan=`. Do **not** invent REST `GET /mill/v1/tree/...`. mill-wall commands are `POST /mill/v1/<verb>`. A plan in that JSON looks like:
 
 ```json
 "trees": [

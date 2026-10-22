@@ -4,7 +4,7 @@ description: >
   Use when this desk is producing <ARTIFACT> on a mill office. Pull mill-desk
   first. Thin adapter - not a second mill. Named by product output, not meta-PM.
 metadata:
-  short-description: "<Artifact>: mill verbs + handoffs"
+  short-description: "<Artifact>: mill commands + handoffs"
 ---
 
 # Office - <Function> -> <ARTIFACT>
@@ -36,7 +36,7 @@ What must be on the desk **before** you can produce (raw material - not the trig
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Replace the domain SoR (CRM/ATS/ledger/...).
-- Invent new mill verbs for industry slang.
+- Invent new mill commands for industry slang.
 
 ## Done looks like
 - Artifact state clear; card `pass`ed (status done) or clean waiting_on

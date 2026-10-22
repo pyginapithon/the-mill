@@ -8,7 +8,7 @@ Desk (owner) is **not** carried in an environment variable.
 
 | What | How (required) | Not |
 |---|---|---|
-| Desk (owner) | `--owner <desk>` on mill connect / verbs | `AGENT_COORD_OWNER=...` |
+| Desk (owner) | `--owner <desk>` on mill connect / commands | `AGENT_COORD_OWNER=...` |
 | Bearer | file `~/.mill/session/<desk>.token` (minted by join/connect) | `AGENT_COORD_TOKEN=...` |
 
 ## Reason

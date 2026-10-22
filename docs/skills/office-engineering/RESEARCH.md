@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-engineering/` exists |
 | Stub | Thin `SKILL.md` present (Product = Working software; Inputs; When + Verbs; Handoffs; Must-not; Done - no Scope; Lingo is need-oriented Verbs table, not TEMPLATE Their-word -> Mill; When!=TEMPLATE-only Inputs) |
 | FUNCTION-LINGO.md | Present - S **Engineering / build** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked; reject `open` / `yield` / bare `create` / teaching `done` |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked; reject `open` / `yield` / bare `create` / teaching `done` |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-qa (`RESEARCH.md` + SKILL), office-ops (`RESEARCH.md` + SKILL) read |
 
@@ -24,12 +24,12 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
 | **Working software / package** | **KEEP** | Catalog product. Stub: change users/agents can run (merged code, published package, live service behavior). README: working software (not other eng). Wake: software/package. |
-| Pull request / change as product | **DROP** | FL sketch: PR/change -> todo (implement) + hold on tree. Forge PR is **SoR** (README wake; stub Must-not: invent verbs for git/CI slang - PR/merge stay forge SoR + card). Card coordinates; PR is not the mill artifact. |
+| Pull request / change as product | **DROP** | FL sketch: PR/change -> todo (implement) + hold on tree. Forge PR is **SoR** (README wake; stub Must-not: invent commands for git/CI slang - PR/merge stay forge SoR + card). Card coordinates; PR is not the mill artifact. |
 | Code review / approve as product | **DROP** | FL collab + sketch: review/approve -> mail handoff; optional second desk claim. Collab move, not shippable eng artifact. |
 | Merge / ship ceremony as product | **DROP** | FL sketch: note progress; done after Pass/pack gate. Merge stays forge SoR; mill `pass` closes card after gate. |
 | RC / release / GA / changelog as product | **DROP** (day-one) | FL sketch: RC/release -> pack cut; Validator remasure Last. Mode of ship path (pack + QA), not 2nd SKILL product. Changelog = note/SoR. |
@@ -72,7 +72,7 @@ Not inputs: vague "make it better," no card, implementing while QA owns Pass/Fai
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). `label-add` for bugs is mill-desk idiomatic (stub) - cite, not invent. Tree attach/move = when said, not day-one teach (mill-desk).
 
@@ -80,21 +80,21 @@ Sources for rows: **FUNCTION-LINGO.md S Engineering / build** (required), mill-d
 
 Shared spine (one table for the function):
 
-| Their word | Source | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | change / implement work | FL product; stub Product | create todo, claim | **`create todo`** then **`claim`/`assign`** | reject bare `create` / `open` |
-| branch | FL product | note, detail | **`note`/detail** pointer to forge branch | branch lives in forge SoR - no `branch` mill verb |
+| branch | FL product | note, detail | **`note`/detail** pointer to forge branch | branch lives in forge SoR - no `branch` mill command |
 | pull request (PR) | FL sketch "todo (implement) + hold on tree"; README forge PR SoR | create todo, hold, note | **todo card** + optional **`hold`** on tree/paths; **link PR in `note`/detail** | reject inventing `pr`/`open-pr` CLI; PR != mill product |
 | review / code review | FL collab + sketch "mail handoff; optional second desk claim" | send, claim | **`send`** reviewer desk; optional second **`claim`** | collab, not product |
 | approve / request changes | FL product/collab | send, note | **`send`** + **`note`** on card | forge review UI stays SoR |
 | merge | FL sketch "note progress; done after Pass/pack gate" | note, pass | **`note`** merge/link; **`pass`** after Pass/pack gate | merge = forge SoR action |
 | ship | FL collab; mill-desk "ship it" -> pass | pass, note, send | **`pass`** (lifecycle); Claims **`send`** as needed | reject teaching `done` |
-| build / CI checks | FL product/collab | note, waiting_on | **`note`** CI links/paths; **`waiting_on`** if red blocks | CI = SoR; no `ci` verb |
+| build / CI checks | FL product/collab | note, waiting_on | **`note`** CI links/paths; **`waiting_on`** if red blocks | CI = SoR; no `ci` command |
 | artifact (wheel/image/package) | FL product; stub published package | note, pass | **`note`** artifact path/id; card **`pass`** when shippable | package is product mode of working software |
 | release candidate (RC) / release / GA | FL sketch "pack cut; Validator remasure Last" | note, send, pass | pack cut + **`send`** validator (Last remasure); **`pass`** after gate | not 2nd product; reject `release` CLI |
 | hotfix | FL sketch "urgent todo + ops handoff" | create todo, claim, send | **`create todo`** (priority in detail) -> **`claim`** -> **`send`** ops when runtime | same spine |
-| changelog | FL product | note | **`note`** / SoR doc link | not a verb |
-| contributor / maintainer | FL collab | claim, assign, presence | **`claim`/`assign`**; presence glance | roles, not verbs |
+| changelog | FL product | note | **`note`** / SoR doc link | not a command |
+| contributor / maintainer | FL collab | claim, assign, presence | **`claim`/`assign`**; presence glance | roles, not commands |
 | reviewer | FL collab | send, claim | **`send`** / optional **`claim`** | - |
 | merge queue | FL collab | waiting_on, note | **`waiting_on` + `note`** | forge queue SoR |
 | bug / issue | mill-desk; stub New eng card/bug | create todo + label | **`create todo`** + `label-add ... bug` | - |
@@ -136,7 +136,7 @@ Pattern: README "Escalate always = mill send"; qa Fail->Engineering; ops->Engine
 - Final Pass/Fail (QA hat) - stub.
 - Ship without a visible card - stub.
 - Leave claimed+100% without `pass` - stub.
-- Invent mill verbs for git/CI slang (`pr`, `merge`, `rebase`, `ci`, `release` as CLI) - stub; FL how-to-talk #4.
+- Invent mill commands for git/CI slang (`pr`, `merge`, `rebase`, `ci`, `release` as CLI) - stub; FL how-to-talk #4.
 - Replace forge (GitHub/GitLab), CI, artifact registry, package index - **link** in note/mail; don't clone.
 - Teach `open` / `yield` / bare `create` / `done` (mill-desk alpha hard-cut #60).
 - Confuse `drop` (hold release) with `unclaim`.
@@ -162,7 +162,7 @@ Pattern: README "Escalate always = mill send"; qa Fail->Engineering; ops->Engine
 ## Scope note
 
 - **In:** Software implement on claimed cards; bug/`create todo`; shared-tree `hold`; Claims ask + fix-after-Fail; pack/tag prep after shipped; hotfix as urgent same spine + ops handoff.
-- **Out:** QA Pass/Fail ownership, ops deploy/uptime product, forge PR database, other eng disciplines, inventing git CLI as mill verbs.
+- **Out:** QA Pass/Fail ownership, ops deploy/uptime product, forge PR database, other eng disciplines, inventing git CLI as mill commands.
 - **Day-one:** single product **Working software / package**; RC/release/hotfix/review = **modes** or collab, not second SKILL products. Forge PRs stay SoR.
 - Adapter stays thin - pull mill-desk first; one card, then STOP.
 
@@ -177,11 +177,11 @@ Pattern: README "Escalate always = mill send"; qa Fail->Engineering; ops->Engine
 | `docs/skills/README.md` | Catalog row Working software; hold rare eng trees; Prove it -> Claims + QA; escalate = send; forge coordination layer |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S Engineering / build | **Required** product/collab words + mill sketch (PR/change, review/approve, merge/ship, RC/release, hotfix) |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-engineering/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-qa/SKILL.md` + `RESEARCH.md` | Claims/Fail handoff mirror; Pass mail -> asker/eng `pass`; RESEARCH shape |
 | `docs/skills/office-ops/SKILL.md` + `RESEARCH.md` | Deploy/incident handoff; hotfix runtime; RESEARCH shape |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; pass lifecycle; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; pass lifecycle; no open/yield/teaching done |
 | `docs/protocol/verbs.md` | Confirm create todo / unclaim replaces yield / pass shipped->done; hold/drop; score |
 
 ### Public industry practice (thin)
@@ -223,7 +223,7 @@ Pattern: README "Escalate always = mill send"; qa Fail->Engineering; ops->Engine
 | score | Absent | Optional/omit unless office KPI |
 | Product noun | "Working software..." | Align README + wake: **Working software / package**; forge PRs stay SoR in Must-not/Product |
 | Done | Behavior/package; Claims evidence; closable after Pass | Add waiting_on/parked; pass lifecycle shipped->done; no silent claimed+100% |
-| Must-not | Pass/Fail; no card; claimed+100%; invent git verbs | Add: HINT bypass; drop!=unclaim; no open/yield/done; no ops/QA ownership; SoR link-only |
+| Must-not | Pass/Fail; no card; claimed+100%; invent git commands | Add: HINT bypass; drop!=unclaim; no open/yield/done; no ops/QA ownership; SoR link-only |
 | Inputs | Present and strong | Keep; fold When triggers lightly; ensure Fail-mail + hold called out (already) |
 | Multi-product clarity | Single Product OK | Explicit one kept; dropped listed in RESEARCH only |
 
@@ -231,7 +231,7 @@ Pattern: README "Escalate always = mill send"; qa Fail->Engineering; ops->Engine
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-engineering/SKILL.md`. Pull mill-desk first. Do not invent verbs.
+Paste/adapt into `docs/skills/office-engineering/SKILL.md`. Pull mill-desk first. Do not invent commands.
 
 ```markdown
 ---
@@ -258,7 +258,7 @@ Forge PRs/CI stay systems of record; mill coordinates the card.
 published package, live service behavior).
 
 Review, RC/release, and hotfix are **modes or collab** on this spine (same
-verbs), not second day-one products. The PR object lives in forge SoR - link it.
+commands), not second day-one products. The PR object lives in forge SoR - link it.
 
 ## Inputs
 On the desk **before** implement (else `note` gap + `send` asker / `waiting_on`
@@ -276,7 +276,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 | change / bug / feature | `create todo` (+ `label-add ... bug` when bug) |
 | take / give work | `claim` / `assign` |
 | drop the claim | `unclaim` |
-| PR / branch | todo card + link in `detail`/`note`; forge SoR (not a mill PR verb) |
+| PR / branch | todo card + link in `detail`/`note`; forge SoR (not a mill PR command) |
 | exclusive tree/file | `hold` / `drop` |
 | progress / CI links / artifact path | `note` (diary; not mail) |
 | review / approve / request changes | `send` reviewer (+ optional second `claim`); forge review SoR |
@@ -304,7 +304,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 - Bypass mill-desk HINT routing.
 - Final Pass/Fail (QA hat); own ops uptime/deploy product.
 - Ship without a visible card; leave claimed+100% without `pass`.
-- Replace forge/CI/registry SoR - link paths; invent git/CI mill verbs (`pr`, `merge`, `release` as CLI).
+- Replace forge/CI/registry SoR - link paths; invent git/CI mill commands (`pr`, `merge`, `release` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse forge approve/merge with mill `pass`.
 

@@ -69,7 +69,7 @@ Not inputs: vague "improve quality," implement-while-checking, Builder suite as 
 - Bypass mill-desk HINT routing.
 - Implement product fixes; rubber-stamp without remasure; rely on Builder suite alone.
 - Replace CI/forge/test-runner SoR - link evidence paths.
-- Invent mill verbs for ISTQB slang (`remasure`, `sign-off`, `regress` as CLI).
+- Invent mill commands for ISTQB slang (`remasure`, `sign-off`, `regress` as CLI).
 - Confuse test Pass/Fail (mail verdict) with mill `pass` (card close).
 - `pass` eng cards unless office says validator closes.
 - Confuse `drop` (hold) with `unclaim`.

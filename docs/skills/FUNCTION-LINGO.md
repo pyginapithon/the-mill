@@ -5,8 +5,8 @@ Mill does not rename itself to Jira/GitHub/Zendesk. For each industry phrase ask
 2. **Collab intent** - assign, review, escalate, approve, wait, finish?
 3. **Mill fulfillment** - which shared record makes that intent durable (presence, todo, mail, hold, waiting_on, score row, wall)?
 
-CLI verbs are the write API for those records - secondary to the representation.
-Industry verbiage for **what each office function ships** (product/artifact) and **how they collaborate**, then a sketch map onto mill primitives. Not a commitment that mill renames its verbs - a translation layer for office-function skills.
+CLI commands are the write API for those records - secondary to the representation.
+Industry verbiage for **what each office function ships** (product/artifact) and **how they collaborate**, then a sketch map onto mill primitives. Not a commitment that mill renames its commands - a translation layer for office-function skills.
 
 Sources (public glossaries): GitHub/PR & release terms; ISTQB testing glossary; SRE/incident (Google/Atlassian/incident.io); ITIL 4 service desk. Sales/people/legal rows use common CRM/ATS practice language.
 
@@ -218,7 +218,7 @@ Sources (public glossaries): GitHub/PR & release terms; ISTQB testing glossary; 
 
 1. Lead with **their product noun** (release, Pass evidence, incident closed, ticket resolved).
 2. Use **their collab verbs** in the When/Handoffs sections.
-3. Map once to mill verbs in a small table - don't rename mill CLI to "open PR."
+3. Map once to mill commands in a small table - don't rename mill CLI to "open PR."
 4. Must-not: pretend mill *is* Jira/GitHub/Zendesk/PagerDuty.
 
 ## Next

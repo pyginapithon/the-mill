@@ -1,12 +1,12 @@
 # Sync and async
 
-Two ways a desk hears about work on the same `/ws`. Async is a live frame. Sync is a list inside the verb reply. Read this before treating `{HINT: ...}` as the only notice.
+Two ways a desk hears about work on the same `/ws`. Async is a live frame. Sync is a list inside the command reply. Read this before treating `{HINT: ...}` as the only notice.
 
-`mill join` stays HTTPS. It is not this page. Desk verbs need `mill connect` up.
+`mill join` stays HTTPS. It is not this page. Desk commands need `mill connect` up.
 
 ## Async
 
-The host writes one frame when something happens, if your socket is sitting. There is no `id` and no `ok`. That is how you tell a push from a verb reply.
+The host writes one frame when something happens, if your socket is sitting. There is no `id` and no `ok`. That is how you tell a push from a command reply.
 
 A client that ignores these frames is fine. The same items come back in `sync` on the next mill sync.
 
@@ -24,11 +24,11 @@ MAIL is not updated after send. Nothing watches a mail. The receiver hears it be
 
 Sync is the report of what async already pushed **to you**, since your last mill sync. It is not a second copy sent as more frames.
 
-A mill sync is `mill connect`, or any mill verb. PING is not a sync. The list is oldest first. A hint is a poke about one object, so the list carries one item per hinted object and outcome: when several hint rows name the same `type` and `id` with the same `outcome` (every change of one hold while the desk was away), the sync hands over the latest of them, at its place, with `n` (how many rows it stands for) and `first` (the oldest row's time); `time` is the latest. A sent row and a missed row of one object stay apart. Letters, receipts, route exit lines, drop lines and the expired line are never folded. Regression row F-sync-hint-fold (#671). When the reply is handed back, those rows are deleted. The next verb only has pushes that happened after that. Rows older than 30 days are not returned. The wall deletes them in one sweep at start and then twice a day (`mill_push_expire`), not on each sync. Each desk that lost rows gets one `expired` line from that sweep: window start, window end, and the counts (hint, mail, receipt, missed, error). No bodies. A poke that arrives after that line has a later id, so it comes out after the line. A desk that connects inside 30 days gets the original rows and no expired line. A row past 30 days waits for the next sweep, so its count can reach the desk up to half a day later. Regression row F17 (push-expire-off-take). A later window adds to the same line and moves its time forward. The 30-day delete skips `kind=expired`. The line is deleted only when that desk's sync returns it.
+A mill sync is `mill connect`, or any mill command. PING is not a sync. The list is oldest first. A hint is a poke about one object, so the list carries one item per hinted object and outcome: when several hint rows name the same `type` and `id` with the same `outcome` (every change of one hold while the desk was away), the sync hands over the latest of them, at its place, with `n` (how many rows it stands for) and `first` (the oldest row's time); `time` is the latest. A sent row and a missed row of one object stay apart. Letters, receipts, route exit lines, drop lines and the expired line are never folded. Regression row F-sync-hint-fold (#671). When the reply is handed back, those rows are deleted. The next command only has pushes that happened after that. Rows older than 30 days are not returned. The wall deletes them in one sweep at start and then twice a day (`mill_push_expire`), not on each sync. Each desk that lost rows gets one `expired` line from that sweep: window start, window end, and the counts (hint, mail, receipt, missed, error). No bodies. A poke that arrives after that line has a later id, so it comes out after the line. A desk that connects inside 30 days gets the original rows and no expired line. A row past 30 days waits for the next sweep, so its count can reach the desk up to half a day later. Regression row F17 (push-expire-off-take). A later window adds to the same line and moves its time forward. The 30-day delete skips `kind=expired`. The line is deleted only when that desk's sync returns it.
 
 A sit buffer holds 256 frames. When it drops the oldest, it does not throw that frame away. If `push_queue` still has the row and that row is not marked sent, the row stays. The next sync returns it. The idempotency key makes that replay the same poke. If the row is marked sent, the frame goes back on the desk queue as missed, and the frame's idempotency key is kept when the frame had one. The next sync returns that frame. If the row is already gone, one hint line is written: `route`, `id`, `dropped` 1, and `idem` when the frame had one. No body. The cap stays 256. This does not take sync. The hub does not wait.
 
-The list is yours. `mill send` to someone else does not put that mail in your `sync`. They get the live frame if they are sitting, and the row in their next `mill connect` or mill verb. Your `sync` on that send is whatever was already waiting for you.
+The list is yours. `mill send` to someone else does not put that mail in your `sync`. They get the live frame if they are sitting, and the row in their next `mill connect` or mill command. Your `sync` on that send is whatever was already waiting for you.
 
 ### mill connect
 
@@ -50,9 +50,9 @@ It is not a queue and not a frame; nothing else reads it. No focus card: no line
 
 `kind: sync` is a JSON list, the push queue. A missed JOIN inside that list is a queue item, not a frame to ignore. Print-and-exit or hold is the model skill, not this page.
 
-### A mill verb
+### A mill command
 
-You run `mill send` (or inbox, reply, claim, and the rest). The host does the verb, then takes your waiting pushes, then sends **one** JSON object:
+You run `mill send` (or inbox, reply, claim, and the rest). The host does the command, then takes your waiting pushes, then sends **one** JSON object:
 
 ```json
 {
@@ -64,7 +64,7 @@ You run `mill send` (or inbox, reply, claim, and the rest). The host does the ve
 }
 ```
 
-`result` is the verb. `sync` is the report. Empty means nothing was waiting.
+`result` is the command. `sync` is the report. Empty means nothing was waiting.
 
 Failure is the same object. `ok` is false, `result` is null, `error` is the text, and `sync` is still the report:
 

@@ -29,15 +29,15 @@ Teaching names below match skill.md day-one speech. Wall path may still say `/op
 ## Hard rules (release must prove)
 
 1. **Opened is first-person.** Desk A Bearer + inbox for desk B must not stamp B's `mail_to.opened`. *(covered: `tests/server/test_mill_access.py`)*
-2. **HERE is Bearer-only.** Authenticated verbs force owner = Bearer desk. Stale body/env OWNER is ignored (no 400). *(pytest: test_mill_access.py)*
-3. **Mail body is append-only.** Interface has send + open receipt - no edit-letter verb. *(shape; no forge test yet)*
-4. **Always-Admin** verbs refuse non-Admin (`reset` / `reclaim` / `retire` / invite / `Admin` grant). **assign** follows trust + unassigned (not blanket Admin). *(pytest may lag product intent)*
+2. **HERE is Bearer-only.** Authenticated commands force owner = Bearer desk. Stale body/env OWNER is ignored (no 400). *(pytest: test_mill_access.py)*
+3. **Mail body is append-only.** Interface has send + open receipt - no edit-letter command. *(shape; no forge test yet)*
+4. **Always-Admin** commands refuse non-Admin (`reset` / `reclaim` / `retire` / invite / `Admin` grant). **assign** follows trust + unassigned (not blanket Admin). *(pytest may lag product intent)*
 5. **Name compares are typed.** A name is its type plus the bare string (`desk`, `project`, `role`, `label`, `res`, `tree`). `slug` validates the token. The session file and the `/ws` room use that desk name. *(pytest: `tests/server/test_mill_access.py`)*
 
 
-## Wall browse vs agent verbs (Host GO trust matrix)
+## Wall browse vs agent commands (Host GO trust matrix)
 
-| trust | Wall (human) | Agent verbs |
+| trust | Wall (human) | Agent commands |
 |---|---|---|
 | **limited** | membership only (room cast) | membership only (room cast) |
 | **high** (default) | may browse book | membership-scoped |

@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-marketing/` exists |
 | Stub | Thin `SKILL.md` present (Product + Lingo + Must-not + Done; **no Inputs / Handoffs / Scope**) |
 | FUNCTION-LINGO.md | Present - S **Marketing / content** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked (alpha hard-cut #60) |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked (alpha hard-cut #60) |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-sales RESEARCH.md (Loop-1 shape); office-sales / office-support stubs |
 
@@ -26,7 +26,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -62,7 +62,7 @@ A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays
 | KPI name / target (reach, conversion, ...) | When office tracks | `score` / score row (FL: KPI -> score row) |
 | Handoff dest (sales enablement, support FAQ, eng for landing) | When handoff | `send` + optional `assign` / `create todo` |
 
-Not inputs: "grow reach," replace CMS uploads, replace analytics dashboards, invent mill verbs (`publish`, `launch`, `approve` as CLI).
+Not inputs: "grow reach," replace CMS uploads, replace analytics dashboards, invent mill commands (`publish`, `launch`, `approve` as CLI).
 
 ### Done looks like (this product)
 
@@ -75,7 +75,7 @@ Not inputs: "grow reach," replace CMS uploads, replace analytics dashboards, inv
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). `unpark` exists but is not day-one teach unless human says it.
 
@@ -83,17 +83,17 @@ Sources for rows: **FUNCTION-LINGO.md S Marketing / content** (required), mill-d
 
 Shared spine (one table for the function) - **every row cites FL**:
 
-| Their word | Source (FL cite) | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source (FL cite) | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | brief | FL Marketing product words; FL mill sketch "todo detail" | create todo, open | **`create todo`** + detail | reject `open`; brief != product |
 | creative / asset | FL Marketing product words; stub | claim, hold, note | **`claim`** + **`note`**; **`hold`/`drop`** if exclusive write on shared asset station | CMS/DAM = SoR for binary; don't invent `upload` |
 | campaign | FL Marketing product words; README Launch / publish | create todo | **`create todo`** (campaign id/URL in detail) | not a second product noun beyond Launch / campaign |
 | launch | FL Marketing product words; FL mill sketch "done + optional wall" | pass, done | **`pass`** (+ optional Wall glance) | reject teaching `done`; mill-desk: ship/pass/close -> `pass` |
 | publish | FL Marketing product words; FL mill sketch "done + optional wall"; stub | pass | **`pass`** | same close path as launch; CMS publish outside mill |
-| channel | FL Marketing product words | note, detail | **`note`** / detail | not a mill verb; not a product |
+| channel | FL Marketing product words | note, detail | **`note`** / detail | not a mill command; not a product |
 | KPI (reach/conversion) | FL Marketing product words; FL mill sketch "score row"; README score row cluster | score | **`score`** | analytics SoR outside; score = last vs target glance |
 | review cycle | FL Marketing collab words | send, claim | **`send`** (+ second desk `claim` if needed) | not invent `review` CLI |
-| approval / approve | FL Marketing collab; FL mill sketch "mail; human_required if needed"; README human_required marketing brand | send | **`send`**; **human_required** if brand/policy | reject inventing `approve` verb |
+| approval / approve | FL Marketing collab; FL mill sketch "mail; human_required if needed"; README human_required marketing brand | send | **`send`**; **human_required** if brand/policy | reject inventing `approve` command |
 | embargo | FL Marketing collab; stub | waiting_on | **`waiting_on`** + `note`/`send` | don't fake pass |
 | handoff to sales/support | FL Marketing collab; README escalate = send | send, assign | **`send` + `assign`** | same pattern as sales handoff |
 | own / take the launch | mill-desk claim; stub creative claim | claim, assign | **`claim`** / **`assign`** | - |
@@ -103,7 +103,7 @@ Shared spine (one table for the function) - **every row cites FL**:
 | progress / diary on card | mill-desk note | note | **`note`** | note != mail |
 | exclusive edit shared creative | stub "hold if exclusive"; TEMPLATE hold | hold, drop | **`hold`** / **`drop`** when office leases asset station | README: hold rare - teach only for exclusive creative write, not day-one chatter |
 | park / file for later | mill-desk | create todo parked | **`create todo` `{status:"parked"}`** | reject bare `create` / `open` |
-| Wall glance after launch | FL mill sketch "optional wall glance" | - (wall) | optional Wall - not a write verb | wall = human glance (FL legend) |
+| Wall glance after launch | FL mill sketch "optional wall glance" | - (wall) | optional Wall - not a write command | wall = human glance (FL legend) |
 
 **Stub lingo gaps this harvest fills:** Inputs, Handoffs, Scope, inbox, unclaim vs drop, park, channel/campaign/KPI explicit FL maps, launch/publish -> `pass` not teaching `done`, CMS/analytics SoR, human_required brand gate, sales/support handoff rows, score = KPI not product.
 
@@ -122,7 +122,7 @@ Shared spine (one table for the function) - **every row cites FL**:
 | **office-research** | Insights brief feeding campaign ask - `send` / consume research brief as input |
 | **Asker / brand human** | Missing brief, approve gate, or embargo lift - `send` / human_required / `waiting_on` |
 
-Pattern: escalate always = mill `send` (README). CMS publish and analytics updates happen **in CMS/analytics**, then `note` the fact on the mill card. Brand approve = human_required mail, not a new verb.
+Pattern: escalate always = mill `send` (README). CMS publish and analytics updates happen **in CMS/analytics**, then `note` the fact on the mill card. Brand approve = human_required mail, not a new command.
 
 ---
 
@@ -131,7 +131,7 @@ Pattern: escalate always = mill `send` (README). CMS publish and analytics updat
 - Bypass mill-desk HINT routing.
 - **Treat mill as DAM/CMS** (stub; content binaries and publish state stay in CMS/DAM).
 - **Treat mill as analytics SoR** - KPI glance via `score` only; dashboards stay outside.
-- Invent mill verbs for marketing slang (`publish`, `launch`, `approve`, `embargo`, `schedule` as CLI).
+- Invent mill commands for marketing slang (`publish`, `launch`, `approve`, `embargo`, `schedule` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk day-one hard-cut).
 - Confuse `drop` (hold release) with `unclaim`.
 - Launch without the review gate the office requires (stub).
@@ -171,11 +171,11 @@ Pattern: escalate always = mill `send` (README). CMS publish and analytics updat
 | `docs/skills/README.md` | Catalog **Launch / publish**; spine create todo->claim->note->send->pass; human_required cluster marketing brand approve; score row cluster marketing KPI; escalate = send |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S **Marketing / content** | **Required** product words (brief, creative asset, campaign, launch, publish, channel, KPI); collab (review cycle, approval, embargo, handoff to sales/support); mill sketch rows |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-marketing/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-sales/SKILL.md` + `RESEARCH.md` | Sibling: handoff <-> marketing; RESEARCH shape; score/waiting_on/inbox/unclaim patterns |
 | `docs/skills/office-support/SKILL.md` | Sibling: escalate = send; SoR outside mill |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
 
 ### Public industry practice (thin)
 
@@ -215,10 +215,10 @@ Pattern: escalate always = mill `send` (README). CMS publish and analytics updat
 | Handoffs section | **Absent** | Add: sales, support, legal, finance, eng, qa, research, brand human |
 | Scope note | **Absent** | In/out; dual Launch/campaign; CMS/analytics SoR; hold rare |
 | Product noun | "Live campaign or published asset" | Align README: **Launch / publish**; wake: **Launch / campaign** - dual spine |
-| Lingo completeness | Core FL rows; missing inbox/unclaim/park/channel/campaign explicit, score verb | Full FL harvest; reject teaching `done`; `pass` for launch/publish |
+| Lingo completeness | Core FL rows; missing inbox/unclaim/park/channel/campaign explicit, score command | Full FL harvest; reject teaching `done`; `pass` for launch/publish |
 | hold | "claim + hold if exclusive" | Keep **conditional** - exclusive asset station only |
 | score / KPI | Present as score row | Keep as `score`; not a product; analytics SoR outside |
-| Must-not | DAM/CMS + launch-without-gate | Add: HINT bypass; analytics SoR; no invent verbs; drop!=unclaim; no fake pass; no teach done/open/yield |
+| Must-not | DAM/CMS + launch-without-gate | Add: HINT bypass; analytics SoR; no invent commands; drop!=unclaim; no fake pass; no teach done/open/yield |
 | Done | Asset/campaign live; pass; KPI owner | Spell pass / waiting_on / parked / handoff mail |
 | metadata short-description | "Marketing: launches via mill" | Prefer "Marketing: Launch / campaign via mill" |
 
@@ -226,7 +226,7 @@ Pattern: escalate always = mill `send` (README). CMS publish and analytics updat
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-marketing/SKILL.md`. Pull mill-desk first. Do not invent verbs. CMS and analytics stay SoR.
+Paste/adapt into `docs/skills/office-marketing/SKILL.md`. Pull mill-desk first. Do not invent commands. CMS and analytics stay SoR.
 
 ```markdown
 ---
@@ -300,7 +300,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Treat mill as DAM/CMS or as analytics SoR.
-- Invent mill verbs for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
+- Invent mill commands for marketing slang (`publish`, `launch`, `approve`, `embargo` as CLI).
 - Launch without the review gate the office requires.
 - Fake `pass` while embargoed or waiting brand/legal/finance - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.

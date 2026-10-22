@@ -14,7 +14,7 @@ Before any research, **open and read** these paths (git checkout or `share/the-m
 | Skills catalog | `docs/skills/README.md` |
 | TEMPLATE | `docs/skills/TEMPLATE.md` |
 | Function lingo | `docs/skills/FUNCTION-LINGO.md` |
-| mill-desk day-one verbs | `docs/protocol/skill.md` |
+| mill-desk day-one commands | `docs/protocol/skill.md` |
 | Function folder (or README row for new) | `docs/skills/office-<function>/` |
 
 Also read if present: existing `office-<fn>/SKILL.md`, sibling office-* skills, prior `RESEARCH.md`.
@@ -29,20 +29,20 @@ A function may have **more than one** product. List each separately with its own
 
 ## Required sources for lingo->mill
 1. **`docs/skills/FUNCTION-LINGO.md`** - apply that function's industry phrases
-2. **`docs/protocol/skill.md`** - day-one verbs only (`create todo`, claim, assign, unclaim, note, send, inbox, hold/drop, pass, ...)
+2. **`docs/protocol/skill.md`** - day-one commands only (`create todo`, claim, assign, unclaim, note, send, inbox, hold/drop, pass, ...)
 3. Existing stub / siblings
 
-Do **not** invent mill CLI verbs. Reject `open` / `yield` / teaching `done` / bare `create`.
+Do **not** invent mill CLI commands. Reject `open` / `yield` / teaching `done` / bare `create`.
 
 ## Output (write under function folder)
-1. `docs/skills/office-<fn>/RESEARCH.md` - research book (kept/dropped products, sources, verb rejects, open Qs)
+1. `docs/skills/office-<fn>/RESEARCH.md` - research book (kept/dropped products, sources, command rejects, open Qs)
 2. Chat/mill handoff: TEMPLATE-shaped brief for Gardener (Product(s), Inputs, Lingo->mill, Handoffs, Must-not, Done, Scope)
 
 ## Order
 Preflight -> research book -> TEMPLATE brief -> handoff gardener -> **STOP**
 
 ## Anti-jobs
-- Invent mill verbs
+- Invent mill commands
 - Patch `SKILL.md` (gardener)
 - Wall / mill product code
 - Scout every function in one run

@@ -41,7 +41,7 @@ On the desk **before** advance/offer/onboard (else `note` gap + `send` / `waitin
 - **Checklist + owners** - child `create todo` per item; `assign` / `claim` per owner
 
 Not inputs: paste full resumes/SSN into mill, skip human_required when required,
-replace ATS/HRIS, invent recruiting CLI verbs.
+replace ATS/HRIS, invent recruiting CLI commands.
 
 ## Lingo -> mill
 | Their word | Mill |
@@ -81,7 +81,7 @@ replace ATS/HRIS, invent recruiting CLI verbs.
 - Bypass mill-desk HINT routing.
 - Replace ATS/HRIS/e-sign/background-check SoR - link paths; minimize PII.
 - Skip human_required on offer if office requires it.
-- Invent mill verbs for recruiting slang (`offer`, `advance`, `loop`, `debrief` as CLI).
+- Invent mill commands for recruiting slang (`offer`, `advance`, `loop`, `debrief` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`. A hiring KPI is a score row. Interview notes are `note`.
 - Own legal clearance or finance approval.

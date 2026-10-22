@@ -26,7 +26,7 @@ Forge PRs/CI stay systems of record; mill coordinates the card.
 published package, live service behavior).
 
 Review, RC/release, and hotfix are **modes or collab** on this spine (same
-verbs), not second day-one products. The PR object lives in forge SoR - link it.
+commands), not second day-one products. The PR object lives in forge SoR - link it.
 
 ## Inputs
 On the desk **before** implement (else `note` gap + `send` asker / `waiting_on`
@@ -44,7 +44,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 | change / bug / feature | `create todo` (+ `label ... bug` when bug) |
 | take / give work | `claim` / `assign` |
 | drop the claim | `unclaim` |
-| PR / branch | todo card + link in `detail`/`note`; forge SoR (not a mill PR verb) |
+| PR / branch | todo card + link in `detail`/`note`; forge SoR (not a mill PR command) |
 | exclusive tree/file | `hold` / `drop` |
 | progress / CI links / artifact path | `note` (diary; not mail) |
 | review / approve / request changes | `send` reviewer (+ optional second `claim`); forge review SoR |
@@ -72,7 +72,7 @@ Not inputs: vague "make it better," no card, or implementing while QA owns Pass/
 - Bypass mill-desk HINT routing.
 - Final Pass/Fail (QA hat); own ops uptime/deploy product.
 - Ship without a visible card; leave claimed+100% without `pass`.
-- Replace forge/CI/registry SoR - link paths; invent git/CI mill verbs (`pr`, `merge`, `release` as CLI).
+- Replace forge/CI/registry SoR - link paths; invent git/CI mill commands (`pr`, `merge`, `release` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse forge approve/merge with mill `pass`.
 

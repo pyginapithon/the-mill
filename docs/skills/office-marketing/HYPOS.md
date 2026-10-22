@@ -1,6 +1,6 @@
 # office-marketing - cold-run hypos (H01-H10)
 
-Cold-run asks for **Launch / campaign** only. Human speech; day-one mill verbs; CMS/DAM and analytics stay SoR.
+Cold-run asks for **Launch / campaign** only. Human speech; day-one mill commands; CMS/DAM and analytics stay SoR.
 
 ## H01
 - **Ask:** Launch the spring webinar campaign (CMS id in the brief) - review already greenlit; go live and pass the card; point KPI owner at the reach score row.

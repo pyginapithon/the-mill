@@ -11,7 +11,7 @@ A cold agent (any vendor, new chat) is told "put our office on AWS / Azure / GCP
 1. **Who touches the cloud.** The agent runs the human's own logged-in provider CLI (`aws`, `az`, `gcloud`), or hands the human exact console steps when that CLI is missing. Mill never calls cloud APIs. Mill never stores provider keys in the book, session files, Wall, or the phase-state file.
 2. **The door.** Invite is the only public door. Admin access is SSH with key auth, open only to the operator's current public IP in the cloud firewall. No VPN.
 3. **The machine.** Ubuntu LTS VM with a public IP. A DNS name is optional. MySQL 8 (InnoDB) on the VM, bound to `127.0.0.1`. Wall HTTPS on 443 with the mill CA ([install requirements A3](../requirements/install.md)). Real TLS on a DNS name is a later add-on. Ubuntu's `mariadb-server` package is not this book.
-4. **CLI.** Flags on the existing `mill install cloud`. No new verb.
+4. **CLI.** Flags on the existing `mill install cloud`. No new command.
 5. **Teachings.** One cold-agent playbook per provider under [cloud/](cloud/). This page is the phase spine. The printed runbook points at the playbook for the provider it printed.
 
 ## Workstation journey
@@ -141,7 +141,7 @@ One invite join line. The workstation runs that join and connects as a desk.
 
 ## TLS
 
-Honor existing requirements. Do not add a verb.
+Honor existing requirements. Do not add a command.
 
 - [install requirements S3](../requirements/install.md): mill CA or real TLS; join fail-closed if the CA is missing
 - [JOIN.md](../JOIN.md): mill install trusts the office CA on this host. Other devices may warn until they trust `ca.crt`. Do not import `wall.crt`. Real TLS on the public DNS name stays a later JOIN/install line.
@@ -158,7 +158,7 @@ New or changed routines are applied on the VM from `agent_coord/server/sql/apply
 
 ## Book
 
-Default: MySQL 8 on the VM, InnoDB, `bind-address` `127.0.0.1`, same as a local host. A later port to another engine is a separate schema that has been shown to load. Managed DB (RDS, Cloud SQL, Azure Database, and the rest) is a later operator choice. Do not invent a migrate verb.
+Default: MySQL 8 on the VM, InnoDB, `bind-address` `127.0.0.1`, same as a local host. A later port to another engine is a separate schema that has been shown to load. Managed DB (RDS, Cloud SQL, Azure Database, and the rest) is a later operator choice. Do not invent a migrate command.
 
 ## Security (cloud adds)
 
@@ -169,8 +169,8 @@ Default: MySQL 8 on the VM, InnoDB, `bind-address` `127.0.0.1`, same as a local 
 - Moving an existing office book onto the VM (fresh `mill init` until a documented migrate exists)
 - Docker as an installer
 - Cloud API code inside mill
-- A managed-DB or migrate verb
-- A new mill verb
+- A managed-DB or migrate command
+- A new mill command
 - VPN
 - Real TLS on a DNS name (later add-on)
 - Marking #502 measured for a provider before the end-to-end measure and the cold-agent test

@@ -12,7 +12,7 @@ clear pass or fail. Lines of code do not count for or against a slice.
 Five recurring office steps are driven by an agent from memory today. Each
 release the shipping agent writes the same three throwaway scripts again (a
 host install script, a live smoke script and a GO poll script) and wraps
-every desk verb in a hand-written `mill connect` background dance. What goes
+every desk command in a hand-written `mill connect` background dance. What goes
 wrong:
 
 1. **Release, install, SQL apply.** `mill update` (`run_update` in
@@ -39,7 +39,7 @@ wrong:
 5. **PATH and env for routines.** A scheduled routine runs in a bare
    shell. It must find the right `mill`, drop a stray `PYTHONPATH` or
    `AGENT_COORD_MILL_HOME`, start `mill connect` in the background, wait
-   for the sync frame, run one verb and kill the connect. Every routine
+   for the sync frame, run one command and kill the connect. Every routine
    prompt carries that recipe, and a wrong PATH runs an old pack.
 
 Agents should keep only the judgment calls: whether a NOGO is right,
@@ -48,9 +48,9 @@ office owner.
 
 ## Candidate approaches
 
-### A. Product verbs and flags in the pack
+### A. Product commands and flags in the pack
 
-Put each step in the pip pack, mostly as flags on verbs that exist:
+Put each step in the pip pack, mostly as flags on commands that exist:
 
 - `mill update --to VERSION` pins, backs up, verifies and rolls back.
 - `mill install sql --apply` runs the throwaway A/B itself and refuses
@@ -61,17 +61,17 @@ Put each step in the pip pack, mostly as flags on verbs that exist:
 - `mill go SHA` sends a structured GO; `mill go --wait SHA --from D1,D2`
   is the gate.
 - `mill connect DESK --then VERB ...` connects, waits for sync, runs one
-  verb, prints its result and exits with its code.
+  command, prints its result and exits with its code.
 
 Tradeoffs:
 
 - Pro: a cold agent finds every step through `mill help VERB`, on any
   office (Linux or Windows), with no repo checkout. The code ships with
   the pack it updates, so it cannot drift from the SQL and the wall.
-  CI tests it like any verb.
+  CI tests it like any command.
 - Pro: it removes the most agent steps. A host update becomes one
   command with one exit code, and a routine becomes one line.
-- Con: more product surface. `mill go` is a new verb against the
+- Con: more product surface. `mill go` is a new command against the
   lexicon's "tiny" rule; the rest are flags.
 - Con: it is the largest change, so it needs to land in slices.
 
@@ -107,14 +107,14 @@ GO becomes a GitHub environment approval at the tag.
 
 **Approach A, in six slices, with B's CI upgrade-path job folded in.** It
 is the only option where a cold agent gets every step from `mill help`
-and one exit code, and it keeps credentials off GitHub. Keep the verb count
-down: everything is a flag on an existing verb except `mill go`.
+and one exit code, and it keeps credentials off GitHub. Keep the command count
+down: everything is a flag on an existing command except `mill go`.
 
 Slices, ordered by agent steps saved per week:
 
 | # | Slice | Card item | Steps today -> after |
 |---|---|---|---|
-| S1 | `mill connect DESK --then VERB ...` plus routine env | 5 | 5 shell lines per verb -> 1 |
+| S1 | `mill connect DESK --then VERB ...` plus routine env | 5 | 5 shell lines per command -> 1 |
 | S2 | `mill update --to V` verify and rollback; `install sql --apply` backup and A/B | 1, 3 | hand script per host per release -> 1 command |
 | S3 | `score-tick` exit codes, heartbeat score, stale alert | 2 | none (silent) -> alert on first missed run |
 | S4 | `mill go SHA` and `mill go --wait SHA --from ...` | 4 | room polling by eye -> exit 0/2 |
@@ -191,11 +191,11 @@ Slices, ordered by agent steps saved per week:
 - The tag push in BUILD.md then reads: `mill go --wait SHA --from ... &&
   git tag -a ...`.
 - No SQL change: it reads the room through the existing mail read path.
-- Touches: `agent_coord/__main__.py` (new verb), a small
+- Touches: `agent_coord/__main__.py` (new command), a small
   `agent_coord/client/go_gate.py`, `docs/dev/BUILD.md` (CI ship path
-  step 2 and 3), `docs/protocol/cli-desk.md`, the verb lexicon doc.
+  step 2 and 3), `docs/protocol/cli-desk.md`, the command lexicon doc.
 
-### S5 - live smoke as a verb
+### S5 - live smoke as a command
 
 - `mill install check --smoke` on the wall host (loopback Admin): create a
   throwaway roster, card and letter, claim, pass, reply, label, read
@@ -242,7 +242,7 @@ Run each by a cold agent: a fresh seat with no prompt recipe, only
 6. S6: a pack that breaks the upgrade from the last release fails the
    `upgrade_sql` check on its PR.
 7. Over one release: the shipping agent writes no host, smoke or poll
-   script, and the release letter names only verb exit codes.
+   script, and the release letter names only command exit codes.
 
 ## Regression rows
 
@@ -251,7 +251,7 @@ This design PR is docs only and adds no row. Each slice adds one F-row in
 
 | # | Proposed row | What it locks in |
 |---|---|---|
-| S1 | F-connect-then | `connect --then` runs one verb after sync, exits with its code, leaves no connect behind, and refuses a foreign `mill` on PATH. |
+| S1 | F-connect-then | `connect --then` runs one command after sync, exits with its code, leaves no connect behind, and refuses a foreign `mill` on PATH. |
 | S2 | F-update-verify-rollback | `update --to` ends verified (health 200, version header) or rolled back with a nonzero exit; `install sql --apply` refuses without a backup or with a failed A/B. |
 | S3 | F-job-heartbeat | A failed tick exits nonzero, records heartbeat 0 and alerts the Admin roster once per outage. |
 | S4 | F-go-gate | `go --wait` passes only on GO from every named desk at the full sha; any NOGO fails it. |
@@ -266,8 +266,8 @@ This design PR is docs only and adds no row. Each slice adds one F-row in
   its own, or must stop and wake a human instead.
 - **GO roles:** which desks `mill go --wait` names by default, and whether
   the office owner's override is a `mill go` from the owner's own seat.
-- **New verb:** `mill go` is the one new verb. The alternative is a flag
-  on `send` (`mill send --go SHA`), which keeps the verb count but reads
+- **New command:** `mill go` is the one new command. The alternative is a flag
+  on `send` (`mill send --go SHA`), which keeps the command count but reads
   worse.
 - **Approach C stays closed:** no host credentials in GitHub unless the
   office owner decides otherwise.
