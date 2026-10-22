@@ -9451,7 +9451,7 @@
           paintFloorView(glance);
         }
       } catch (e) {}
-      if (clock) clock.textContent = new Date().toISOString().slice(11, 19);
+      if (clock) clock.textContent = wallClockLine(d);
       enhanceTables(document);
       markOverflow();
     }
@@ -9512,10 +9512,14 @@
       host.dataset.sig = html;
       host.innerHTML = html;
     }
+    /* Last rail read (ms). Rail counts change slowly; a read this fresh is reused. */
+    let _railBookAt = 0;
+    const WALL_RAIL_FRESH_MS = 5000;
     async function loadRailBook() {
       const root = document.getElementById("rail-book");
       if (!root || root.dataset.busy === "1") return;
       root.dataset.busy = "1";
+      _railBookAt = Date.now();
       /* wow139: spinner until each POV part lands; fetch desks/projects/roles in parallel. */
       try {
         ["rail-desks", "rail-roster"].forEach(function (id) {
@@ -9737,7 +9741,8 @@
         if (!wallTickGenAlive(tickGen) && !_wallReuseInflight) return;
         if (railPick) return;
       }
-      loadRailBook();
+      /* The restore tick and the tick its rail pick starts land together: one rail read, not two. */
+      if (Date.now() - _railBookAt > WALL_RAIL_FRESH_MS) loadRailBook();
       const clock = document.getElementById("clock");
       const scope = floorScope();
       const projectKey = scope.key;
@@ -9892,7 +9897,8 @@
         const pickKey = railPick ? (railPick.kind + ":" + railPick.id) : "";
         if (h === _floorHash && pickKey === _railPickApplied && pickKey === _hereDomPick) {
           const cl = document.getElementById("clock");
-          if (cl) cl.textContent = new Date().toISOString().slice(11, 19);
+          /* Same version, node and local zone as every other paint (no bare UTC). */
+          if (cl) cl.textContent = wallClockLine(raw);
           /* wow148: fp same / hash same - keep last result; drop checking overlay. */
           try { wallRestoreActivePaneFromFloor(); } catch (eRest0) {}
           try { wallPreserveThemeChrome(); } catch (eTh0) {}

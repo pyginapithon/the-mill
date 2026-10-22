@@ -751,7 +751,7 @@ def _build_parser() -> MillArgumentParser:
     kp.add_argument("name", nargs="?", default="", metavar="NAME")
     kp.add_argument("value", nargs="?", default="", metavar="VALUE")
     kp.add_argument("--target", default="", help="the number to reach (gap and met are read against it); alone, sets it without a point")
-    kp.add_argument("--note", default="", help="what this try changed (one line, kept with the point)")
+    kp.add_argument("--note", default="", help="what this try changed (one line, at most 200 characters, kept with the point)")
     kp.add_argument("--better", default="", choices=("", "up", "down"), help="up (default) or down, e.g. tokens")
     kp.add_argument("--unit", default="", help="unit shown with the points, e.g. ms, bytes, tokens")
     kp.add_argument("--limit", type=int, default=0, help="points to show on a read (default 10)")
