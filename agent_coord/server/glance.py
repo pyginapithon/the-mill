@@ -110,7 +110,6 @@ _UNSTORED = (
     "op=score.history count",
     "session hint files",
     "mill-wall-svc-out.log",
-    "mcp-mill.debug.log",
 )
 _STATION_TODOS = (
     "Station cards still fail when the book is asked with a lan cut. "

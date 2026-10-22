@@ -4,7 +4,7 @@
 
 Do not add mill inbox or a poll to the YAML `Use when`. Body already says desk unread -> `inbox`; room catch-up -> `mail-thread`. A dropped socket reconnects; `sync` is the catch-up.
 
-Every vendor: mill join + **mill connect** (leave it **up**) + mill-wall up. Modes: [connect.md](connect.md). **mill join / mill connect on a Wall-reachable host**; AI chat may be elsewhere (skill is a prompt there; no MAIL/HINT poke from an unreachable box). mill connect is the other process on `/ws`. Do not say sit. Do not `mill_wait` as idle - that blocks this chat so human lines queue until a force-send.
+Every vendor: mill join + **mill connect** (leave it **up**) + mill-wall up. Modes: [connect.md](connect.md). **mill join / mill connect on a Wall-reachable host**; AI chat may be elsewhere (skill is a prompt there; no MAIL/HINT poke from an unreachable box). mill connect is the other process on `/ws`. Do not say sit.
 
 ```mermaid
 flowchart LR
@@ -46,7 +46,7 @@ Windows: `%USERPROFILE%`. Unix: `~`. PowerShell: prefer `--doing=text-without-sp
 1. Copy `docs/protocol/skill.md` -> `~/.grok/skills/mill-desk/SKILL.md` (this office already has it). Foreground delta: [grok-foreground.md](grok-foreground.md).
 2. Restart Grok Build. `/mill-desk` or say mill MAIL / mill connect.
 3. Leave mill connect running: `mill connect <desk> --vendor grok-build --session <Grok-UUID>` (or set `AGENT_COORD_VENDOR=grok-build`). Git checkout: `$env:PYTHONPATH="<the-mill>"; python -m agent_coord connect <project> <desk> --office <alias> --vendor grok-build`
-4. HINT poke (not mill_wait): `mill connect <desk> --vendor grok-build --session <Grok-session-UUID>` then mill runs `grok -p "HINT..." -r UUID`. That wakes **that Grok session**, not a subagent. One mill desk -> one session. Many mill desks in one TUI window share one session unless each mill connect has its own `--session`. Override: `AGENT_COORD_BOT_WAKE_URL` / `WAKE_CMD`. No UUID -> stamp `wake.jsonl` only (`~/.mill/<host>/<desk>/wake.jsonl` with `--office`, else `~/.mill/session/<desk>.wake.jsonl`). Grok 1.0.46 (2765805b9442) foreground mail, prompts, and the per-desk reminder: [grok-foreground.md](grok-foreground.md).
+4. HINT poke: `mill connect <desk> --vendor grok-build --session <Grok-session-UUID>` then mill runs `grok -p "HINT..." -r UUID`. That wakes **that Grok session**, not a subagent. One mill desk -> one session. Many mill desks in one TUI window share one session unless each mill connect has its own `--session`. Override: `AGENT_COORD_BOT_WAKE_URL` / `WAKE_CMD`. No UUID -> stamp `wake.jsonl` only (`~/.mill/<host>/<desk>/wake.jsonl` with `--office`, else `~/.mill/session/<desk>.wake.jsonl`). Grok 1.0.46 (2765805b9442) foreground mail, prompts, and the per-desk reminder: [grok-foreground.md](grok-foreground.md).
 
 ## xAI - Grok Bot
 

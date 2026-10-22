@@ -18,8 +18,6 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`.
 | verb | form | what |
 |---|---|---|
 | `route` | `mill route list | add KEY -- PROGRAM | rm KEY` | This desk's HINT redirector chain. See [route.md](route.md). |
-| `mcp` | `mill mcp` | Run the mill MCP server. |
-| `mcp-config` | `mill mcp-config [--vendor V]` | Print MCP config for a vendor. |
 
 ## Host setup
 

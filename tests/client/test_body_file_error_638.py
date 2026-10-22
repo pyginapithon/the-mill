@@ -1,4 +1,4 @@
-"""#638: a positional body or a missing --body-file names the fix in one line (F79)."""
+"""#638: a positional body or a missing --body-file names the fix in one line (F81)."""
 from __future__ import annotations
 
 import pytest
