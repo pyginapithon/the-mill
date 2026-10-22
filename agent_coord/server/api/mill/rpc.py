@@ -1949,16 +1949,26 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     elif step == "done":
         if st != "shipped":
             raise CoordError(f"pass --done: {need} is {st}, not shipped; nothing changed")
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass shipped->done is the asker")
+        # #655: an asker that does not resolve is not a pass for everyone;
+        # only the volunteer may still finish the card.
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass shipped->done is the asker"
+                if ask
+                else "who-may: pass shipped->done is the asker; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "done"
     else:
         if st not in ("shipped", "done"):
             raise CoordError(
                 f"pass --back: {need} is {st}; only shipped or done steps back (unclaim releases a claim)"
             )
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass --back is the asker or the volunteer")
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass --back is the asker or the volunteer"
+                if ask
+                else "who-may: pass --back is the asker or the volunteer; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "shipped" if st == "done" else ("claimed" if vol else "open")
     rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=nxt)
     rec = {"ok": True, "need": need, "status": nxt, "was": st, "id": int(hit["id"])}
