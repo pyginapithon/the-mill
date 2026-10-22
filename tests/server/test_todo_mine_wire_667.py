@@ -59,3 +59,9 @@ def test_cli_body_asks_the_wall_for_mine() -> None:
     with patch("agent_coord.client.tokens.resolve_desk_owner", return_value="me"):
         body = body_from_args(args)
     assert body.get("mine") is True
+
+
+def test_empty_mine_read_is_under_2_kb() -> None:
+    out = _many({"mine": True}, owner="nobody")
+    assert out["cards"] == []
+    assert len(json.dumps({"ok": True, "result": out})) < 2048
