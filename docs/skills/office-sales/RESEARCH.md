@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-sales/` exists |
 | Stub | Thin `SKILL.md` present (Product + Lingo + Must-not + Done; **no Inputs / Handoffs / Scope**) |
 | FUNCTION-LINGO.md | Present - S **Sales / pipeline (common CRM)** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked (alpha hard-cut #60) |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked (alpha hard-cut #60) |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-support, office-marketing stubs; office-qa / office-research RESEARCH.md shape read |
 
@@ -25,7 +25,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -71,7 +71,7 @@ Not inputs: "grow pipeline," replace CRM amounts, fan-out assign to `*` + role +
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). `unpark` exists but is not day-one teach unless human says it.
 
@@ -79,12 +79,12 @@ Sources for rows: **FUNCTION-LINGO.md S Sales / pipeline** (required), mill-desk
 
 Shared spine (one table for the function):
 
-| Their word | Source (FL cite) | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source (FL cite) | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | lead | FL Sales product words | create todo, open | **`create todo`** (link CRM lead id in detail) | reject `open`; CRM remains SoR |
-| MQL / SQL | FL Sales product words | note, create todo | **`note`** stage on opp todo (or new todo if office splits) | not mill verbs; qualification != invent `qualify` |
+| MQL / SQL | FL Sales product words | note, create todo | **`note`** stage on opp todo (or new todo if office splits) | not mill commands; qualification != invent `qualify` |
 | opportunity | FL mill sketch "todo (or plan row for big deals)" | create todo | **`create todo`** | plan row = later/not day-one teach; stub "lead / opportunity -> create todo" |
-| pipeline | FL Sales product words | todo list, wall | **`todo`** glance / Wall - not a write product | reject inventing `pipeline` verb |
+| pipeline | FL Sales product words | todo list, wall | **`todo`** glance / Wall - not a write product | reject inventing `pipeline` command |
 | proposal | FL Sales product words | note, send, hold | **`note`** path + optional `send` legal/finance | hold rare (README: don't teach hold in sales unless needed) |
 | account | FL Sales product words | detail link | **detail / `note`** CRM account id | SoR = CRM; don't clone account DB |
 | renewal | FL Sales product words | create todo, send CS | **`create todo`** renew opp **or** `send` CS | same spine; not 2nd product day-one |
@@ -117,7 +117,7 @@ Shared spine (one table for the function):
 | **office-engineering / office-qa** | Security review, POC build, or Claims remasure for deal - `send` (+ eng/qa todo if work) |
 | **Asker / AE / SDR peer** | Missing stage outcome, CRM id, or next-step criteria - `send` / `waiting_on` |
 
-Pattern borrow: support "escalate = mill send"; README "Escalate always = mill send to a more specialized desk"; marketing <-> sales handoff is mail, not new verb. CRM stage/amount updates happen **in CRM**, then `note` the fact on the mill card.
+Pattern borrow: support "escalate = mill send"; README "Escalate always = mill send to a more specialized desk"; marketing <-> sales handoff is mail, not new command. CRM stage/amount updates happen **in CRM**, then `note` the fact on the mill card.
 
 ---
 
@@ -126,7 +126,7 @@ Pattern borrow: support "escalate = mill send"; README "Escalate always = mill s
 - Bypass mill-desk HINT routing.
 - **Replace CRM** as system of record for amounts, accounts, stage history, forecasts-of-record (stub; FUNCTION-LINGO how-to-talk #4; README domain SoR).
 - Fan-out the same assign to `*` + role + desk (stub).
-- Invent mill verbs for CRM slang (`qualify`, `forecast`, `close`, `pipeline`, `stage` as CLI).
+- Invent mill commands for CRM slang (`qualify`, `forecast`, `close`, `pipeline`, `stage` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk day-one hard-cut).
 - Confuse `drop` (hold release) with `unclaim`.
 - Teach `hold` day-one for sales unless the office leases a shared proposal/doc resource (README: hold rare - eng/legal).
@@ -167,11 +167,11 @@ Pattern borrow: support "escalate = mill send"; README "Escalate always = mill s
 | `docs/skills/README.md` | Catalog **Close-won / handoff**; spine create todo->claim->note->send->pass; hold rare sales/support; score row cluster sales forecast; escalate = send |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S **Sales / pipeline (common CRM)** | **Required** product words (lead, MQL/SQL, opportunity, pipeline, proposal, close-won/lost, account, renewal); collab (handoff SDR->AE->CS, next step, blocked legal/pricing, forecast); mill sketch rows |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-sales/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-support/SKILL.md` | Sibling: escalate = send; SoR outside mill; waiting_on pattern |
 | `docs/skills/office-marketing/SKILL.md` | Sibling: launch/publish; KPI score row; handoff-to-sales spirit |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; pass = ship/close; no open/yield/teaching done |
 
 ### Public industry practice (thin)
 
@@ -179,7 +179,7 @@ Pattern borrow: support "escalate = mill send"; README "Escalate always = mill s
 |---|---|
 | Common CRM practice (Salesforce/HubSpot-style) - lead -> MQL/SQL -> opportunity -> close | Stages are **CRM SoR**; mill card tracks collab ownership + next step + handoff mail (aligns FL) |
 | Close-won / close-lost | Terminal opportunity outcomes -> mill `pass` + note; win triggers CS onboarding handoff (FL sketch) |
-| SDR / AE / CS handoff | Role chain = mill `send` + `assign`, not a new verb |
+| SDR / AE / CS handoff | Role chain = mill `send` + `assign`, not a new command |
 | Sales forecast | Pipeline coverage / commit vs target -> mill `score` / score rows (README cluster), CRM keeps detailed forecast SoR |
 
 ### Guesses (flagged)
@@ -214,7 +214,7 @@ Pattern borrow: support "escalate = mill send"; README "Escalate always = mill s
 | hold | Absent (good) | Keep absent day-one unless office leases docs |
 | score / forecast | Present as score row | Keep as `score`; not a product |
 | close-won path | pass + mail CS onboarding todo | Keep; clarify `send` vs required onboarding todo (open Q) |
-| Must-not | CRM + fan-out assign | Add: HINT bypass; no invent verbs; drop!=unclaim; no fake pass; no teach done/open/yield |
+| Must-not | CRM + fan-out assign | Add: HINT bypass; no invent commands; drop!=unclaim; no fake pass; no teach done/open/yield |
 | Done | Stage advanced or closed; next owner mailed | Spell close-won / close-lost / handoff / waiting_on / parked |
 | metadata short-description | "Sales: opportunities via mill" | Prefer "Sales: Close-won / handoff via mill" |
 
@@ -222,7 +222,7 @@ Pattern borrow: support "escalate = mill send"; README "Escalate always = mill s
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-sales/SKILL.md`. Pull mill-desk first. Do not invent verbs. CRM stays SoR.
+Paste/adapt into `docs/skills/office-sales/SKILL.md`. Pull mill-desk first. Do not invent commands. CRM stays SoR.
 
 ```markdown
 ---
@@ -293,7 +293,7 @@ Never teach `open` / `yield` / bare `create` / `done`.
 - Bypass mill-desk HINT routing.
 - Replace CRM as SoR for amounts/accounts/stage/forecast-of-record.
 - Fan-out the same assign to `*` + role + desk.
-- Invent mill verbs for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
+- Invent mill commands for CRM slang (`qualify`, `pipeline`, `close`, `stage` as CLI).
 - Fake `pass` while blocked - use waiting_on + mail.
 - Confuse `drop` (hold) with `unclaim`.
 

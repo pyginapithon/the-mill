@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-people/` exists |
 | Stub | Thin `SKILL.md` present (Product = Filled req or completed onboarding checklist; Lingo + Must-not + Done; **no Inputs / Handoffs / Scope**) |
 | FUNCTION-LINGO.md | Present - S **People / recruiting** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked; reject `open` / `yield` / bare `create` / teaching `done` |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked; reject `open` / `yield` / bare `create` / teaching `done` |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-sales (close-won -> CS onboarding mail/todo); office-ops / office-support RESEARCH shape; README human_required cluster: people (offer) |
 
@@ -26,7 +26,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -100,7 +100,7 @@ Not inputs: "make them productive," dump medical/payroll PII into mill, close pa
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). Tree `attach` when said - not day-one teaching.  
 **Do not confuse** interview "score row" with mill `score` (KPI last vs target).
@@ -109,21 +109,21 @@ Sources for rows: **FUNCTION-LINGO.md S People / recruiting** (required - every 
 
 Shared spine (one table for the function):
 
-| Their word | Source | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
 | req / requisition | FL sketch "plan or parent todo"; stub | create todo, detail | **`create todo`** parent + `detail` (ATS/req link) | reject bare `create`; plan row = parent todo day-one (no invent `plan` CLI) |
-| candidate | FL product | detail, note | **`detail` / `note`** pointer (ATS id); minimize PII | not a mill verb; ATS SoR |
+| candidate | FL product | detail, note | **`detail` / `note`** pointer (ATS id); minimize PII | not a mill command; ATS SoR |
 | interview loop | FL sketch "child todos per interviewer"; stub | create todo, assign, claim | child **`create todo`** per interviewer + **`assign`/`claim`** | reject inventing `loop` CLI |
 | panel | FL collab; stub panel/debrief | send, note, assign | **`send`/`note`** + panelist **`assign`** | - |
 | debrief | FL sketch "mail thread / note"; stub | send, note | **`send`** + **`note`** on card | note != mail |
 | interview notes | FL product word | note, send | **`note`** ratings/summary (+ `send` HM) | **!=** mill `score`; no invent `score row` CLI |
-| hiring manager | FL collab | assign, send, claim | **`assign`/`send`** HM desk; HM may **`claim`** | role on owner, not new verb |
+| hiring manager | FL collab | assign, send, claim | **`assign`/`send`** HM desk; HM may **`claim`** | role on owner, not new command |
 | recruiter | FL collab | claim, assign, send | **`claim`/`assign`** recruiter; **`send`** for wakes | - |
 | advance | FL collab reject/advance; stub | note, assign | **`note`** decision + **`assign`** next step | - |
 | reject (candidate) | FL collab; stub | note, pass, send | **`note`** reason; close loop children; parent may stay open or park | reject teaching `done` |
 | offer | FL sketch "human_required gate"; stub; README | human_required, send, note, pass | **human_required** + **`send`** approver + **`note`** outcome; then parent path to **`pass`** | never invent `offer` CLI; letter/e-sign = ATS/HRIS |
 | onboarding | FL sketch "checklist todos; claim per owner"; stub | create todo, claim, assign | checklist **`create todo`**s + **`claim`/`assign`** per owner | - |
-| done onboarding / checklist complete | stub "all children passed" | pass | children + parent **`pass`** | reject teaching `done` / status speech as verb |
+| done onboarding / checklist complete | stub "all children passed" | pass | children + parent **`pass`** | reject teaching `done` / status speech as command |
 | filled req / hired | README product; stub Done | pass, note, send | **`note`** outcome + **`pass`** parent; **`send`** onboarding kickoff | reject teaching `done` |
 | drop the claim | mill-desk | unclaim | **`unclaim`** | never confuse with `drop` (hold) |
 | exclusive offer-doc edit | TEMPLATE hold; legal-ish rare | hold, drop | **`hold`/`drop`** if the office leases a res for the packet | rare; README hold clusters eng/legal - people only if leased |
@@ -133,7 +133,7 @@ Shared spine (one table for the function):
 | progress diary | mill-desk note | note | **`note`** | note != mail |
 | find people mail | mill-desk mail | inbox | **`inbox`** | - |
 | park / defer req or leftover | mill-desk | create todo parked | **`create todo` `{status:"parked"}`** | reject `open` / bare `create` |
-| escalate (to legal/finance/IT) | README escalate = send | send | **`send`** specialized desk (+ optional their `create todo`) | never invent `escalate` verb |
+| escalate (to legal/finance/IT) | README escalate = send | send | **`send`** specialized desk (+ optional their `create todo`) | never invent `escalate` command |
 | close-won -> CS onboarding (inbound) | sales FL/stub sibling | send, create todo | people may **`inbox`** / receive sales **`send`**; customer onboarding != employee Onboarded - route per office | don't smash CS onboarding into people product without policy |
 
 **Stub lingo gaps this harvest fills:** Inputs, Handoffs, Scope, FL candidate/panel/HM/recruiter/interview notes!=score, waiting_on, assign/unclaim, hold/drop nuance, park, human_required emphasis, ATS SoR outside, reject open/yield/bare create/teaching done, split Hired vs Onboarded Done paths.
@@ -163,7 +163,7 @@ Pattern: README "Escalate always = mill send"; human_required clusters people (o
 - Replace domain SoR: **ATS / HRIS** (Greenhouse, Lever, Workday, etc.), e-sign, background-check vendor - **link** in note/mail; don't clone stages, full resumes, or payroll.
 - Store sensitive candidate PII in mill beyond what policy allows (stub).
 - Skip **human_required** on offer if office requires it (stub + README).
-- Invent mill verbs for recruiting slang (`offer`, `advance`, `reject`, `debrief`, `req`, `loop` as CLI).
+- Invent mill commands for recruiting slang (`offer`, `advance`, `reject`, `debrief`, `req`, `loop` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk alpha hard-cut).
 - Confuse `drop` (hold release) with `unclaim`.
 - Confuse interview **score row** with mill **`score`** (KPI).
@@ -194,7 +194,7 @@ Pattern: README "Escalate always = mill send"; human_required clusters people (o
 ## Scope note
 
 - **In:** Req parent card; interview loop children; debrief/advance/reject notes+mail; offer human_required gate + outcome; onboarding checklist todos with per-owner claim; waiting_on for approver/candidate/IT/legal; optional hiring KPI `score` if office sets it.
-- **Out:** ATS/HRIS as SoR, offer letter authorship/e-sign, background checks, payroll/benefits admin, customer CS onboarding from sales close-won (unless office routes it), inventing recruiting CLI verbs.
+- **Out:** ATS/HRIS as SoR, offer letter authorship/e-sign, background checks, payroll/benefits admin, customer CS onboarding from sales close-won (unless office routes it), inventing recruiting CLI commands.
 - **Day-one:** **two** products (Hired; Onboarded); shared one lingo table; req/loop/debrief = structure/collab under Hired, not extra products.
 - Adapter stays thin - pull mill-desk first; one card, then STOP.
 
@@ -209,11 +209,11 @@ Pattern: README "Escalate always = mill send"; human_required clusters people (o
 | `docs/skills/README.md` | Catalog row Hired / onboarded; human_required people (offer); escalate = send; waiting_on; hold rare outside eng/legal |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S People / recruiting | **Required** product/collab words + mill sketch (req, interview loop, debrief, offer, onboarding) - every sketch row mapped |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-people/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-sales/SKILL.md` + sales RESEARCH | Close-won -> CS onboarding mail/todo adjacency; dual-product RESEARCH shape |
 | `docs/skills/office-ops/RESEARCH.md` (backup mill-docs) | RESEARCH + TEMPLATE brief section pattern |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
 
 ### Public industry practice (thin)
 
@@ -254,18 +254,18 @@ Pattern: README "Escalate always = mill send"; human_required clusters people (o
 | Handoffs section | Absent | Add HM, recruiter, legal, finance, IT/ops, eng interviewers; sales CS adjacency note |
 | Scope note | Absent | In/out; two products; ATS outside; day-one thin adapter |
 | Product noun | "Filled req or completed onboarding checklist" | Align README **Hired / onboarded**; keep two subsections or dual Done |
-| Lingo -> mill table | Partial FL; missing candidate, HM, recruiter, score row!=score, waiting_on, unclaim, hold, park, inbox, escalate | Full FUNCTION-LINGO People harvest + day-one verbs only |
+| Lingo -> mill table | Partial FL; missing candidate, HM, recruiter, score row!=score, waiting_on, unclaim, hold, park, inbox, escalate | Full FUNCTION-LINGO People harvest + day-one commands only |
 | waiting_on / assign / unclaim / hold / park / inbox / score | Missing or implicit | Add; drop!=unclaim; interview notes != mill score |
 | human_required | Offer row only | Emphasize in Must-not + Done; wire `send` approver |
 | ATS SoR | Implied ("not an ATS") | Explicit Must-not: don't clone ATS/HRIS/e-sign |
 | Done | Offer outcome; onboarding owners claimed; req closed | Split Hired vs Onboarded; waiting_on/parked paths; reject teaching `done` |
-| Must-not | PII; skip human_required | Add: HINT bypass; invent verbs; open/yield/bare create/teaching done; drop!=unclaim; score row!=score; no legal/finance own |
+| Must-not | PII; skip human_required | Add: HINT bypass; invent commands; open/yield/bare create/teaching done; drop!=unclaim; score row!=score; no legal/finance own |
 
 ---
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-people/SKILL.md`. Pull mill-desk first. Do not invent verbs.
+Paste/adapt into `docs/skills/office-people/SKILL.md`. Pull mill-desk first. Do not invent commands.
 
 ```markdown
 ---
@@ -307,7 +307,7 @@ On the desk **before** advance/offer/onboard (else `note` gap + `send` / `waitin
 - **Checklist + owners** - child `create todo` per item; `assign` / `claim` per owner
 
 Not inputs: paste full resumes/SSN into mill, skip human_required when required,
-replace ATS/HRIS, invent recruiting CLI verbs.
+replace ATS/HRIS, invent recruiting CLI commands.
 
 ## Lingo -> mill
 | Their word | Mill |
@@ -347,7 +347,7 @@ replace ATS/HRIS, invent recruiting CLI verbs.
 - Bypass mill-desk HINT routing.
 - Replace ATS/HRIS/e-sign/background-check SoR - link paths; minimize PII.
 - Skip human_required on offer if office requires it.
-- Invent mill verbs for recruiting slang (`offer`, `advance`, `loop`, `debrief` as CLI).
+- Invent mill commands for recruiting slang (`offer`, `advance`, `loop`, `debrief` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`; confuse interview notes with mill `score`.
 - Own legal clearance or finance approval.

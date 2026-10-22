@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from agent_coord.server.allow import allowed, client_ip, door_client
+from agent_coord.server.allow import allowed, door_client
 
 # 192.0.2.0/24 (documentation) counts as private in ipaddress, like a LAN peer.
 PRIVATE_PEER = "192.0.2.40"
@@ -67,11 +67,6 @@ def test_bad_forwarded_entry_is_denied() -> None:
     ip, via = door_client("127.0.0.1", "not-an-ip")
     assert via
     assert not allowed(ip, RULES, empty_open=False, forwarded=via)
-
-
-def test_client_ip_unchanged_for_path_and_directory() -> None:
-    assert client_ip("127.0.0.1", "203.0.113.9, 127.0.0.1") == "203.0.113.9"
-    assert client_ip(PRIVATE_PEER, "203.0.113.9") == "203.0.113.9"
 
 
 def _app(monkeypatch, door: str):

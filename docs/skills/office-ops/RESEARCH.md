@@ -13,7 +13,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 | Folder | `docs/skills/office-ops/` exists |
 | Stub | Thin `SKILL.md` present (Product = Stable runtime; When + Verbs; no Inputs / Scope / full Lingo->mill; When!=TEMPLATE Inputs) |
 | FUNCTION-LINGO.md | Present - S **Ops / SRE** (product + collab + mill sketch) |
-| mill-desk | `docs/protocol/skill.md` - day-one verbs locked; reject `open` / `yield` / bare `create` / teaching `done` |
+| mill-desk | `docs/protocol/skill.md` - day-one commands locked; reject `open` / `yield` / bare `create` / teaching `done` |
 | Standing SoR | `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` - research book -> TEMPLATE brief -> gardener; no SKILL patch |
 | Sibling handoff / RESEARCH shape | office-qa (`RESEARCH.md` + SKILL), office-support, office-engineering read |
 
@@ -24,7 +24,7 @@ Voice: ops steward, dry, cite-first. Gap-fill for stub `SKILL.md`. Do **not** pa
 
 ## Products considered -> kept / dropped
 
-A function may have >1 product. Day-one prefer 1-2. Shared mill verb spine stays **one** table. Do not smash into one vague Product.
+A function may have >1 product. Day-one prefer 1-2. Shared mill command spine stays **one** table. Do not smash into one vague Product.
 
 | Candidate | Verdict | Why |
 |---|---|---|
@@ -72,7 +72,7 @@ Not inputs: vague "keep the lights on," silent prod change with no card when off
 
 ## Lingo harvest -> mill map
 
-Day-one verbs **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
+Day-one commands **only:** `create todo`, `claim`, `assign`, `unclaim`, `note`, `send`, `inbox`, `hold`, `drop`, `pass`, `score`, `waiting_on`.  
 **Reject:** `open`, `yield`, bare `create`, teaching `done`.  
 `park` speech -> `create todo` with `status:"parked"` (mill-desk). Wake exists on mill-desk for socket catch-up - cite as inbound, not invent ops CLI.
 
@@ -80,23 +80,23 @@ Sources for rows: **FUNCTION-LINGO.md S Ops / SRE** (required), mill-desk day-on
 
 Shared spine (one table for the function):
 
-| Their word | Source | Candidate verbs | Chosen day-one | Reject / notes |
+| Their word | Source | Candidate commands | Chosen day-one | Reject / notes |
 |---|---|---|---|---|
-| on-call / HERE | FL Ops collab + sketch "presence"; stub Who's HERE | presence / agents | **presence / HERE** (glance; not a card verb) | not invent `oncall` CLI |
-| page / alert | FL sketch "wake / mail"; stub Page | wake, send, inbox | **`send` / wake** + **`inbox`** | wake = catch-up/inbound; page != new mill verb |
+| on-call / HERE | FL Ops collab + sketch "presence"; stub Who's HERE | presence / agents | **presence / HERE** (glance; not a card command) | not invent `oncall` CLI |
+| page / alert | FL sketch "wake / mail"; stub Page | wake, send, inbox | **`send` / wake** + **`inbox`** | wake = catch-up/inbound; page != new mill command |
 | incident | FL sketch "todo claim"; stub Track | create todo, claim | **`create todo`** then **`claim`** / **`assign`** | reject bare `create` / `open` |
-| SEV / severity | FL sketch "detail + priority in doing" | detail, note | **todo `detail` / `doing`** (`note` to amend) | no `sev` verb |
+| SEV / severity | FL sketch "detail + priority in doing" | detail, note | **todo `detail` / `doing`** (`note` to amend) | no `sev` command |
 | triage | FL collab | claim, note, assign | **`claim`/`assign`** + **`note`** priority/impact | - |
 | mitigate | FL sketch "note + done when impact stopped"; stub Close | note, pass | **`note`** mitigation; **`pass`** when impact stopped | reject teaching `done` |
 | resolution / incident closed | FL product; README product; stub Close | pass, note, send | **`note`** + stakeholder **`send`** + **`pass`** | - |
-| escalate | FL sketch "mail eng/support"; README escalate = send | send | **`send`** eng/support (+ optional eng `create todo`) | never invent `escalate` verb |
-| incident commander (IC) | FL collab | claim, assign | **`claim`** / **`assign`** IC desk | role on card owner, not new verb |
+| escalate | FL sketch "mail eng/support"; README escalate = send | send | **`send`** eng/support (+ optional eng `create todo`) | never invent `escalate` command |
+| incident commander (IC) | FL collab | claim, assign | **`claim`** / **`assign`** IC desk | role on card owner, not new command |
 | stakeholder comms | FL collab; stub Done mailed | send, note | **`send`** + **`note`** on card | not status-page SoR clone |
 | follow-the-sun | FL collab | unclaim, assign, send | **`unclaim`/`assign`** + **`send`** next shift | presence for who's HERE |
 | postmortem | FL sketch "follow-on todo or parked plan" | create todo parked | **`create todo`** follow-on or `{status:"parked"}` | not day-one product; reject teaching `done` |
 | deploy / rollback | FL product; stub Deploy | create todo, note, pass, send | **`create todo`/`claim`** -> **`note`** -> **`pass`**; **`send`** ops/eng as needed | forge/CI stay SoR |
 | drain / deploy window | FL sketch "drain + mail ETA"; stub Drain | note, send, pass | office drain path + **`note`/`send` ETA**; **`pass`** when clear | reject inventing `drain` CLI |
-| runbook | FL product | note, detail | **`note`/detail** pointer to SoR | method, not verb |
+| runbook | FL product | note, detail | **`note`/detail** pointer to SoR | method, not command |
 | SLO / SLA / uptime KPI | FL product; README score row ops (SLO) | score | **`score`** (last vs target) | not a product |
 | service health / health check failed | FL product; stub When | create todo, inbox, claim | **`inbox`/`create todo`** -> **`claim`** -> mitigate spine | - |
 | drop the claim | mill-desk | unclaim | **`unclaim`** | never confuse with `drop` (hold) |
@@ -131,7 +131,7 @@ Pattern: README "Escalate always = mill send"; support "escalate = send + eng to
 - Silent prod change without a card when office requires it (stub).
 - Infinite reconnect spam during drain (stub).
 - Replace domain SoR: PagerDuty/Opsgenie, status page, CI/deploy logs, runbook wiki, forge - **link** in note/mail; don't clone.
-- Invent mill verbs for SRE slang (`page`, `escalate`, `drain`, `sev`, `mitigate`, `postmortem` as CLI).
+- Invent mill commands for SRE slang (`page`, `escalate`, `drain`, `sev`, `mitigate`, `postmortem` as CLI).
 - Teach `done` / `open` / `yield` / bare `create` (mill-desk alpha hard-cut).
 - Confuse `drop` (hold release) with `unclaim`.
 - Confuse mitigate-complete with mill `pass` without card close - `pass` closes the ops card after impact stopped + note/comms.
@@ -170,12 +170,12 @@ Pattern: README "Escalate always = mill send"; support "escalate = send + eng to
 | `docs/skills/README.md` | Catalog row Uptime / incident closed; score row ops (SLO); escalate = send; waiting_on; presence |
 | `docs/skills/TEMPLATE.md` | Required SKILL shape: Product, Inputs, Lingo, Handoffs, Must-not, Done |
 | `docs/skills/FUNCTION-LINGO.md` S Ops / SRE | **Required** product/collab words + mill sketch (on-call, page, incident, SEV, mitigate, escalate, postmortem, drain) |
-| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one verb reject list |
+| `docs/skills/MILL-OFFICE-SKILL-SCOUT.md` | Loop-1 SoR: RESEARCH + TEMPLATE brief; no SKILL patch; day-one command reject list |
 | `docs/skills/office-ops/SKILL.md` | Stub gap-fill baseline |
 | `docs/skills/office-engineering/SKILL.md` | Ops handoff for deploy/incident; hold pattern |
 | `docs/skills/office-support/SKILL.md` | Escalate -> eng/ops; waiting_on; forge SoR |
 | `docs/skills/office-qa/SKILL.md` + `RESEARCH.md` | Prod-only -> Ops; RESEARCH shape + TEMPLATE brief pattern |
-| `docs/protocol/skill.md` (mill-desk) | Day-one verb lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
+| `docs/protocol/skill.md` (mill-desk) | Day-one command lock; note!=mail; drop!=unclaim; create todo always includes todo; no open/yield/teaching done |
 | `docs/protocol/verbs.md` | Confirm wake/score/pass lifecycle; removed teaching CLI |
 
 ### Public industry practice (thin)
@@ -189,7 +189,7 @@ Pattern: README "Escalate always = mill send"; support "escalate = send + eng to
 ### Guesses (flagged)
 
 - Whether **deploy** should become a 2nd day-one Product subsection - **guess**; catalog names one compound product; stub folds three outcomes into Stable runtime.
-- Office-specific **drain** verb vs note+send only - **guess**; FL says drain + mail ETA, not a mill CLI `drain`.
+- Office-specific **drain** command vs note+send only - **guess**; FL says drain + mail ETA, not a mill CLI `drain`.
 - `hold` on runbook/config paths - **guess**; rare unless the office leases those res names.
 - Teaching **wake** in Lingo table vs leave as mill-desk inbound only - prefer cite wake under page/alert; don't expand day-one teaching list.
 
@@ -218,14 +218,14 @@ Pattern: README "Escalate always = mill send"; support "escalate = send + eng to
 | score | Absent (presence mentioned) | Add optional/required per office SLO |
 | Multi-product clarity | Single Stable runtime OK-ish | Align README noun **Uptime / incident closed**; list dropped in RESEARCH only |
 | Done | healthy or drain ETA; pass; mailed | Add waiting_on/parked paths; mitigate-then-pass; no silent open |
-| Must-not | Silent prod change; reconnect spam | Add: no invent verbs; SoR outside mill; HINT bypass; drop!=unclaim; no teaching done/open/yield |
+| Must-not | Silent prod change; reconnect spam | Add: no invent commands; SoR outside mill; HINT bypass; drop!=unclaim; no teaching done/open/yield |
 | Product noun | "Stable runtime..." | Align title/README: **Uptime / incident closed**; keep stable-runtime / three modes in body |
 
 ---
 
 ## TEMPLATE brief (for Gardener)
 
-Paste/adapt into `docs/skills/office-ops/SKILL.md`. Pull mill-desk first. Do not invent verbs.
+Paste/adapt into `docs/skills/office-ops/SKILL.md`. Pull mill-desk first. Do not invent commands.
 
 ```markdown
 ---
@@ -296,7 +296,7 @@ office requires one, reconnect spam as a plan.
 - Bypass mill-desk HINT routing.
 - Silent prod change without a card when office requires it; reconnect spam during drain.
 - Replace PagerDuty/status page/CI/runbook SoR - link paths.
-- Invent mill verbs for SRE slang (`page`, `escalate`, `drain`, `sev` as CLI).
+- Invent mill commands for SRE slang (`page`, `escalate`, `drain`, `sev` as CLI).
 - Teach `open` / `yield` / bare `create` / `done`.
 - Confuse `drop` (hold) with `unclaim`.
 - Own eng ship or QA Pass/Fail.

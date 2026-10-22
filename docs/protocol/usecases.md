@@ -1,14 +1,14 @@
 # Use cases
 
-Desks (agent + human) use mill as a **coordination office**, not as the model. Verbs exist because of these jobs. Faster/cheaper = **less mill JSON in the model**, not a fancier tokenizer.
+Desks (agent + human) use mill as a **coordination office**, not as the model. Commands exist because of these jobs. Faster/cheaper = **less mill JSON in the model**, not a fancier tokenizer.
 
 Print: `mill briefing usecases` (cats this file). **SoT is [tables.sql](../../agent_coord/server/sql/tables.sql) + [skill.md](skill.md).** This file follows those. Join: [JOIN.md](../JOIN.md). Host PC: [HOST.md](../HOST.md).
 
 Idle is mill connect + HINT. Never dump `/api/floor`.
 
-## What desks actually do (jobs -> verbs -> tokens)
+## What desks actually do (jobs -> commands -> tokens)
 
-| Job | Who | Verbs | Expensive (tokens) | Cheap |
+| Job | Who | Commands | Expensive (tokens) | Cheap |
 |---|---|---|---|---|
 | **Be here** | agent | `mill connect`, PING | mill connect every turn | mill connect `/ws` until HINT |
 | **Talk** | agent | `send`, `{kind: mail}`, `inbox` unread | dump all mail / `/api/v1` | push -> unread dests; act or ignore |
@@ -81,7 +81,7 @@ Retire flags `name.deleted` on every type and leaves the row. Reclaim clears `de
 
 `member (name_id, desk_id)` is roster, not live (`` `join` ``). **Not labels.** mill join always inserts Office.
 
-**Trust:** `high` (default) or `limited`. Show: `mill trust` (any seated desk). Set: `mill trust high` / `mill trust limited` (Admin; either way any time). Pack/wall must ship verb first. Chart: [admin.md](../requirements/admin.md).
+**Trust:** `high` (default) or `limited`. Show: `mill trust` (any seated desk). Set: `mill trust high` / `mill trust limited` (Admin; either way any time). Pack/wall must ship command first. Chart: [admin.md](../requirements/admin.md).
 
 - **Mint** group / role / label: high = any seated desk; limited = Admin only.
 - **member-add/remove other** (an ordinary project or role): high = any desk; limited = Admin only.
@@ -107,9 +107,9 @@ Per-listener detail / custom recipes: [hints.md](hints.md).
 
 ## Hint chart (use case -> watcher -> poke)
 
-**Rule:** one mapper, **hint = `activity.type` uppercased**. Hub is dumb. Frame is `{type, id, hint, detail?}`. Prefer `detail` when present; else mill-fetch. Then the desk runs **one** verb.
+**Rule:** one mapper, **hint = `activity.type` uppercased**. Hub is dumb. Frame is `{type, id, hint, detail?}`. Prefer `detail` when present; else mill-fetch. Then the desk runs **one** command.
 
-| Use case | mill verb | `watcher` `(type, id)` | **hint** | Desk with mill connect up does | Poke |
+| Use case | mill command | `watcher` `(type, id)` | **hint** | Desk with mill connect up does | Poke |
 |---|---|---|---|---|---|
 | N1 rename desk | `rename` | none | none | optional STOP | **no** |
 | N1 retire / reclaim | `retire` / `reclaim` | none | none | optional STOP | **no** |
@@ -157,4 +157,4 @@ Do **not** add `activity.type=admin`. Hint stays `type.upper()`. Split is **what
 
 **Office mill connect is quiet.** A clock-in does not fan out a name frame. Retire, reclaim, and member-add do not either.
 
-Wall glance is the human admin surface. mill verbs stay cheap. Do not mill-send `To: human` for these.
+Wall glance is the human admin surface. mill commands stay cheap. Do not mill-send `To: human` for these.

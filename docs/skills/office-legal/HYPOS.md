@@ -2,7 +2,7 @@
 
 Product: **Cleared / hold**  
 Modes: `clear` | `withhold` | `redline`  
-Day-one verbs only. Gap mix ~5 yes / ~5 no.  
+Day-one commands only. Gap mix ~5 yes / ~5 no.  
 `human_required` where skill requires (clear).  
 **Disambiguation:** legal hold / withhold / block-ship != mill `hold` (exclusive doc lease). Legal block = `waiting_on` + mail; mill `hold`/`drop` = redline lock only.
 
@@ -60,7 +60,7 @@ Day-one verbs only. Gap mix ~5 yes / ~5 no.
 - **Ask:** Lock the agreement so I can edit - also block the ship until I'm done.
 - **Inputs gap:** yes
 - **Product mode:** Cleared / hold | redline + withhold
-- **Fail-if:** collapses both into one verb; mill `hold` used for ship-block or `waiting_on` used for doc lock; missing doc station / ship-card pointers
+- **Fail-if:** collapses both into one command; mill `hold` used for ship-block or `waiting_on` used for doc lock; missing doc station / ship-card pointers
 
 ## H10
 - **Ask:** We're good - approve and let eng ship.

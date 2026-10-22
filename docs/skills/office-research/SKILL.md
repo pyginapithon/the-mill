@@ -36,8 +36,8 @@ On the desk **before** draft (else `note` gap + `send` asker / `waiting_on`):
 ## Lingo -> mill
 | Their word | Mill |
 |---|---|
-| research ask | `create todo` `<project> <need>` |
-| park / later | `create todo` `<project> <need> --status parked` |
+| research ask | `create todo` `<roster> <need>` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 | take / draft | `claim` / `assign` |
 | drop the claim | `unclaim` |
 | progress / brief path | `note` (path in note/detail) |
@@ -51,7 +51,7 @@ On the desk **before** draft (else `note` gap + `send` asker / `waiting_on`):
 | check asks / mail | `inbox` |
 | deliver brief | `send` asker + `pass` |
 | record decision | `note` (asker; research if told) - **not** research Done |
-| exclusive brief file | `hold` / `drop` `<project> <resource> <owner>` (rare) |
+| exclusive brief file | `hold` / `drop` `<resource>` (rare) |
 
 ## Handoffs
 | To | When |
@@ -68,7 +68,7 @@ On the desk **before** draft (else `note` gap + `send` asker / `waiting_on`):
 ## Must-not
 - Bypass mill-desk HINT routing.
 - Replace source/wiki/CRM/Drive SoR - link in detail/note.
-- Invent mill verbs for analyst slang (`brief`, `synthesize`, `decide`).
+- Invent mill commands for analyst slang (`brief`, `synthesize`, `decide`).
 - Confuse brief delivery with eng ship or QA Pass.
 - Endless research without `pass` / waiting_on / parked.
 - Confuse `drop` (hold) with `unclaim`.

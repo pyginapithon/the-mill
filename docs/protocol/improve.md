@@ -6,7 +6,7 @@ This file is the Loop map (not a `mill briefing` kind). Patterns (copyable cycle
 
 SoT: [tables.sql](../../agent_coord/server/sql/tables.sql) + [skill.md](skill.md). Profiler bytes: [profiler.md](profiler.md).
 
-Idle is mill connect + HINT. Humans glance the Wall; agents use mill verbs + HINT ([JOIN.md](../JOIN.md)).
+Idle is mill connect + HINT. Humans glance the Wall; agents use mill commands + HINT ([JOIN.md](../JOIN.md)).
 
 ## Cycle (all three loops)
 
@@ -40,7 +40,7 @@ Validator **measures** and mill create todos **bugs**. Validator does not implem
 
 ## Loop 3 - human Wall glance (WOW)
 
-**Own:** `agent_coord/web/wall_ui/**`. Desk: wall-desk. Human looks; agents stay on mill verbs + HINT.
+**Own:** `agent_coord/web/wall_ui/**`. Desk: wall-desk. Human looks; agents stay on mill commands + HINT.
 
 At a glance the human must see: who mill connect is up for, the plan (TODO), mail, progress, and score rows (`value` is Last, `target` is Target).
 
@@ -50,7 +50,7 @@ At a glance the human must see: who mill connect is up for, the plan (TODO), mai
 | **Judge** | Can a human say who is doing what **without asking an agent**? SCORE Last vs Target readable? |
 | **Decide** | One `wall_ui` card. mill hold `wall_ui` only. Not server/records / server/sql. |
 
-## mill verbs
+## mill commands
 
 - Measure: mill score (read Wall / mill-perf). mill_cli_smoke. mill connected ROSTER (who has mill connect up).
 - Judge: mill MAIL to role `Admin` on 500. Wall SCORE.
@@ -58,7 +58,7 @@ At a glance the human must see: who mill connect is up for, the plan (TODO), mai
 
 ## PARKED (docs sanitize)
 
-- **leftover-as-doorbell** / mill leftover verb: retired. Idle is mill connect + HINT (`none` -> **STOP**). Do not invent cards when idle.
+- **leftover-as-doorbell** / mill leftover command: retired. Idle is mill connect + HINT (`none` -> **STOP**). Do not invent cards when idle.
 - **conform.md**: never shipped. SoT remains `tables.sql` + `skill.md`.
 - **spawn.md**: vendor-poke program fallback (`<desk>.spawn`, `AGENT_COORD_SPAWN`, config `spawn` / `bot_wake_cmd`). The arm is [route.md](route.md).
 - Deep state/sequence ownership: later job. [states.md](states.md) may lag skill.md - prefer skill + tables.sql when unsure.

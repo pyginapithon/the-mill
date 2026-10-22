@@ -21,6 +21,6 @@ A key that is present with an empty program does not fall through to `*`. This m
 
 ## Must not
 
-- Invent Arm verbs that are not on PATH.
+- Invent Arm commands that are not on PATH.
 
 See also: [connect.md](connect.md), [hints.md](hints.md), [route.md](route.md).
