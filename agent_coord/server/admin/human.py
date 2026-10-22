@@ -126,21 +126,48 @@ def redeem_collect(code: str) -> dict[str, Any]:
     }
 
 
-def desk_post(cn, data: dict[str, Any]) -> dict[str, Any]:
+def _seated_desk(cn, *secrets: str) -> str:
+    """Desk whose seat matches one of these secrets. Empty when none does."""
+    from agent_coord.client.tokens import token_hash
+    from agent_coord.server.records.join import desk_for_token_hash
+
+    for raw in secrets:
+        secret = (raw or "").strip()
+        if not secret:
+            continue
+        try:
+            desk = desk_for_token_hash(cn, token_hash(secret))
+        except Exception:
+            desk = ""
+        if desk:
+            return desk
+    return ""
+
+
+def desk_post(cn, data: dict[str, Any], session: str = "") -> dict[str, Any]:
     token = str(data.get("token") or "")
-    if not door.check(token):
-        raise CoordError("wall send: mill invite token required")
+    who = _seated_desk(cn, session, token)
+    if not who:
+        if not door.check(token) and not door.check(session):
+            raise CoordError("wall send: mill invite token required")
+        raise CoordError("wall send: desk session required")
     action = str(data.get("action") or "").strip().lower()
     project = _project(str(data.get("project") or ""))
-    src = str(data.get("src") or "human").strip()
+    named_src = str(data.get("src") or "").strip()
+    if named_src and named_src != who:
+        raise CoordError("wall send: sender is the seated desk")
+    src = who
     if data.get("mark_read") or action == "mark_read":
         raw_ids = data.get("ids") or data.get("id") or []
         if isinstance(raw_ids, (int, str)):
             raw_ids = [raw_ids]
-        desk = str(data.get("desk") or data.get("reader") or data.get("dst") or "").strip()
+        named = str(data.get("desk") or data.get("reader") or "").strip()
+        alt = str(data.get("dst") or "").strip()
+        if (named and named != who) or (alt and alt != who):
+            raise CoordError("wall send: reader is the seated desk")
         n = 0
         for mid in raw_ids:
-            rec_opened.insert(cn, int(mid), desk)
+            rec_opened.insert(cn, int(mid), who)
             n += 1
         return {"ok": True, "n": n}
     if data.get("ack_human") or action in ("ack_human", "clear_human", "clear_human_required"):
