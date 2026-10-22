@@ -69,7 +69,7 @@ def _branch(cn):
     rid = int(root["id"])
     fnd = rpc._h_reply(
         book,
-        {"mail_id": rid, "body": "verb: todo\\nerror: no sitting connect", "src": "asker"},
+        {"mail_id": rid, "body": "command: todo\\nerror: no sitting connect", "src": "asker"},
         "unit",
         "asker",
     )
@@ -77,7 +77,7 @@ def _branch(cn):
     tag = uuid.uuid4().hex[:6]
     a = rpc._h_open(
         book,
-        {"need": f"f{fid}-rerun-{tag}", "detail": "rerun the verb", "parent_type": "mail", "parent_id": fid},
+        {"need": f"f{fid}-rerun-{tag}", "detail": "rerun the command", "parent_type": "mail", "parent_id": fid},
         "unit",
         "asker",
     )

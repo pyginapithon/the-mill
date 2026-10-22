@@ -1,4 +1,4 @@
-"""0.7.x CLI language: `mill <action> <type> <name>` maps onto the wall RPC verbs."""
+"""0.7.x CLI language: `mill <action> <type> <name>` maps onto the wall RPC commands."""
 from __future__ import annotations
 
 import pytest
@@ -169,7 +169,7 @@ def test_alias_from_link():
     assert alias_from_link("not a link") == ""
 
 
-def test_every_verb_takes_yes():
+def test_every_command_takes_yes():
     import argparse
 
     p = _build_parser()
@@ -234,6 +234,6 @@ def test_watch_id_must_be_positive_number(body, cmd):
 
 def test_watch_help_names_id_only():
     p = _build_parser()
-    for verb in ("watch", "unwatch"):
-        usage = p._subparsers._group_actions[0].choices[verb].format_usage()
+    for command in ("watch", "unwatch"):
+        usage = p._subparsers._group_actions[0].choices[command].format_usage()
         assert "ID|NAME" not in usage and " ID" in usage

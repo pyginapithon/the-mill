@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
-# skill.md inbound (canonical). ignore = do not queue / no mill verb.
+# skill.md inbound (canonical). ignore = do not queue / no mill command.
 ROUTES: dict[str, dict[str, Any]] = {
     "heartbeat:PING": {"ignore": True},
     "join:JOIN": {"ignore": True},

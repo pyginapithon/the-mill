@@ -68,7 +68,7 @@ def test_mail_is_recipients_never_watchers(live):
     ({"verb": "add", "type": "todo", "id": "abc"}, "TARGET is type:id"),
     ({"verb": "add", "type": "todo", "id": 3, "who": "ghost"}, "no such desk or roster ghost"),
     ({"verb": "add", "type": "todo", "id": 3, "who": "x" * 65}, "WHO is a desk or roster"),
-    ({"verb": "watcher", "type": "todo", "id": 3}, "verb is add or remove"),
+    ({"verb": "watcher", "type": "todo", "id": 3}, "command is add or remove"),
 ])
 def test_refusals(live, body, msg):
     with pytest.raises(CoordError, match=msg):
@@ -100,7 +100,7 @@ def test_other_desk_and_roster_follow_member_add_trust(live, monkeypatch):
     _go({"verb": "add", "type": "todo", "id": 3, "who": "peer"})
 
 
-def test_add_remove_are_rpc_verbs_and_watcher_is_gone():
+def test_add_remove_are_rpc_commands_and_watcher_is_gone():
     assert rpc.HANDLERS["add"] is rpc._h_add_remove and rpc.HANDLERS["remove"] is rpc._h_add_remove
     assert "watcher" not in rpc.HANDLERS and not hasattr(rpc, "_h_watcher")
 
@@ -111,16 +111,16 @@ class _SqlRefusal(Exception):
         self.msg, self.sqlstate, self.errno = msg, sqlstate, errno
 
 
-@pytest.mark.parametrize("verb,patch", [
+@pytest.mark.parametrize("command,patch", [
     ("add", "agent_coord.server.records.mail.to_node_put"),
     ("remove", "agent_coord.server.records.mail.to_node_delete"),
 ])
-def test_sql_signal_becomes_one_plain_line_270(live, monkeypatch, verb, patch):
+def test_sql_signal_becomes_one_plain_line_270(live, monkeypatch, command, patch):
     def boom(*a, **k):
         raise _SqlRefusal("remove: not a recipient on this letter or under it")
     monkeypatch.setattr(patch, boom)
     with pytest.raises(CoordError) as ei:
-        _go({"verb": verb, "type": "mail", "id": 7, "who": "peer"})
+        _go({"verb": command, "type": "mail", "id": 7, "who": "peer"})
     assert str(ei.value) == "remove: not a recipient on this letter or under it"
 
 

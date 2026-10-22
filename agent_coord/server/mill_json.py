@@ -2,12 +2,12 @@
 """Stamp mill version on every top-level JSON object the wall emits.
 
 Single source: agent_coord.install.packver.package_version (pyproject / dist).
-Field name is always ``mill`` (string). Lean verb payloads inside ``result``
+Field name is always ``mill`` (string). Lean command payloads inside ``result``
 stay untouched - version lives on the envelope only.
 
-Bare JSON arrays (rare; desk verbs are /ws RPC) wrap as
+Bare JSON arrays (rare; desk commands are /ws RPC) wrap as
 ``{"result": [...], "mill": "<ver>"}`` so the wire can carry the version
-without inventing a second field name. CLI desk verbs print the full
+without inventing a second field name. CLI desk commands print the full
 ok/mill/id/result/sync envelope by default (``mill --raw`` unwraps);
 join HTTP is already an object.
 """

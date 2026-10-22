@@ -51,7 +51,7 @@ def test_ws_connect_seated_p95(
         try:
             # Seated = auth passed and socket usable (server closes 4401 on bad token).
             sit_s = time.perf_counter() - t0
-            rtt, reply = await ws_rpc_rtt(ws, verb="session", args={})
+            rtt, reply = await ws_rpc_rtt(ws, command="session", args={})
             assert reply.get("ok") is True or "error" in reply, (
                 f"post-sit rpc unexpected: {reply!r} sit_s={sit_s:.3f} rtt={rtt:.3f}"
             )
@@ -84,7 +84,7 @@ def test_ws_light_rpc_rtt_p95(
         try:
             rtts: list[float] = []
             for _ in range(_RPC_SAMPLES):
-                rtt, reply = await ws_rpc_rtt(ws, verb="session", args={})
+                rtt, reply = await ws_rpc_rtt(ws, command="session", args={})
                 assert isinstance(reply, dict), f"rpc reply not dict: {reply!r}"
                 assert reply.get("ok") is True or "result" in reply or "error" in reply, (
                     f"rpc shape: {reply!r} rtt={rtt:.3f}s"
@@ -116,7 +116,7 @@ def test_ws_reconnect_resit_bound(
         t0 = time.perf_counter()
         ws2 = await ws_connect_seated(url, token, mill_ssl_context)
         try:
-            rtt, reply = await ws_rpc_rtt(ws2, verb="session", args={})
+            rtt, reply = await ws_rpc_rtt(ws2, command="session", args={})
             elapsed = time.perf_counter() - t0
             assert reply.get("ok") is True or "error" in reply, (
                 f"re-sit rpc unexpected: {reply!r} reconnect_s={elapsed:.3f} rtt={rtt:.3f}"
@@ -161,7 +161,7 @@ def test_ws_rpc_under_concurrent_http(
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
                 fut = pool.submit(_http_burst)
                 for _ in range(5):
-                    rtt, reply = await ws_rpc_rtt(ws, verb="session", args={})
+                    rtt, reply = await ws_rpc_rtt(ws, command="session", args={})
                     assert reply.get("ok") is True or "error" in reply, reply
                     rtts.append(rtt)
                 fut.result(timeout=60)

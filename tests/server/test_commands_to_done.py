@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""A6 verbs-to-done: stamp formula + score_tick scrape."""
+"""A6 commands-to-done: stamp formula + score_tick scrape."""
 from datetime import datetime, timezone
 from pathlib import Path
 
-from agent_coord.server import verbs_to_done as vtd
+from agent_coord.server import commands_to_done as vtd
 from agent_coord.server.score_tick import (
     BOOK_PERF,
     BOOK_TARGET,
-    KPI_VERBS_TO_DONE,
+    KPI_COMMANDS_TO_DONE,
     measure,
-    measure_verbs_to_done,
+    measure_commands_to_done,
 )
 
 
@@ -17,12 +17,12 @@ def setup_function() -> None:
     vtd.reset_for_tests()
 
 
-def test_book_verbs_to_done_kpi_formula() -> None:
-    assert KPI_VERBS_TO_DONE in BOOK_PERF
-    assert BOOK_TARGET[KPI_VERBS_TO_DONE] == ""
-    assert "verb" in BOOK_PERF[KPI_VERBS_TO_DONE].lower()
-    assert "note" in BOOK_PERF[KPI_VERBS_TO_DONE].lower()
-    assert KPI_VERBS_TO_DONE == "mill-office.verbs_to_done"
+def test_book_commands_to_done_kpi_formula() -> None:
+    assert KPI_COMMANDS_TO_DONE in BOOK_PERF
+    assert BOOK_TARGET[KPI_COMMANDS_TO_DONE] == ""
+    assert "command" in BOOK_PERF[KPI_COMMANDS_TO_DONE].lower()
+    assert "note" in BOOK_PERF[KPI_COMMANDS_TO_DONE].lower()
+    assert KPI_COMMANDS_TO_DONE == "mill-office.verbs_to_done"
 
 
 def test_claim_to_done_excludes_note_spam(monkeypatch) -> None:
@@ -101,7 +101,7 @@ def test_assign_starts_window_for_volunteer(monkeypatch) -> None:
     assert lines[0][2]["notes"] == 0
 
 
-def test_measure_verbs_to_done_p50() -> None:
+def test_measure_commands_to_done_p50() -> None:
     text = "\n".join(
         [
             "2026-09-27T10:00:00Z op=card.verbs_to_done ms=100.0 verbs=2 notes=0 card=1 need=a desk=DESK_a ok=1",
@@ -112,24 +112,24 @@ def test_measure_verbs_to_done_p50() -> None:
     )
     since = datetime(2026, 9, 27, 9, 30, 0, tzinfo=timezone.utc)
     # sorted 2,4,8 -> p50 index round(0.5*2)=1 -> 4
-    assert measure_verbs_to_done(text, since) == 4
+    assert measure_commands_to_done(text, since) == 4
 
 
-def test_measure_includes_verbs_to_done_kpi(tmp_path: Path) -> None:
+def test_measure_includes_commands_to_done_kpi(tmp_path: Path) -> None:
     (tmp_path / "mill-perf.log").write_text(
         "2026-09-27T10:00:00Z op=card.verbs_to_done ms=150.0 verbs=5 notes=2 card=56 need=aws-56 desk=DESK_x ok=1\n",
         encoding="utf-8",
     )
     now = datetime(2026, 9, 27, 10, 30, 0, tzinfo=timezone.utc)
     row = measure(dest=tmp_path, window_s=3600, now=now)
-    assert row[KPI_VERBS_TO_DONE] == 5
+    assert row[KPI_COMMANDS_TO_DONE] == 5
 
 
-def test_publish_book_perf_verbs_to_done_empty_target() -> None:
+def test_publish_book_perf_commands_to_done_empty_target() -> None:
     from agent_coord.server import score_tick as st
 
-    note = st.BOOK_PERF[KPI_VERBS_TO_DONE]
-    tgt = st.BOOK_TARGET.get(KPI_VERBS_TO_DONE, st.TARGET)
-    row = {"kpi": KPI_VERBS_TO_DONE, "value": "5", "target": tgt, "note": note}
+    note = st.BOOK_PERF[KPI_COMMANDS_TO_DONE]
+    tgt = st.BOOK_TARGET.get(KPI_COMMANDS_TO_DONE, st.TARGET)
+    row = {"kpi": KPI_COMMANDS_TO_DONE, "value": "5", "target": tgt, "note": note}
     assert row["target"] == ""
     assert row["value"] == "5"

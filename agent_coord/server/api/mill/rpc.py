@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""POST /mill/v1/<verb> - mill-wall opens MySQL; laptops never do.
+"""POST /mill/v1/<command> - mill-wall opens MySQL; laptops never do.
 
 Access token is the mill here token (GitLab PAT / PyPI token): Authorization
 Bearer or PRIVATE-TOKEN. mill-wall does not write ~/.mill/session for laptops.
@@ -65,7 +65,7 @@ def _project_alias(cn, project: str) -> str:
     return project
 
 
-def _require_live_project(cn, project: str, verb: str) -> str:
+def _require_live_project(cn, project: str, command: str) -> str:
     """Refuse an unknown, retired, or empty project before any write (#237)."""
     from agent_coord.helpers.projects import project_refusal
     from agent_coord.server.records import name as rec_name
@@ -76,20 +76,20 @@ def _require_live_project(cn, project: str, verb: str) -> str:
         got = rec_name.live_roster(cn, who)
         if got is not None and _stored(got) == who:
             return who
-    err = project_refusal(verb, who, _live_projects(cn))
+    err = project_refusal(command, who, _live_projects(cn))
     if err:
         raise CoordError(err)
     return who
 
 
-def _check_roster(cn, verb: str, name: str) -> None:
+def _check_roster(cn, command: str, name: str) -> None:
     """Refuse a sender roster that is not a live roster (#241). Any roster works (0.7.0)."""
     from agent_coord.server.records import name as rec_name
 
     if not name:
         return
     if len(name) > 64 or rec_name.get(cn, name, CONST_ROSTER) is None:
-        raise CoordError(f"{verb}: no such roster {name[:64]}")
+        raise CoordError(f"{command}: no such roster {name[:64]}")
 
 
 def _seat_roster(cn, desk: str) -> str:
@@ -134,7 +134,7 @@ def _live_dest_kind(cn, name: str) -> str:
 from agent_coord.server.book import Book
 from agent_coord.client.tokens import token_hash
 
-OPEN_VERBS = frozenset({"join"})
+OPEN_COMMANDS = frozenset({"join"})
 
 # Keys the server alone may set on a request body. A client must never supply
 # them: `host` is the office-host (loopback) marker the Admin gate trusts, and
@@ -195,7 +195,7 @@ def _require_join_authorized(c: Book, body: dict[str, Any], token: str) -> None:
 
 
 def _require_live_ws(owner: str | None) -> None:
-    """HTTP desk-acting verbs are refused. Verbs run as JSON RPC on sitting /ws.
+    """HTTP desk-acting commands are refused. Commands run as JSON RPC on sitting /ws.
 
     owner is unused; kept so existing monkeypatches stay compatible.
     """
@@ -206,7 +206,7 @@ def _require_live_ws(owner: str | None) -> None:
 
 
 def _poke(
-    c: Book, typ: str, nid: Any, verb: str, *, owner: str | None = None, fresh: bool = False
+    c: Book, typ: str, nid: Any, command: str, *, owner: str | None = None, fresh: bool = False
 ) -> None:
     """Same HTTPS request: SELECT watchers -> Hub. Hint = type.upper(). Never raises.
 
@@ -229,7 +229,7 @@ def _poke(
         try:
             from agent_coord.server.push import mill_admin_alert
 
-            mill_admin_alert(c._cn, f"{verb} fanout: {e}", verb=verb)
+            mill_admin_alert(c._cn, f"{command} fanout: {e}", command=command)
         except Exception:
             pass
 
@@ -669,10 +669,10 @@ def _h_project(c: Book, body: dict[str, Any], project: str, owner: str | None) -
     dispatch fills an empty project with a default, so this reads the raw body.
     """
     who = _stored(str(body.get("project") or ""))
-    verb = str(body.get("for") or "connect").strip() or "connect"
-    if verb not in ("connect", "inbox", "hold"):
-        verb = "connect"
-    _require_live_project(c._cn, who, verb)
+    command = str(body.get("for") or "connect").strip() or "connect"
+    if command not in ("connect", "inbox", "hold"):
+        command = "connect"
+    _require_live_project(c._cn, who, command)
     return {"ok": True, "project": who, "projects": _live_projects(c._cn)}
 
 
@@ -683,22 +683,22 @@ def _h_here(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
 def _h_label(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import label as rec_label
 
-    verb = slug(str(body.get("verb") or ""))
-    from agent_coord.client.outbound import canonical_verb
+    command = slug(str(body.get("verb") or ""))
+    from agent_coord.client.outbound import canonical_command
 
-    verb = canonical_verb(verb)
+    command = canonical_command(command)
     typ = str(body.get("type") or body.get("kind") or "")
     nid = int(body.get("id") or 0)
     if not nid and body.get("ref"):
-        nid = _card_ref_id(c._cn, body, verb)
+        nid = _card_ref_id(c._cn, body, command)
     tag = str(body.get("label") or body.get("tag") or "")
-    if verb == "label":
+    if command == "label":
         return rec_label.select(c._cn, typ, nid)
     if not typ or not nid or not tag:
         raise CoordError("mill label-add/remove: type id label required")
     # An unknown project refuses before the tag is touched (#245).
-    _require_live_project(getattr(c, "_cn", None), project, verb)
-    if verb == "label-add":
+    _require_live_project(getattr(c, "_cn", None), project, command)
+    if command == "label-add":
         # A new label is created on first use when trust allows (else Admin: mill create label NAME).
         from agent_coord.config import mill_catalog_open
         from agent_coord.server.records import name as rec_name
@@ -717,7 +717,7 @@ def _h_label(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         # A label that is not on the node is a refusal on the call, not ok (#245).
         if rec and str(rec[0].get("op") or "") == "not-removed":
             raise CoordError("label-remove: %s %s has no label %s" % (typ, nid, _stored(tag)))
-    _poke(c, typ, nid, verb, owner=owner, fresh=True)
+    _poke(c, typ, nid, command, owner=owner, fresh=True)
     return rec
 
 
@@ -739,11 +739,11 @@ def _mail_role_admin(c: Book, project: str, owner: str | None, target: str, *, a
 
 def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import member as rec_member
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
     from agent_coord.server.admin.guard import require_admin
 
-    verb = canonical_verb(str(body.get("verb") or ""))
-    if verb == "member":
+    command = canonical_command(str(body.get("verb") or ""))
+    if command == "member":
         return rec_member.select(c._cn, "", owner or "")
     group = str(body.get("group") or "")
     if not group:
@@ -760,7 +760,7 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
         g = CONST_ADMIN
     if admin_slot and not body.get("host"):
         raise CoordError(f"{CONST_ROSTER} {CONST_ADMIN}: office host only (loopback)")
-    if admin_slot and verb == "member-remove":
+    if admin_slot and command == "member-remove":
         require_admin(c._cn, owner or "")
     elif not admin_slot and target != self_desk:
         from agent_coord.server.admin.guard import require_admin_if_limited
@@ -772,7 +772,7 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
 
         was_admin = is_role_admin(c._cn, target)
     slot_kind = CONST_ROSTER
-    if verb == "member-add":
+    if command == "member-add":
         if admin_slot:
             rows = rec_member.put_admin(c._cn, target)
         else:
@@ -1212,7 +1212,7 @@ def _h_send(
         try:
             from agent_coord.server.push import mill_admin_alert
 
-            mill_admin_alert(c._cn, f"mail fanout: {e}", verb="send")
+            mill_admin_alert(c._cn, f"mail fanout: {e}", command="send")
         except Exception:
             pass
     return rec
@@ -1267,10 +1267,10 @@ def _mail_reader(c: Book, mail_id: int, owner: str | None) -> bool:
 
 
 def _ends_read(fn):
-    """End the read transaction when a read verb returns (#672).
+    """End the read transaction when a read command returns (#672).
 
     The participant check used to commit as a side effect. With no check left,
-    a read verb must not leave a snapshot or metadata lock open on a pooled
+    a read command must not leave a snapshot or metadata lock open on a pooled
     connection (a later DDL or migrate would wait on it).
     """
     import functools
@@ -2391,11 +2391,11 @@ def _poke_tree(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None
         pass
 
 
-def _tree_id(c: Book, typ: str, raw: Any, ref: Any, verb: str) -> int:
-    """A tree verb's id, or its todo named ROSTER/NEED resolved to the id (#706, as #274)."""
+def _tree_id(c: Book, typ: str, raw: Any, ref: Any, command: str) -> int:
+    """A tree command's id, or its todo named ROSTER/NEED resolved to the id (#706, as #274)."""
     nid = int(raw or 0)
     if not nid and ref:
-        nid = _card_ref_id(c._cn, {"ref": ref, "type": typ}, verb)
+        nid = _card_ref_id(c._cn, {"ref": ref, "type": typ}, command)
     return nid
 
 
@@ -2499,48 +2499,48 @@ def _json_names(raw: Any) -> list[str]:
     return [str(x) for x in got if isinstance(x, str)] if isinstance(got, list) else []
 
 
-def _card_ref_id(cn, body: dict[str, Any], verb: str) -> int:
+def _card_ref_id(cn, body: dict[str, Any], command: str) -> int:
     """A todo named ROSTER/NEED (body ref) -> its id (#274). 0 when the body has no ref."""
     ref = str(body.get("ref") or "").strip()
     if not ref:
         return 0
-    verb = {"label-add": "label", "label-remove": "unlabel"}.get(verb, verb)
+    command = {"label-add": "label", "label-remove": "unlabel"}.get(command, command)
     typ = str(body.get("type") or body.get("kind") or "").strip().lower()
     if typ == CONST_HOLD:
-        return _hold_ref_id(cn, ref, verb)
+        return _hold_ref_id(cn, ref, command)
     if typ != "todo":
         raise CoordError(
-            f"{verb}: only a todo (ROSTER/NEED) or a hold (its name) goes by name; "
+            f"{command}: only a todo (ROSTER/NEED) or a hold (its name) goes by name; "
             f"give the {typ or 'activity'} id"
         )
     roster, _, need = ref.partition("/")
     roster, need = _stored(roster.strip()), need.strip()
     if not roster or not need or len(roster) > 64 or len(need) > 64:
-        raise CoordError(f"{verb}: give the todo as ROSTER/NEED (for example cold-test/fix-login)")
+        raise CoordError(f"{command}: give the todo as ROSTER/NEED (for example cold-test/fix-login)")
     from agent_coord.server.records import name as rec_name
     from agent_coord.server.records import todo as rec_todo
 
     if need.isdigit():
-        raise CoordError(f"{verb}: {need} is a todo id; give the number alone, not {roster}/{need}")
+        raise CoordError(f"{command}: {need} is a todo id; give the number alone, not {roster}/{need}")
     if rec_name.get(cn, roster, CONST_ROSTER) is None:
-        raise CoordError(f"{verb}: no roster {roster}")
+        raise CoordError(f"{command}: no roster {roster}")
     row = rec_todo.find(cn, roster, need)
     if not row:
-        raise CoordError(f"{verb}: no card {need} in {roster} (mill todo {roster} --done lists its cards)")
+        raise CoordError(f"{command}: no card {need} in {roster} (mill todo {roster} --done lists its cards)")
     return int(row.get("id") or 0)
 
 
-def _hold_ref_id(cn, name: str, verb: str) -> int:
+def _hold_ref_id(cn, name: str, command: str) -> int:
     """A hold named by its resource -> the hold id (#327). A released hold keeps its row."""
     from agent_coord.server.records import hold as rec_hold
 
     got = rec_hold.peek(cn, "", name)
     if not got.get("id"):
-        raise CoordError(f"{verb}: no hold named {name[:120]} (mill hold lists every lock)")
+        raise CoordError(f"{command}: no hold named {name[:120]} (mill hold lists every lock)")
     return int(got["id"])
 
 
-def _add_target(body: dict[str, Any], verb: str, cn=None) -> tuple[str, int]:
+def _add_target(body: dict[str, Any], command: str, cn=None) -> tuple[str, int]:
     """TARGET of mill add/remove: an activity type and a positive id (#265), or a todo ROSTER/NEED (#274)."""
     typ = str(body.get("type") or "").strip().lower()
     try:
@@ -2548,15 +2548,15 @@ def _add_target(body: dict[str, Any], verb: str, cn=None) -> tuple[str, int]:
     except (TypeError, ValueError):
         nid = 0
     if not nid and body.get("ref") and cn is not None:
-        nid = _card_ref_id(cn, body, verb)
+        nid = _card_ref_id(cn, body, command)
     if typ not in ACTIVITY_TYPES or nid <= 0:
         raise CoordError(
-            "%s: TARGET is type:id, type one of %s" % (verb, "|".join(ACTIVITY_TYPES))
+            "%s: TARGET is type:id, type one of %s" % (command, "|".join(ACTIVITY_TYPES))
         )
     return typ, nid
 
 
-def _add_who(c: Book, body: dict[str, Any], owner: str | None, verb: str) -> tuple[str, str, int]:
+def _add_who(c: Book, body: dict[str, Any], owner: str | None, command: str) -> tuple[str, str, int]:
     """WHO of mill add/remove: (name, kind, name id). Default this desk.
 
     A desk wins when a desk and a roster share the name. Another desk or any
@@ -2568,13 +2568,13 @@ def _add_who(c: Book, body: dict[str, Any], owner: str | None, verb: str) -> tup
     self_desk = _stored(owner or "")
     who = _stored(str(body.get("who") or "")) or self_desk
     if not who or len(who) > 64:
-        raise CoordError(f"{verb}: WHO is a desk or roster name")
+        raise CoordError(f"{command}: WHO is a desk or roster name")
     kind = _live_dest_kind(c._cn, who)
     if not kind:
-        raise CoordError(f"{verb}: no such desk or roster {who}")
+        raise CoordError(f"{command}: no such desk or roster {who}")
     nid = rec_name.get(c._cn, who, kind)
     if nid is None:
-        raise CoordError(f"{verb}: no such desk or roster {who}")
+        raise CoordError(f"{command}: no such desk or roster {who}")
     if kind != CONST_DESK or who != self_desk:
         require_admin_if_limited(c._cn, self_desk)
     return who, kind, int(nid)
@@ -2610,24 +2610,24 @@ def _add_remove(c: Book, body: dict[str, Any], owner: str | None) -> Any:
     a roster row expands to its members when it wakes them. --hint is add-only
     and watcher-only.
     """
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
     from agent_coord.helpers.bounds import bound_watcher_hint
     from agent_coord.server.records import mail as rec_mail
     from agent_coord.server.records import watcher as rec_w
     from agent_coord.server.records.label import _activity_live
 
-    verb = canonical_verb(str(body.get("verb") or ""))
-    if verb not in ("add", "remove"):
-        raise CoordError("add/remove: verb is add or remove")
-    typ, nid = _add_target(body, verb, c._cn)
+    command = canonical_command(str(body.get("verb") or ""))
+    if command not in ("add", "remove"):
+        raise CoordError("add/remove: command is add or remove")
+    typ, nid = _add_target(body, command, c._cn)
     raw_hint = body.get("hint")
     has_hint = raw_hint is not None and str(raw_hint) != ""
-    if has_hint and (verb != "add" or typ == CONST_MAIL):
-        raise CoordError(f"{verb}: --hint is for add on a watched kind, not {typ}")
+    if has_hint and (command != "add" or typ == CONST_MAIL):
+        raise CoordError(f"{command}: --hint is for add on a watched kind, not {typ}")
     if not _activity_live(c._cn, typ, nid):
-        raise CoordError(f"{verb}: no {typ} {nid}")
-    who, kind, who_id = _add_who(c, body, owner, verb)
-    out: dict[str, Any] = {"ok": True, "verb": verb, "type": typ, "id": nid, "who": who, "kind": kind}
+        raise CoordError(f"{command}: no {typ} {nid}")
+    who, kind, who_id = _add_who(c, body, owner, command)
+    out: dict[str, Any] = {"ok": True, "verb": command, "type": typ, "id": nid, "who": who, "kind": kind}
     if typ == CONST_MAIL:
         # #sec S-3: only a desk that can already read this letter may change who
         # is on it (including adding itself). Admin, sender, recipient, or a
@@ -2636,14 +2636,14 @@ def _add_remove(c: Book, body: dict[str, Any], owner: str | None) -> Any:
         # itself (a visible join without posting), as a reply would join it.
         # Adding or removing another desk still needs the caller to be the
         # sender, a recipient, a participant of its room, or Admin.
-        self_join = verb == "add" and kind == CONST_DESK and who == _stored(owner or "")
+        self_join = command == "add" and kind == CONST_DESK and who == _stored(owner or "")
         if not self_join and not _mail_reader(c, nid, owner):
             raise CoordError(
-                f"{verb}: not allowed on mail {nid}; "
+                f"{command}: not allowed on mail {nid}; "
                 "you are not its sender, a recipient, or a participant of its room "
                 "(you may add yourself)"
             )
-        if verb == "add":
+        if command == "add":
             before = {_stored(r.get("desk") or "") for r in rec_mail.to_list(c._cn, nid) or []}
             out.update(rec_mail.to_node_put(c._cn, nid, who_id))
             try:
@@ -2661,7 +2661,7 @@ def _add_remove(c: Book, body: dict[str, Any], owner: str | None) -> Any:
         else:
             out.update(rec_mail.to_node_delete(c._cn, nid, who_id))
         return out
-    if verb == "add":
+    if command == "add":
         hint = bound_watcher_hint(str(raw_hint or ""))
         out["rows"] = rec_w.set_hint(c._cn, typ, nid, who_id, hint)
         out["hint"] = hint or None
@@ -2746,11 +2746,11 @@ def _h_invite(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     return door_mod.board_packet()
 
 
-def _note_doing(c: Book, project: str, owner: str | None, verb: str) -> None:
-    """A verb that writes nothing else bumps the seat; doing stays the desk's (#635)."""
-    from agent_coord.server.records.doing_stack import BUMP_VERBS
+def _note_doing(c: Book, project: str, owner: str | None, command: str) -> None:
+    """A command that writes nothing else bumps the seat; doing stays the desk's (#635)."""
+    from agent_coord.server.records.doing_stack import BUMP_COMMANDS
 
-    if verb not in BUMP_VERBS or not owner:
+    if command not in BUMP_COMMANDS or not owner:
         return
     try:
         from agent_coord.server.records import join as rec_join
@@ -3073,9 +3073,9 @@ HANDLERS = {
 
 
 def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
-    from agent_coord.client.outbound import WALL, canonical_verb
+    from agent_coord.client.outbound import WALL, canonical_command
 
-    verb = canonical_verb(str(body.get("verb") or body.get("cmd") or ""))
+    command = canonical_command(str(body.get("verb") or body.get("cmd") or ""))
 
     # Trusted-field hardening: a client cannot carry a server-internal key.
     # `host` on the HTTP path is set by guard.mark_host from the socket peer
@@ -3089,9 +3089,9 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
         body["project"] = project  # handlers that read the body see id 1's name too
     owner_raw = str(body.get("owner") or "").strip()
     owner = _stored(owner_raw) if owner_raw else None
-    if verb not in WALL:
-        raise CoordError(f"unknown mill verb {verb}")
-    if verb not in OPEN_VERBS:
+    if command not in WALL:
+        raise CoordError(f"unknown mill command {command}")
+    if command not in OPEN_COMMANDS:
         from agent_coord.client.session_errors import (
             SESSION_INVALID_REJOIN,
             SESSION_TOKEN_REQUIRED,
@@ -3110,52 +3110,52 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
         owner = _stored(bearer)
         c._tokens[(project, owner)] = token
         c._guard_owner(project, owner, token, must_be_present=True)
-        # HTTP desk-acting cut: verbs are JSON RPC on the sitting /ws only.
+        # HTTP desk-acting cut: commands are JSON RPC on the sitting /ws only.
         _require_live_ws(owner)
     else:
-        # OPEN_VERBS (join) mint a desk with no bearer; gate by the office door.
+        # OPEN_COMMANDS (join) mint a desk with no bearer; gate by the office door.
         _require_join_authorized(c, body, token)
-    fn = HANDLERS.get(verb)
+    fn = HANDLERS.get(command)
     if fn is None:
-        raise CoordError(f"unknown mill verb {verb}")
+        raise CoordError(f"unknown mill command {command}")
     # #504: redact secrets at mill-wall choke point (CLI cannot bypass)
-    from agent_coord.server.redact import WRITE_VERBS, scrub_request_body
+    from agent_coord.server.redact import WRITE_COMMANDS, scrub_request_body
 
-    if verb in WRITE_VERBS or canonical_verb(verb) in WRITE_VERBS:
+    if command in WRITE_COMMANDS or canonical_command(command) in WRITE_COMMANDS:
         scrub_request_body(body)
     try:
         out = fn(c, body, project, owner)
         try:
             from agent_coord.server import wake_first
 
-            wake_first.note_rpc(owner, verb, ok=True)
+            wake_first.note_rpc(owner, command, ok=True)
         except Exception:
             pass
         try:
-            from agent_coord.server import verbs_to_done
+            from agent_coord.server import commands_to_done
 
-            verbs_to_done.note_card(owner, verb, out, body=body)
+            commands_to_done.note_card(owner, command, out, body=body)
         except Exception:
             pass
         try:
             from agent_coord.server import hold_blocked
 
-            hold_blocked.note_hold(owner, verb, out, body=body)
+            hold_blocked.note_hold(owner, command, out, body=body)
         except Exception:
             pass
         try:
             from agent_coord.server import nest_sor
 
-            nest_sor.note_nest(owner, verb, out, body=body)
+            nest_sor.note_nest(owner, command, out, body=body)
         except Exception:
             pass
         try:
             from agent_coord.server import mail_sor
 
-            mail_sor.note_mail(owner, verb, out, body=body)
+            mail_sor.note_mail(owner, command, out, body=body)
         except Exception:
             pass
-        _note_doing(c, project, owner, verb)
+        _note_doing(c, project, owner, command)
         if owner:
             c.acting_desk = owner
         return out
@@ -3163,7 +3163,7 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
         try:
             from agent_coord.server import wake_first
 
-            wake_first.note_rpc(owner, verb, ok=False)
+            wake_first.note_rpc(owner, command, ok=False)
         except Exception:
             pass
         raise
@@ -3185,7 +3185,7 @@ def rpc_remembered(desk: str, req_id: str) -> tuple[bool, Any]:
 
 
 def rpc_claim(desk: str, req_id: str) -> str:
-    """owner runs the verb. wait means it is in flight. done means the result is cached."""
+    """owner runs the command. wait means it is in flight. done means the result is cached."""
     key = (desk, req_id)
     with _RPC_LOCK:
         if key in _RPC_DONE:
@@ -3227,26 +3227,26 @@ def rpc_abort(desk: str, req_id: str) -> None:
 def dispatch_ws(
     c: Book,
     desk: str,
-    verb: str,
+    command: str,
     args: dict[str, Any] | None = None,
     req_id: str | None = None,
     *,
     peer: str = "",
     forwarded: bool = False,
 ) -> Any:
-    """Run a desk-acting verb for the sitting /ws desk. Identity is desk, not body owner.
+    """Run a desk-acting command for the sitting /ws desk. Identity is desk, not body owner.
 
-    A repeated req_id returns the first result and does not run the verb again (#137).
+    A repeated req_id returns the first result and does not run the command again (#137).
     """
-    from agent_coord.client.outbound import WALL, canonical_verb
+    from agent_coord.client.outbound import WALL, canonical_command
 
-    v = canonical_verb(str(verb or ""))
+    v = canonical_command(str(command or ""))
     if not v:
-        raise CoordError("ws rpc: verb required")
-    if v in OPEN_VERBS or v == "join":
-        raise CoordError("join stays HTTP only; not a /ws RPC verb")
+        raise CoordError("ws rpc: command required")
+    if v in OPEN_COMMANDS or v == "join":
+        raise CoordError("join stays HTTP only; not a /ws RPC command")
     if v not in WALL:
-        raise CoordError(f"unknown mill verb {v}")
+        raise CoordError(f"unknown mill command {v}")
     owner = desk_name(desk)
     if not owner:
         raise CoordError("ws rpc: desk required")
@@ -3268,10 +3268,10 @@ def dispatch_ws(
         body["project"] = project  # handlers that read the body see id 1's name too
     fn = HANDLERS.get(v)
     if fn is None:
-        raise CoordError(f"unknown mill verb {v}")
-    from agent_coord.server.redact import WRITE_VERBS, scrub_request_body
+        raise CoordError(f"unknown mill command {v}")
+    from agent_coord.server.redact import WRITE_COMMANDS, scrub_request_body
 
-    if v in WRITE_VERBS or canonical_verb(v) in WRITE_VERBS:
+    if v in WRITE_COMMANDS or canonical_command(v) in WRITE_COMMANDS:
         scrub_request_body(body)
     rid = str(req_id or "").strip()
     owns_id = False
@@ -3301,9 +3301,9 @@ def dispatch_ws(
         except Exception:
             pass
         try:
-            from agent_coord.server import verbs_to_done
+            from agent_coord.server import commands_to_done
 
-            verbs_to_done.note_card(owner, v, out, body=body)
+            commands_to_done.note_card(owner, v, out, body=body)
         except Exception:
             pass
         try:

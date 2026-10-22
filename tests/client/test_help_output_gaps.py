@@ -23,7 +23,7 @@ def _help(argv: list[str]) -> str:
         sys.stdout, sys.stderr, sys.argv = old_out, old_err, old_argv
 
 
-def _listed_verbs(top: str) -> list[str]:
+def _listed_commands(top: str) -> list[str]:
     names: list[str] = []
     in_pos = False
     for line in top.splitlines():
@@ -35,7 +35,7 @@ def _listed_verbs(top: str) -> list[str]:
         if not in_pos or not line.startswith("    ") or line.startswith("      "):
             continue
         name = line.strip().split()[0]
-        if name and name != "VERB" and not name.startswith("-"):
+        if name and name != "COMMAND" and not name.startswith("-"):
             names.append(name)
     return names
 
@@ -43,13 +43,13 @@ def _listed_verbs(top: str) -> list[str]:
 def test_office_is_on_every_listed_help():
     top = _help(["mill", "-h"])
     assert "--office" in top
-    verbs = _listed_verbs(top)
-    assert "inbox" in verbs
-    assert "send" in verbs
-    assert "mail-thread" in verbs
-    for verb in verbs:
-        text = _help(["mill", verb, "-h"])
-        assert "--office" in text, verb
+    commands = _listed_commands(top)
+    assert "inbox" in commands
+    assert "send" in commands
+    assert "mail-thread" in commands
+    for command in commands:
+        text = _help(["mill", command, "-h"])
+        assert "--office" in text, command
         text.encode("cp1252")
 
 

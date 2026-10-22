@@ -6,7 +6,7 @@ from agent_coord.client.tokens import token_hash
 from agent_coord.server.admin.human import agent_call, allows, seat
 
 
-def test_mill_verb_is_the_agent_door():
+def test_mill_command_is_the_agent_door():
     assert agent_call("/mill/v1/join") is True
     assert agent_call("/") is False
     assert agent_call("/board") is False

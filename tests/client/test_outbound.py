@@ -5,12 +5,12 @@ import pytest
 
 from agent_coord.client.outbound import (
     PATH,
-    VERBS,
+    COMMANDS,
     body_from_args,
-    canonical_verb,
-    is_mill_verb_path,
+    canonical_command,
+    is_mill_command_path,
     parse_path,
-    verb_path,
+    command_path,
 )
 from agent_coord.helpers.errors import CoordError
 
@@ -25,7 +25,7 @@ def _active(monkeypatch, tmp_path, desk: str) -> None:
     write_rpc_bridge(desk, port=9, secret="sitting", pid=os.getpid())
 
 
-def test_skill_md_verbs():
+def test_skill_md_commands():
     for v in (
         "open",
         "unpark",
@@ -44,18 +44,18 @@ def test_skill_md_verbs():
         "member-add",
         "score",
     ):
-        assert v in VERBS
+        assert v in COMMANDS
 
 
-def test_old_verb_names_are_not_rewritten():
+def test_old_command_names_are_not_rewritten():
     for old in ("ask", "volunteer", "yield", "yield-need", "kpi", "here", "presence", "file", "acquire", "release", "progress"):
-        assert canonical_verb(old) == old
+        assert canonical_command(old) == old
 
 
-def test_verb_path():
-    assert verb_path("open") == "/mill/v1/open"
-    assert verb_path("ask") == "/mill/v1/ask"
-    assert verb_path("unclaim") == "/mill/v1/unclaim"
+def test_command_path():
+    assert command_path("open") == "/mill/v1/open"
+    assert command_path("ask") == "/mill/v1/ask"
+    assert command_path("unclaim") == "/mill/v1/unclaim"
     assert PATH == "/mill/v1"
 
 
@@ -65,9 +65,9 @@ def test_parse_path_v1_and_alias():
     assert parse_path("/api/mill/send") == "send"
     assert parse_path("/api/v1/mill/claim") == "claim"
     assert parse_path("/api/floor") is None
-    assert is_mill_verb_path("/mill/v1/open")
-    assert is_mill_verb_path("/api/mill/inbox")
-    assert not is_mill_verb_path("/api/floor")
+    assert is_mill_command_path("/mill/v1/open")
+    assert is_mill_command_path("/api/mill/inbox")
+    assert not is_mill_command_path("/api/floor")
 
 
 def test_body_create_todo(monkeypatch, tmp_path):
@@ -201,10 +201,10 @@ def test_inbox_ignores_argv_owner_spoof(monkeypatch, tmp_path):
     assert got["owner"] == "alice"
 
 
-def test_reply_in_verbs():
-    assert "reply" in VERBS
-    assert "mail-thread" in VERBS
-    assert "thread" not in VERBS
+def test_reply_in_commands():
+    assert "reply" in COMMANDS
+    assert "mail-thread" in COMMANDS
+    assert "thread" not in COMMANDS
 
 
 def test_mail_thread_body_from_args(monkeypatch, tmp_path):

@@ -113,9 +113,9 @@ def test_shape_limit_zero_omits_points_but_keeps_trend() -> None:
 
 def test_shape_groups_many_scores_in_order() -> None:
     a = _rows(3)
-    b = [dict(r, id=8, kpi="ms.verb", better="up") for r in _rows(2)]
+    b = [dict(r, id=8, kpi="ms.command", better="up") for r in _rows(2)]
     got = ss.shape(a + b, 0)
-    assert [g["score"] for g in got] == ["tokens.loop", "ms.verb"]
+    assert [g["score"] for g in got] == ["tokens.loop", "ms.command"]
 
 
 @pytest.mark.parametrize("reply", [{}, {"a": 1}, {"x": "y" * 85}, {"x": "y" * 984}, {"x": "\u00e9" * 50}])

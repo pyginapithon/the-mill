@@ -29,9 +29,9 @@ def _page(args: Any) -> int:
     return int(getattr(args, "page", 0) or 0)
 
 
-def _refuse_page(verb: str, why: str, args: Any) -> bool:
+def _refuse_page(command: str, why: str, args: Any) -> bool:
     if _page(args):
-        raise CoordError(f"{verb} --page: {why}; drop --page")
+        raise CoordError(f"{command} --page: {why}; drop --page")
     return False
 
 
@@ -64,26 +64,26 @@ def note_applies(args: Any) -> bool:
         and not bool(getattr(args, "raw", False))
 
 
-def _block(verb: str, n: int, total: int) -> tuple[int, int, dict]:
+def _block(command: str, n: int, total: int) -> tuple[int, int, dict]:
     of = max(1, -(-total // MAIL_PAGE))
     if n > of:
-        raise CoordError(f"{verb} --page {n}: {total} letter(s) make {of} page(s)")
+        raise CoordError(f"{command} --page {n}: {total} letter(s) make {of} page(s)")
     block: dict[str, Any] = {"n": n, "of": of, "size": MAIL_PAGE, "letters": total}
     return n, of, block
 
 
-def cut(rows: list, page: int, verb: str = "inbox") -> tuple[list, dict]:
+def cut(rows: list, page: int, command: str = "inbox") -> tuple[list, dict]:
     """inbox: the letters on page (1-based; 0 = first), wall order, and the page block."""
-    n, of, block = _block(verb, max(1, page), len(rows))
+    n, of, block = _block(command, max(1, page), len(rows))
     if n < of:
         block["next"] = f"--page {n + 1}"
     block["full"] = FULL_HINT
     return rows[(n - 1) * MAIL_PAGE : n * MAIL_PAGE], block
 
 
-def cut_newest(rows: list, page: int, verb: str = "mail-thread") -> tuple[list, dict]:
+def cut_newest(rows: list, page: int, command: str = "mail-thread") -> tuple[list, dict]:
     """A room: page 1 is the newest MAIL_PAGE letters, kept oldest first."""
-    n, of, block = _block(verb, max(1, page), len(rows))
+    n, of, block = _block(command, max(1, page), len(rows))
     hi = len(rows) - (n - 1) * MAIL_PAGE
     lo = max(0, hi - MAIL_PAGE)
     block["order"] = "page 1 is the newest letters; a higher page is older"

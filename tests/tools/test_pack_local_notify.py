@@ -15,7 +15,7 @@ def _mod():
     return mod
 
 
-def test_notify_cmd_parses_with_the_mill_send_verb(tmp_path) -> None:
+def test_notify_cmd_parses_with_the_mill_send_command(tmp_path) -> None:
     from agent_coord.__main__ import _build_parser
 
     mod = _mod()

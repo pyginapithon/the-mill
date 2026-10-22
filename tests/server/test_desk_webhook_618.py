@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """#618 desk webhook wake. Regression row F68 (desk-webhook).
 
-Seen: no verb or procedure wrote join.endpoint_url or delivery_mode, so no desk
+Seen: no command or procedure wrote join.endpoint_url or delivery_mode, so no desk
 could be armed; the auth key was one host-wide setting, so two desks with two
 receivers could not both be armed; a letter never rang a webhook; and a burst
 of hints would have started one paid bot run per hint.

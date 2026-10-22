@@ -21,9 +21,9 @@ from agent_coord.server.records import opened as rec_opened
 
 def agent_call(path: str) -> bool:
     """True when this request is the agent door, not the human wall."""
-    from agent_coord.client.outbound import is_mill_verb_path
+    from agent_coord.client.outbound import is_mill_command_path
 
-    return is_mill_verb_path(path)
+    return is_mill_command_path(path)
 
 
 def _office():

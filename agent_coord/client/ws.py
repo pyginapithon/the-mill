@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """mill connect backchannel: sit on mill-wall /ws/{desk}. Recv enqueues; drain prints.
 
-Desk-acting verbs use JSON RPC on that same sitting socket via a localhost bridge.
-The bridge records the parent pid of the mill connect process. A verb may use
+Desk-acting commands use JSON RPC on that same sitting socket via a localhost bridge.
+The bridge records the parent pid of the mill connect process. A command may use
 only the bridge whose parent pid equals its own parent pid. On Windows the
 parent pid skips console-script launchers (mill.exe), so `mill` and
 `python -m agent_coord` agree on the shell. mill_ws_call never
@@ -115,7 +115,7 @@ def write_rpc_bridge(
     """Publish 127.0.0.1 bridge for this desk (secret authenticates).
 
     pid is the mill connect process. parent_pid is the process that launched
-    connect. A later verb may send only when its own parent pid matches.
+    connect. A later command may send only when its own parent pid matches.
     """
     path = rpc_bridge_path(desk)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -276,7 +276,7 @@ def dead_connect_for_parent(parent_pid: int | None = None) -> bool:
 # wait then fail closed. 0.5s is longer than the usual port-bind poll (0.02s
 # steps) and far shorter than reconnect backoff (3s).
 SITTING_BRIDGE_RETRY_WAIT_S = 0.5
-# No starting file yet: how long a verb looks for a connect launched just before it.
+# No starting file yet: how long a command looks for a connect launched just before it.
 SITTING_FIRST_WAIT_S = 3.0
 # Handshake can take the websocket open timeout (10s) after mode:ws prints
 # and before the bridge file exists (#210). Poll only while that connect is starting.
@@ -423,13 +423,13 @@ READY_NOTE = (
 )
 
 
-def with_connect_roster(verb: str, args: dict[str, Any]) -> dict[str, Any]:
+def with_connect_roster(command: str, args: dict[str, Any]) -> dict[str, Any]:
     """send/reply without --roster carry the roster this connect named (#337).
 
     The server checks the desk is on it; an explicit --roster is left alone.
     """
     named = str(READY_ROSTER.get("roster") or "").strip()
-    if verb not in ("send", "reply") or not named or str(args.get("roster") or "").strip():
+    if command not in ("send", "reply") or not named or str(args.get("roster") or "").strip():
         return args
     return dict(args, connect_roster=named)
 
@@ -489,7 +489,7 @@ def wait_for_sitting_desk() -> str:
             time.sleep(CONNECT_START_POLL_S)
         ep = bridge_for_parent(parent)
         return str(ep.get("desk") or "").strip() if ep else ""
-    # `mill connect DESK & mill VERB`: the connect may not have written its
+    # `mill connect DESK & mill COMMAND`: the connect may not have written its
     # starting file yet. Look for a while before giving up (0.7.x one-liner).
     wait_s = max(SITTING_FIRST_WAIT_S, SITTING_BRIDGE_RETRY_WAIT_S) if SITTING_BRIDGE_RETRY_WAIT_S else 0.0
     deadline = time.monotonic() + wait_s
@@ -653,11 +653,11 @@ def fail_lone_rpc(pending: dict[str, Any], raw: Any) -> bool:
 
 
 def rpc_timeout_error(
-    verb: str, req_id: str, args: dict[str, Any] | None = None
+    command: str, req_id: str, args: dict[str, Any] | None = None
 ) -> str:
-    """A verb that never answered may already have been applied (#137, #177)."""
+    """A command that never answered may already have been applied (#137, #177)."""
     where = "mill inbox / mill todo"
-    if str(verb or "") == "reply":
+    if str(command or "") == "reply":
         mid = ""
         if isinstance(args, dict):
             mid = str(
@@ -665,7 +665,7 @@ def rpc_timeout_error(
             ).strip()
         where = f"mill mail-thread {mid}" if mid else "mill mail-thread <root>"
     return (
-        f"ws rpc: no reply in 30s for {verb} (id {req_id}); "
+        f"ws rpc: no reply in 30s for {command} (id {req_id}); "
         f"it may have applied - check with {where} before retrying"
     )
 
@@ -682,10 +682,10 @@ def pop_rpc_reply(late: dict[str, dict[str, Any]], req_id: str) -> dict[str, Any
     return late.pop(str(req_id or ""), None)
 
 
-def _retry_key(verb: str, args: dict[str, Any]) -> str:
+def _retry_key(command: str, args: dict[str, Any]) -> str:
     import hashlib
 
-    blob = json.dumps({"verb": verb, "args": args}, sort_keys=True, default=str)
+    blob = json.dumps({"verb": command, "args": args}, sort_keys=True, default=str)
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
@@ -696,9 +696,9 @@ def _retry_path(key: str) -> Path:
     return folder / (key + ".json")
 
 
-def load_retry_id(verb: str, args: dict[str, Any], *, now: float | None = None) -> str:
+def load_retry_id(command: str, args: dict[str, Any], *, now: float | None = None) -> str:
     """Reuse the id from a recent no-reply, so the wall can dedupe (#137)."""
-    path = _retry_path(_retry_key(verb, args))
+    path = _retry_path(_retry_key(command, args))
     try:
         row = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -717,16 +717,16 @@ def load_retry_id(verb: str, args: dict[str, Any], *, now: float | None = None) 
     return str(row.get("id") or "")
 
 
-def save_retry_id(verb: str, args: dict[str, Any], req_id: str) -> None:
-    path = _retry_path(_retry_key(verb, args))
+def save_retry_id(command: str, args: dict[str, Any], req_id: str) -> None:
+    path = _retry_path(_retry_key(command, args))
     path.write_text(
         json.dumps({"id": req_id, "at": time.time()}, separators=(",", ":")),
         encoding="utf-8",
     )
 
 
-def clear_retry_id(verb: str, args: dict[str, Any]) -> None:
-    path = _retry_path(_retry_key(verb, args))
+def clear_retry_id(command: str, args: dict[str, Any]) -> None:
+    path = _retry_path(_retry_key(command, args))
     try:
         path.unlink()
     except OSError:
@@ -860,10 +860,10 @@ def own_bridge_call(desk: str, body: dict[str, Any], *, timeout_s: float = 35.0)
     ep = read_rpc_bridge(desk)
     if not ep or int(ep.get("pid") or 0) != os.getpid():
         raise CoordError("socket not ready")
-    verb = str(body.get("verb") or "")
+    command = str(body.get("verb") or "")
     args = {k: v for k, v in dict(body).items() if k not in ("verb", "cmd", "owner", "token")}
     req_id = str(uuid.uuid4())
-    req = {"id": req_id, "verb": verb, "args": args, "secret": ep["secret"]}
+    req = {"id": req_id, "verb": command, "args": args, "secret": ep["secret"]}
     raw_req = (json.dumps(req, default=str) + "\n").encode("utf-8")
     buf = b""
     with socket.create_connection((str(ep["host"]), int(ep["port"])), timeout=10.0) as sock:
@@ -1075,12 +1075,12 @@ async def _sit_session(
                         }
                     else:
                         req_id = str(req.get("id") or "")
-                        verb = str(req.get("verb") or req.get("cmd") or "").strip()
+                        command = str(req.get("verb") or req.get("cmd") or "").strip()
                         args = req.get("args", {})
                         if not req_id:
                             reply = {"id": None, "ok": False, "error": "ws rpc: id required"}
-                        elif not verb:
-                            reply = {"id": req_id, "ok": False, "error": "ws rpc: verb required"}
+                        elif not command:
+                            reply = {"id": req_id, "ok": False, "error": "ws rpc: command required"}
                         elif args is not None and not isinstance(args, dict):
                             reply = {
                                 "id": req_id,
@@ -1094,7 +1094,7 @@ async def _sit_session(
                             if stashed is not None:
                                 reply = stashed
                             else:
-                                wire = {"id": req_id, "verb": verb, "args": with_connect_roster(verb, args)}
+                                wire = {"id": req_id, "verb": command, "args": with_connect_roster(command, args)}
                                 wait_q: asyncio.Queue = asyncio.Queue(maxsize=1)
 
                                 async def _submit(
@@ -1126,14 +1126,14 @@ async def _sit_session(
                                     reply = {
                                         "id": req_id,
                                         "ok": False,
-                                        "error": rpc_timeout_error(verb, req_id, args),
+                                        "error": rpc_timeout_error(command, req_id, args),
                                     }
                                 except Exception as e:
                                     text = str(e)[:240]
                                     reply = {
                                         "id": req_id,
                                         "ok": False,
-                                        "error": text or rpc_timeout_error(verb, req_id, args),
+                                        "error": text or rpc_timeout_error(command, req_id, args),
                                     }
                                 if str(reply.get("id") or "") != req_id:
                                     if reply.get("id"):
@@ -1141,7 +1141,7 @@ async def _sit_session(
                                     reply = {
                                         "id": req_id,
                                         "ok": False,
-                                        "error": rpc_timeout_error(verb, req_id, args),
+                                        "error": rpc_timeout_error(command, req_id, args),
                                     }
                     conn.sendall((json.dumps(reply, default=str) + "\n").encode("utf-8"))
                 except Exception as e:
@@ -1575,7 +1575,7 @@ def start_ws_thread(
 
 
 def mill_ws_call(body: dict[str, Any], *, token: str = "", desk: str = "") -> Any:
-    """Desk-acting verb over the sitting mill connect /ws via localhost bridge.
+    """Desk-acting command over the sitting mill connect /ws via localhost bridge.
 
     Requires mill connect (bridge file). Does not open a second /ws (would kick).
     token is unused for bridge auth (local secret); kept for call-site compat.
@@ -1587,7 +1587,7 @@ def mill_ws_call(body: dict[str, Any], *, token: str = "", desk: str = "") -> An
     then fail closed. Other errors are not retried.
     """
     from agent_coord.helpers.errors import CoordError
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
     from agent_coord.client.session_errors import (
         SESSION_CONNECT_DIED,
         SESSION_WS_BRIDGE_REQUIRED,
@@ -1596,14 +1596,14 @@ def mill_ws_call(body: dict[str, Any], *, token: str = "", desk: str = "") -> An
     _ = token  # Bearer already authenticated the sitting connect
     _ = desk  # not the sender; the parent pid selects the bridge
 
-    verb = canonical_verb(str(body.get("verb") or body.get("cmd") or ""))
-    if not verb:
-        raise CoordError("ws rpc: verb required")
-    if verb == "join":
-        raise CoordError("join stays HTTP only; not a /ws RPC verb")
+    command = canonical_command(str(body.get("verb") or body.get("cmd") or ""))
+    if not command:
+        raise CoordError("ws rpc: command required")
+    if command == "join":
+        raise CoordError("join stays HTTP only; not a /ws RPC command")
 
     args = {k: v for k, v in dict(body).items() if k not in ("verb", "cmd", "owner", "token")}
-    req_id = load_retry_id(verb, args) or str(uuid.uuid4())
+    req_id = load_retry_id(command, args) or str(uuid.uuid4())
 
     def _once() -> Any:
         ep = bridge_for_parent()
@@ -1616,7 +1616,7 @@ def mill_ws_call(body: dict[str, Any], *, token: str = "", desk: str = "") -> An
 
         req = {
             "id": req_id,
-            "verb": verb,
+            "verb": command,
             "args": args,
             "secret": ep["secret"],
         }
@@ -1666,11 +1666,11 @@ def mill_ws_call(body: dict[str, Any], *, token: str = "", desk: str = "") -> An
             out = dict(msg)
             if not isinstance(out.get("sync"), list):
                 out["sync"] = list(out.get("sync") or [])
-            clear_retry_id(verb, args)
+            clear_retry_id(command, args)
             return out
         err = str(err_text or "ws rpc failed")
         if err.startswith("ws rpc: no reply in 30s"):
-            save_retry_id(verb, args, req_id)
+            save_retry_id(command, args, req_id)
         sync = msg.get("sync") if isinstance(msg.get("sync"), list) else list(msg.get("sync") or [])
         raise CoordError(err, sync=sync, envelope=dict(msg))
 

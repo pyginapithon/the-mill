@@ -58,7 +58,7 @@ def test_raw_refused_drop_also_exits_1():
         assert http.mill_http_from_args(SimpleNamespace(cmd="drop", raw=True)) == 1
 
 
-def test_other_verbs_unchanged():
+def test_other_commands_unchanged():
     reply = {"ok": True, "result": {"released": False}}
     with patch.object(http, "mill_http_call", return_value=reply), patch(
         "agent_coord.client.outbound.body_from_args", return_value={"verb": "hold"}

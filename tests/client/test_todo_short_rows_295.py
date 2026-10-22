@@ -41,7 +41,7 @@ def _wall(monkeypatch, rows, note="your rosters only (the-mill); mill todo --all
 
 def _run(capsys, **kw):
     base = dict(cmd="todo", project="the-mill", need="", find="", group_by="", raw=False,
-                said_verb="", full=False, page=0)
+                said_command="", full=False, page=0)
     base.update(kw)
     rc = http.mill_http_from_args(SimpleNamespace(**base))
     out = capsys.readouterr().out.strip().splitlines()

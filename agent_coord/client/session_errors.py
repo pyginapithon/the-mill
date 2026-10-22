@@ -15,7 +15,7 @@ SESSION_JOIN_DENIED = (
     "mill join --link-file PATH (the welcome link file; ask an Admin to mint a seat)"
 )
 
-# Missing Bearer on a gated verb.
+# Missing Bearer on a gated command.
 SESSION_TOKEN_REQUIRED = (
     "mill access token required; mill connect DESK "
     "(writes ~/.mill/session/<desk>.token)"
@@ -27,13 +27,13 @@ SESSION_WS_REQUIRED = (
     "disconnected: no active Hub /ws for this desk; mill connect DESK to reconnect"
 )
 
-# HTTP desk-acting verbs are cut: verbs run as JSON RPC on the sitting /ws only.
+# HTTP desk-acting commands are cut: commands run as JSON RPC on the sitting /ws only.
 SESSION_WS_RPC_ONLY = (
-    "desk-acting verbs use live /ws JSON RPC; mill connect, then verb on that socket"
+    "desk-acting commands use live /ws JSON RPC; mill connect, then command on that socket"
 )
 
 # mill_ws_call needs the sitting mill connect localhost bridge (no second /ws).
-# Match is the verb process parent pid, not the host active file.
+# Match is the command process parent pid, not the host active file.
 # A fresh shell, a subshell, or the next tool call has a different parent, so
 # "connect again, then retry" misses the same way (#179). Name the same-parent
 # rule and a one-shot recipe for this OS. A second connect supersedes the first.
@@ -41,32 +41,32 @@ SESSION_WS_RPC_ONLY = (
 # text and this constant stay the same string.
 _BRIDGE_PREFIX = (
     "no sitting mill connect for this process; "
-    "this verb must be a child of the shell that started mill connect (same parent process). "
+    "this command must be a child of the shell that started mill connect (same parent process). "
 )
 _BRIDGE_SUFFIX = "The connect is the desk's identity; a command outside one has none."
 # What breaks the parent match, per OS (#361). One tool call is one shell.
 _BASH_DIRECT = (
-    "Connect and the verbs go in ONE tool call (the next tool call is a new shell), and each verb "
+    "Connect and the commands go in ONE tool call (the next tool call is a new shell), and each command "
     "is a direct child of that shell: no timeout, nohup or other wrapper command and no ( ) subshell "
     "or second bash -c in front of it (redirecting its output to a file is fine). "
 )
 _PS_DIRECT = (
-    "Connect and the verbs go in ONE tool call: a Start-Process connect stops when the PowerShell "
-    "call that started it ends, so the next tool call finds none. Run each verb directly in that "
+    "Connect and the commands go in ONE tool call: a Start-Process connect stops when the PowerShell "
+    "call that started it ends, so the next tool call finds none. Run each command directly in that "
     "PowerShell, not through cmd /c, Start-Process or a new powershell. "
 )
-# Every mill command runs this way: connect and the verb share one parent (0.7.x).
-ONE_LINER = "bash -c 'mill connect DESK >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill VERB ARGS'"
+# Every mill command runs this way: connect and the command share one parent (0.7.x).
+ONE_LINER = "bash -c 'mill connect DESK >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill COMMAND ARGS'"
 _BASH_RECIPE = "Run it as: " + ONE_LINER + " (connect alone in the foreground just blocks). "
 _PS_RECIPE = (
     "Run it as: $c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; "
-    "mill VERB ARGS; Stop-Process $c.Id (connect alone in the foreground just blocks). "
+    "mill COMMAND ARGS; Stop-Process $c.Id (connect alone in the foreground just blocks). "
 )
 
 
 PS_ONE_LINER = (
     "$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; "
-    "mill VERB ARGS; Stop-Process $c.Id"
+    "mill COMMAND ARGS; Stop-Process $c.Id"
 )
 
 
@@ -89,7 +89,7 @@ def parent_exited_notice(desk: str, os_name: str | None = None, **extra: object)
     out["hint"] = (
         "the shell that started this connect ended, so the connect stopped (a connect never "
         "outlives the shell that started it; a new tool call is a new shell). Start connect and "
-        "run the verbs in one tool call: " + recipe
+        "run the commands in one tool call: " + recipe
     )
     return out
 
@@ -102,6 +102,6 @@ SESSION_CONNECT_DIED = (
     "disconnected: the mill connect for this process died. "
     "A connect stops when the shell that started it ends: a new tool call is a new shell, and a "
     "Start-Process connect stops with the PowerShell call that ran it. "
-    "Start mill connect again in this same shell, then retry the verb, all in one tool call."
+    "Start mill connect again in this same shell, then retry the command, all in one tool call."
 )
 

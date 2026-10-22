@@ -8,7 +8,7 @@ import json
 import pytest
 
 from agent_coord.client.http import mill_api_key, mill_http_call
-from agent_coord.server.api.mill.rpc import OPEN_VERBS, dispatch
+from agent_coord.server.api.mill.rpc import OPEN_COMMANDS, dispatch
 from agent_coord.helpers.errors import CoordError
 
 # Valid CA PEM stub (base64 DER body) so fetch_mill_ca's parse_mill_ca_pem accepts it.
@@ -21,7 +21,7 @@ _CA_PEM = (
 
 @pytest.fixture(autouse=True)
 def _ws_gate_noop_for_non_ws_tests(monkeypatch):
-    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_verbs."""
+    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_commands."""
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_ws",
         lambda owner: None,
@@ -60,7 +60,7 @@ def test_mill_api_key_session_file(monkeypatch, tmp_path):
 
 
 def test_mill_http_call_join_sends_bearer_not_body_token(monkeypatch, tmp_path):
-    """join stays HTTP; desk verbs use /ws RPC (see test_ws_rpc / mill_ws_call)."""
+    """join stays HTTP; desk commands use /ws RPC (see test_ws_rpc / mill_ws_call)."""
     from agent_coord.client.tokens import write_session_token
 
     monkeypatch.setenv("AGENT_COORD_MILL_URL", "https://office.example")
@@ -95,7 +95,7 @@ def test_mill_http_call_join_sends_bearer_not_body_token(monkeypatch, tmp_path):
     assert captured["body"].get("token") == "gl-style-pat"
 
 
-def test_mill_http_call_desk_verb_uses_ws_rpc(monkeypatch, tmp_path):
+def test_mill_http_call_desk_command_uses_ws_rpc(monkeypatch, tmp_path):
     import os
 
     from agent_coord.client.tokens import write_session_token
@@ -136,20 +136,20 @@ def test_dispatch_session_requires_access_token():
 
 
 def test_dispatch_here_is_open():
-    assert "join" in OPEN_VERBS
-    assert "here" not in OPEN_VERBS
-    assert "session" not in OPEN_VERBS
+    assert "join" in OPEN_COMMANDS
+    assert "here" not in OPEN_COMMANDS
+    assert "session" not in OPEN_COMMANDS
 
 
 def test_dispatch_registry_covers_outbound_wall():
-    from agent_coord.client.outbound import VERBS, WALL
+    from agent_coord.client.outbound import COMMANDS, WALL
     from agent_coord.server.api.mill.rpc import HANDLERS
 
-    assert VERBS <= WALL
-    # WALL is the client verb set. The old thread verb is gone (#241).
+    assert COMMANDS <= WALL
+    # WALL is the client command set. The old thread command is gone (#241).
     assert WALL <= set(HANDLERS)
     assert "thread" not in HANDLERS
-    with pytest.raises(CoordError, match="unknown mill verb"):
+    with pytest.raises(CoordError, match="unknown mill command"):
         dispatch(
             type("F", (), {"_tokens": {}, "resolve_bearer": lambda self, token: "DESK_d"})(),
             {"verb": "leftover", "project": "p", "owner": "d"},
@@ -231,7 +231,7 @@ def test_dispatch_unpark_and_unclaim(monkeypatch):
     )
     assert rec["ok"] is True
     for old in ("yield", "yield-need"):
-        with pytest.raises(CoordError, match="unknown mill verb"):
+        with pytest.raises(CoordError, match="unknown mill command"):
             dispatch(
                 c,
                 {"verb": old, "project": "the-mill", "owner": "desk", "need": "mill-park"},

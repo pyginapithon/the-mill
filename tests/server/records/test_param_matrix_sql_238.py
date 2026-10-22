@@ -1,4 +1,4 @@
-"""Every book verb, every argument, every bad value, on a throwaway book (#238).
+"""Every book command, every argument, every bad value, on a throwaway book (#238).
 
 The CLI runs in this process: the real parser, request body, handler, and
 SPs. Only the /ws hop is replaced by dispatch_ws with the error shape the
@@ -137,19 +137,19 @@ class World:
 
 def _dispatch(w: World, body: dict):
     """The /ws hop: dispatch_ws, then the reply shape asgi and mill_ws_call give."""
-    from agent_coord.client.outbound import canonical_verb
+    from agent_coord.client.outbound import canonical_command
     from agent_coord.server.api.mill import rpc
     from agent_coord.server.asgi import hold_envelope_ok
 
-    verb = canonical_verb(str(body.get("verb") or body.get("cmd") or ""))
+    command = canonical_command(str(body.get("verb") or body.get("cmd") or ""))
     args = {k: v for k, v in dict(body).items() if k not in ("verb", "cmd", "owner", "token")}
     try:
-        result = rpc.dispatch_ws(w.book, w.desk, verb, args)
+        result = rpc.dispatch_ws(w.book, w.desk, command, args)
     except CoordError as e:
         raise CoordError(str(e)) from None
     except Exception as e:
         raise CoordError(str(e)[:240]) from None
-    return {"ok": hold_envelope_ok(verb, result), "result": result, "sync": []}
+    return {"ok": hold_envelope_ok(command, result), "result": result, "sync": []}
 
 
 @pytest.fixture(scope="module")
@@ -157,7 +157,7 @@ def world(cn, tmp_path_factory):
     from agent_coord.client.tokens import token_hash
     from agent_coord.server.records import join as here
 
-    # the-mill is the default project for verbs that still default it (#243, #244).
+    # the-mill is the default project for commands that still default it (#243, #244).
     seed_names(
         cn, (pc.P, "roster"), ("the-mill", "roster"), (ME, "desk"), (PEER, "desk"),
         ("c238-lbl", "label"),
@@ -184,38 +184,38 @@ def _parser():
 CASES = pc.build_cases(_parser())
 
 
-# Verbs whose cases cannot run yet. unpark takes its parent since #246.
+# Commands whose cases cannot run yet. unpark takes its parent since #246.
 BLOCKED: dict[str, str] = {}
 
 
 @pytest.mark.parametrize(
-    "verb",
+    "command",
     [
         pytest.param(v, marks=[pytest.mark.xfail(strict=True, reason=BLOCKED[v])]) if v in BLOCKED else v
         for v in pc.BOOK
     ],
 )
-def test_base_argv_is_valid(world, verb) -> None:
+def test_base_argv_is_valid(world, command) -> None:
     """The base command succeeds, so a refusal below belongs to the bad value."""
-    argv = verb.split() + world.fill(pc.BOOK[verb])
+    argv = command.split() + world.fill(pc.BOOK[command])
     code, out, err = world.run(argv)
     assert code == 0, (argv[:6], out[-300:], err[-300:])
 
 
 def _params():
     out = []
-    for verb, dest, case, argv in CASES:
-        cid = pc.case_id(verb, dest, case)
+    for command, dest, case, argv in CASES:
+        cid = pc.case_id(command, dest, case)
         marks = [pytest.mark.xfail(strict=True, reason=GAPS[cid])] if cid in GAPS else []
-        if verb in BLOCKED:
-            marks = [pytest.mark.skip(reason=BLOCKED[verb])]
-        out.append(pytest.param(verb, argv, id=cid, marks=marks))
+        if command in BLOCKED:
+            marks = [pytest.mark.skip(reason=BLOCKED[command])]
+        out.append(pytest.param(command, argv, id=cid, marks=marks))
     return out
 
 
-@pytest.mark.parametrize("verb,argv", _params())
-def test_bad_value_refused_on_the_call(world, verb, argv) -> None:
-    filled = verb.split() + world.fill(argv)
+@pytest.mark.parametrize("command,argv", _params())
+def test_bad_value_refused_on_the_call(world, command, argv) -> None:
+    filled = command.split() + world.fill(argv)
     before = world.checksum()
     code, out, err = world.run(filled)
     after = world.checksum()

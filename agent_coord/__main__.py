@@ -49,22 +49,22 @@ def normalize_seat_argv(argv: list[str]) -> list[str]:
 
 
 BODY_FILE_FIX = "write the body to a UTF-8 file and pass --body-file PATH (a body in the command line is not read)"
-_BODY_VERBS = ("reply", "send")
+_BODY_COMMANDS = ("reply", "send")
 
 
 class MillArgumentParser(argparse.ArgumentParser):
-    _verb = ""
+    _command = ""
 
     def parse_known_args(self, args=None, namespace=None):
         words = list(sys.argv[1:] if args is None else args)
-        self._verb = next((w for w in words if not str(w).startswith("-")), "")
+        self._command = next((w for w in words if not str(w).startswith("-")), "")
         return super().parse_known_args(args, namespace)
 
     def error(self, message: str) -> None:
         if "--seat" in message and "expected one argument" in message:
             message = message + "; if the value starts with '-', use --seat=VALUE"
         elif "required: --body-file" in message or (
-            "unrecognized arguments" in message and self._verb in _BODY_VERBS
+            "unrecognized arguments" in message and self._command in _BODY_COMMANDS
         ):
             # #638: one line that names the fix, not just the missing flag.
             message = message + "; " + BODY_FILE_FIX
@@ -77,7 +77,7 @@ def _attach_office_help(parser: argparse.ArgumentParser) -> None:
         "--office",
         default="",
         metavar="ALIAS",
-        help="office alias; place it before or after the verb",
+        help="office alias; place it before or after the command",
     )
     for action in parser._actions:
         if isinstance(action, argparse._SubParsersAction):
@@ -396,10 +396,10 @@ def main(argv: list[str] | None = None) -> int:
     mismatch = checkout_dist_line()
     if mismatch:
         print(mismatch, file=sys.stderr, flush=True)
-    verbs = [a for a in raw if not a.startswith("-")]
-    if verbs and verbs[0] in ("leftover", "leftover-done"):
+    commands = [a for a in raw if not a.startswith("-")]
+    if commands and commands[0] in ("leftover", "leftover-done"):
         print(
-            '{"ok": false, "error": "unknown mill verb. Idle is mill connect + HINT."}',
+            '{"ok": false, "error": "unknown mill command. Idle is mill connect + HINT."}',
             flush=True,
         )
         return 2
@@ -463,14 +463,14 @@ def _build_parser() -> MillArgumentParser:
     p.add_argument(
         "--raw",
         action="store_true",
-        help="desk verbs: print lean result (old unwrap) instead of full ok/mill/id/result/sync envelope",
+        help="desk commands: print lean result (old unwrap) instead of full ok/mill/id/result/sync envelope",
     )
-    sub = p.add_subparsers(dest="cmd", required=False, metavar="VERB")
+    sub = p.add_subparsers(dest="cmd", required=False, metavar="COMMAND")
 
     
     br = sub.add_parser(
         "briefing",
-        help="print bootstrap / join / human / usecases / verbs / skill / connect / spawn / howto-ai / improve",
+        help="print bootstrap / join / human / usecases / commands / skill / connect / spawn / howto-ai / improve",
     )
     br.add_argument(
         "kind",
@@ -478,8 +478,8 @@ def _build_parser() -> MillArgumentParser:
         default="",
         help="join / connect / skill / ...  (omit = list kinds). mill briefing is local printout.",
     )
-    hp = sub.add_parser("help", help="mill CLI for desks (docs/protocol/cli-desk.md); mill help VERB = one verb")
-    hp.add_argument("verb", nargs="?", default="", help="optional verb (join, inbox, send, ...)")
+    hp = sub.add_parser("help", help="mill CLI for desks (docs/protocol/cli-desk.md); mill help COMMAND = one command")
+    hp.add_argument("command", nargs="?", default="", help="optional command (join, inbox, send, ...)")
 
     ini = sub.add_parser(
         "init",
@@ -1018,24 +1018,24 @@ def _build_parser() -> MillArgumentParser:
     rtr.add_argument("--yes", action="store_true", help="skip the retype prompt")
 
     memb = sub.add_parser("member", help="list this desk's rosters (Office first)")
-    for _verb, _what in (("add", "put desks on"), ("remove", "take desks off")):
+    for _command, _what in (("add", "put desks on"), ("remove", "take desks off")):
         _ap = sub.add_parser(
-            _verb,
-            help=f"mill {_verb} roster NAME [d1,d2]: {_what} a roster (no desks = you). "
-            f"mill {_verb} TYPE:ID [WHO]: mail recipient or watcher (#265).",
+            _command,
+            help=f"mill {_command} roster NAME [d1,d2]: {_what} a roster (no desks = you). "
+            f"mill {_command} TYPE:ID [WHO]: mail recipient or watcher (#265).",
         )
         _ap.add_argument("kind", metavar="TYPE", help="roster, or TYPE:ID (mail|todo|join|hold|score)")
         _ap.add_argument("group", metavar="NAME|WHO", nargs="?", default="")
         _ap.add_argument("desks", nargs="?", default="", help="roster form: comma list of desks; omit for yourself")
-        if _verb == "add":
+        if _command == "add":
             _ap.add_argument("--hint", default="", help="TYPE:ID form, watched kinds only: per-listener wake recipe")
-        if _verb == "remove":
+        if _command == "remove":
             _ap.add_argument("--yes", action="store_true", help="skip the prompt")
-    for _verb, _what in (("watch", "wake me on"), ("unwatch", "stop waking me on")):
-        _wp = sub.add_parser(_verb, help=f"mill {_verb} TYPE ID: {_what} a todo, hold, score or join (self only); a todo also by ROSTER/NEED")
+    for _command, _what in (("watch", "wake me on"), ("unwatch", "stop waking me on")):
+        _wp = sub.add_parser(_command, help=f"mill {_command} TYPE ID: {_what} a todo, hold, score or join (self only); a todo also by ROSTER/NEED")
         _wp.add_argument("type", metavar="TYPE", choices=("todo", "hold", "score", "join", "room"))
         _wp.add_argument("target", metavar="ID", help="activity id; a todo also by ROSTER/NEED (cold-test/fix-login)")
-        if _verb == "watch":
+        if _command == "watch":
             _wp.add_argument("--hint", default="", help="per-listener wake recipe")
     lab = sub.add_parser("label", help="mill label TYPE ID NAME: tag an activity; a new label is created on first use")
     lab.add_argument("type")
@@ -1416,14 +1416,14 @@ def _build_parser() -> MillArgumentParser:
 
 
 def _yes_everywhere(parser: argparse.ArgumentParser, top: bool = True) -> None:
-    """Every verb takes --yes (0.7.x): it skips a prompt, or is a no-op where none exists."""
+    """Every command takes --yes (0.7.x): it skips a prompt, or is a no-op where none exists."""
     for act in parser._actions:
         if isinstance(act, argparse._SubParsersAction):
             for child in act.choices.values():
                 has_sub = any(isinstance(a, argparse._SubParsersAction) for a in child._actions)
                 if not has_sub and "--yes" not in child._option_string_actions:
                     child.add_argument(
-                        "--yes", action="store_true", help="skip any prompt (this verb has none)"
+                        "--yes", action="store_true", help="skip any prompt (this command has none)"
                     )
                 _yes_everywhere(child, top=False)
 
@@ -1443,7 +1443,7 @@ def _no_abbrev(parser: argparse.ArgumentParser) -> None:
 
 
 def _subparser(p: argparse.ArgumentParser, name: str) -> argparse.ArgumentParser:
-    """The named verb's parser, found on the built parser."""
+    """The named command's parser, found on the built parser."""
     for act in p._actions:
         if isinstance(act, argparse._SubParsersAction) and name in act.choices:
             return act.choices[name]
@@ -1501,7 +1501,7 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
         if args.cmd == "help":
             from agent_coord.install.office import help_text
 
-            text = help_text(getattr(args, "verb", "") or "")
+            text = help_text(getattr(args, "command", "") or "")
             if text.startswith("mill help: no such topic"):
                 sys.stderr.write(text)
                 return 2
@@ -1658,7 +1658,7 @@ def _run_parsed(p: MillArgumentParser, argv: list[str] | None) -> int:
             from agent_coord.client.tokens import resolve_desk_owner
             from agent_coord.client.ws import wait_for_sitting_desk
 
-            # Like the RPC verbs: wait for a connect started just before in this shell (#358).
+            # Like the RPC commands: wait for a connect started just before in this shell (#358).
             owner = resolve_desk_owner("") or wait_for_sitting_desk()
             if not owner:
                 print("mill route: mill connect DESK first", file=sys.stderr, flush=True)

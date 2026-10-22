@@ -45,9 +45,9 @@ def test_move_by_name_sends_refs():
     assert "id" not in body and "parent_id" not in body
 
 
-@pytest.mark.parametrize("verb", ["prune", "detach"])
-def test_prune_detach_by_name(verb):
-    body = _body([verb, "agent-ux", "todo", "agent-ux/child"])
+@pytest.mark.parametrize("command", ["prune", "detach"])
+def test_prune_detach_by_name(command):
+    body = _body([command, "agent-ux", "todo", "agent-ux/child"])
     assert body["ref"] == "agent-ux/child" and "id" not in body
 
 

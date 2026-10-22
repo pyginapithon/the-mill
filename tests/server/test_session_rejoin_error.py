@@ -14,7 +14,7 @@ from agent_coord.server.api.mill import rpc
 
 @pytest.fixture(autouse=True)
 def _ws_gate_noop_for_non_ws_tests(monkeypatch):
-    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_verbs."""
+    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_commands."""
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_ws",
         lambda owner: None,

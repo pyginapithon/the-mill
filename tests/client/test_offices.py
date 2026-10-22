@@ -111,7 +111,7 @@ def test_host_key_strips_scheme_and_default_port():
     assert host_key("") == ""
 
 
-def test_pull_office_flag_before_or_after_verb():
+def test_pull_office_flag_before_or_after_command():
     name, rest = pull_office_flag(["todo", "--office", "Offsite", "--owner", "build-cloud"])
     assert name == "Offsite"
     assert rest == ["todo", "--owner", "build-cloud"]

@@ -48,7 +48,7 @@ def _wall(monkeypatch, board, label_pairs=(), owner="desk-a", calls=None, trunca
 
 def _run(capsys, **kw):
     base = dict(cmd="todo", project="", need="", find="", group_by="", raw=False,
-                said_verb="", full=False, page=0, mine=True)
+                said_command="", full=False, page=0, mine=True)
     base.update(kw)
     rc = http.mill_http_from_args(SimpleNamespace(**base))
     out = capsys.readouterr().out.strip().splitlines()
@@ -189,28 +189,28 @@ class Wall:
 
     def __init__(self, cards, rank, rosters=("Office", "fx-r9"), fail=None):
         self.cards, self.rank, self.rosters, self.fail = list(cards), list(rank), list(rosters), fail or {}
-        self.verbs: list = []
+        self.commands: list = []
 
     def __call__(self, body):
-        verb = body["verb"]
-        self.verbs.append(verb)
-        if verb in self.fail:
-            err = self.fail[verb]
+        command = body["verb"]
+        self.commands.append(command)
+        if command in self.fail:
+            err = self.fail[command]
             if isinstance(err, BaseException):
                 raise err
             return {"ok": False, "error": err}
-        if verb == "member":
+        if command == "member":
             return {"ok": True, "result": [{"slot": r} for r in self.rosters]}
-        if verb == "trail":
+        if command == "trail":
             return _label_reply(sorted(self.rank, key=lambda t: t[1]))
-        if verb == "todo" and "rosters" in body:
+        if command == "todo" and "rosters" in body:
             on = [c for c in self.cards if c["project_id"] in body["rosters"] and c["status"] != "done"]
             return {"ok": True, "result": {"cards": on, "rosters": len(body["rosters"])}}
-        if verb == "todo":
+        if command == "todo":
             roster = body.get("project") or "the-mill"
             hit = [c for c in self.cards if c["project_id"] == roster and str(c["id"]) == str(body.get("need"))]
             return {"ok": True, "result": hit} if hit else {"ok": False, "error": f"todo: no card {body.get('need')} in {roster}"}
-        raise AssertionError(verb)
+        raise AssertionError(command)
 
 
 def _fx(i, volunteer="", status="open", roster="fx-r9", labels=("desk-a",)):
@@ -224,7 +224,7 @@ def test_block_reads_focus_cards_on_any_roster_of_the_desk():
     assert [c["id"] for c in block["cards"]] == [43, 41, 46, 42, 44]
     assert block["cards"][0] == {"id": 43, "project_id": "fx-r9", "need_id": "need-43", "status": "open",
                                  "volunteer": "", "rank": 0}
-    assert wall.verbs == ["member", "todo", "trail"]
+    assert wall.commands == ["member", "todo", "trail"]
 
 
 def test_block_top_five_actionable_in_rank_order():
@@ -254,7 +254,7 @@ def test_block_none_when_nothing_to_work_on():
 def test_block_skips_the_label_read_when_no_card_wears_it():
     wall = Wall([_fx(1, "desk-a", "claimed", labels=())], [])
     assert focus.connect_block(wall, "desk-a") is None
-    assert wall.verbs == ["member", "todo"]
+    assert wall.commands == ["member", "todo"]
 
 
 def test_card_on_a_roster_the_desk_is_not_on_is_not_focus():
@@ -262,17 +262,17 @@ def test_card_on_a_roster_the_desk_is_not_on_is_not_focus():
     assert [c["id"] for c in focus.connect_block(wall, "desk-a")["cards"]] == [2]
 
 
-@pytest.mark.parametrize("verb,err,said", [
+@pytest.mark.parametrize("command,err,said", [
     ("member", "member: refused", "member: refused"),
     ("todo", "todo: unknown project fx-r9", "todo: unknown project fx-r9"),
     ("trail", "trail: owner required", "trail: owner required"),
     ("todo", OSError("timed out"), "timed out"),
 ])
-def test_block_names_the_failed_read(verb, err, said):
-    wall = Wall([_fx(1)], [(1, 0)], fail={verb: err})
+def test_block_names_the_failed_read(command, err, said):
+    wall = Wall([_fx(1)], [(1, 0)], fail={command: err})
     with pytest.raises(focus.FocusError) as e:
         focus.connect_block(wall, "desk-a")
-    assert said in str(e.value) and verb in str(e.value)
+    assert said in str(e.value) and command in str(e.value)
 
 
 def _socket(monkeypatch, wall, project_reply=None):
@@ -325,4 +325,4 @@ def test_connect_prints_nothing_without_focus_or_after_refusal(monkeypatch, caps
     stop = threading.Event()
     ws_mod.hold_sync_lines()
     http.seat_then_focus("desk-a", "x", stop, {})
-    assert wall.verbs == [] and "focus" not in capsys.readouterr().out
+    assert wall.commands == [] and "focus" not in capsys.readouterr().out

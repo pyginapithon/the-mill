@@ -250,8 +250,8 @@
         if (o && owners.indexOf(o) < 0) owners.push(o);
       });
       const note = span === "hourly"
-        ? `<p class="floor-tl-note">Hour rollup. Each point is that desk's verb count.</p>`
-        : `<p class="floor-tl-note">Day rollup, 30 midnights. Each point is that desk's verb count.</p>`;
+        ? `<p class="floor-tl-note">Hour rollup. Each point is that desk's command count.</p>`
+        : `<p class="floor-tl-note">Day rollup, 30 midnights. Each point is that desk's command count.</p>`;
       if (!owners.length) {
         const empty = span === "hourly"
           ? "No hour rollup for these desks."
@@ -291,18 +291,18 @@
         if (!perDesk[owner] || i < 0 || i >= nB) return;
         perDesk[owner][i] = evidenceCount(row);
       });
-      const verbColor = "#5ec8d8";
+      const commandColor = "#5ec8d8";
       let legend = "";
       let charts = "";
       if (byDesk) {
-        legend = `<div class="floor-tl-legend"><span><i style="background:${verbColor}"></i>verbs</span></div>`;
+        legend = `<div class="floor-tl-legend"><span><i style="background:${commandColor}"></i>commands</span></div>`;
         charts = owners.map(function (owner) {
           const values = perDesk[owner];
           let ymax = 1;
           values.forEach(function (v) { if (v > ymax) ymax = v; });
           return `<div class="floor-tl-chart" data-owner="${esc(owner)}" role="button" tabindex="0">` +
             `<div class="floor-tl-name">${esc(owner)}</div>` +
-            floorTlSvg([{ values: values, color: verbColor, thick: 1.6 }], ymax, spec, since, nB) + `</div>`;
+            floorTlSvg([{ values: values, color: commandColor, thick: 1.6 }], ymax, spec, since, nB) + `</div>`;
         }).join("");
       } else {
         legend = `<div class="floor-tl-legend">` + owners.map(function (o, i) {
@@ -313,7 +313,7 @@
         });
         let ymax = 1;
         named.forEach(function (s) { s.values.forEach(function (v) { if (v > ymax) ymax = v; }); });
-        charts = `<div class="floor-tl-chart"><div class="floor-tl-name">verbs</div>` +
+        charts = `<div class="floor-tl-chart"><div class="floor-tl-name">commands</div>` +
           floorTlSvg(named, ymax, spec, since, nB) + `</div>`;
       }
       tlEl.innerHTML = `<div class="floor-tl-stick">${note}${legend}</div>` + charts;

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from agent_coord.lib.observe import parse_roots
 from agent_coord.server.asgi import make_asgi_app
-from agent_coord.server.glance import _pack_routines, build, seal, slowest_verb_text
+from agent_coord.server.glance import _pack_routines, build, seal, slowest_command_text
 from agent_coord.server.score_tick import BOOK_PERF
 import agent_coord.server.middleware as mw
 
@@ -583,7 +583,7 @@ def test_tap_post_opens_glance_and_a_miss_is_empty(monkeypatch):
     _misses.clear()
 
 
-def test_slowest_verb_is_max_ms_in_the_hour():
+def test_slowest_command_is_max_ms_in_the_hour():
     from datetime import timezone
 
     from agent_coord.server.glance import _UNSTORED
@@ -598,17 +598,17 @@ def test_slowest_verb_is_max_ms_in_the_hour():
             "2026-10-06T21:30:00Z op=verb.extra ms=9999.0 desk=nope verb=skip ok=1",
         ]
     )
-    assert slowest_verb_text(text, since) == {
+    assert slowest_command_text(text, since) == {
         "verb": "todo",
         "ms": 180.5,
         "desk": "cold-ab-b",
         "ok": 0,
         "err": "no such need",
     }
-    assert "slowest verb name" not in _UNSTORED
+    assert "slowest command name" not in _UNSTORED
 
 
-def test_slowest_verb_reads_http_and_ws_transports():
+def test_slowest_command_reads_http_and_ws_transports():
     from datetime import timezone
 
     since = datetime(2026, 10, 6, 21, 0, tzinfo=timezone.utc)
@@ -620,7 +620,7 @@ def test_slowest_verb_reads_http_and_ws_transports():
             "2026-10-06T21:17:00Z op=api.mill ms=7000.0 status=200",
         ]
     )
-    assert slowest_verb_text(http_slow, since) == {
+    assert slowest_command_text(http_slow, since) == {
         "verb": "hold",
         "ms": 900.0,
         "desk": "cold-ab-c",
@@ -633,19 +633,19 @@ def test_slowest_verb_reads_http_and_ws_transports():
             "2026-10-06T21:18:00Z op=verb ms=300.0 desk=cold-ab-d verb=hold ok=1",
         ]
     )
-    assert slowest_verb_text(ws_slow, since) == {"verb": "hold", "ms": 300.0, "desk": "cold-ab-d", "ok": 1}
+    assert slowest_command_text(ws_slow, since) == {"verb": "hold", "ms": 300.0, "desk": "cold-ab-d", "ok": 1}
 
 
-def test_slowest_verb_err_is_trimmed_and_kept_only_there():
+def test_slowest_command_err_is_trimmed_and_kept_only_there():
     from datetime import timezone
 
     since = datetime(2026, 10, 6, 21, 0, tzinfo=timezone.utc)
     long_err = "x" * 400
     text = "2026-10-06T21:15:00Z op=api.mill.todo ms=12.0 status=500 owner=cold-ab-e err=" + long_err
-    got = slowest_verb_text(text, since)
+    got = slowest_command_text(text, since)
     assert got == {"verb": "todo", "ms": 12.0, "desk": "cold-ab-e", "ok": 0, "err": "x" * 160}
     ok_line = "2026-10-06T21:15:00Z op=verb ms=12.0 desk=cold-ab-e verb=send ok=1"
-    assert "err" not in slowest_verb_text(ok_line, since)
+    assert "err" not in slowest_command_text(ok_line, since)
     sealed = seal({"logs": {"slowest_verb": got}, "book": {"err": CANARY}})
     assert sealed["logs"]["slowest_verb"]["err"] == "x" * 160
     assert CANARY not in json.dumps(sealed)

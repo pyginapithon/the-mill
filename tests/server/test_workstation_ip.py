@@ -59,7 +59,7 @@ def test_set_lan_ip_skips_blank() -> None:
     set_lan_ip(Boom(), "", "198.51.100.5")
 
 
-def test_join_saves_lan_ip_other_verbs_do_not(monkeypatch) -> None:
+def test_join_saves_lan_ip_other_commands_do_not(monkeypatch) -> None:
     from pathlib import Path
 
     from fastapi.testclient import TestClient

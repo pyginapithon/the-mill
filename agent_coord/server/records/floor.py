@@ -1535,7 +1535,7 @@ def _v1_envelope(parts: list[str]) -> dict[str, Any]:
         "node": this_host(),
         "version": package_version(),
         "parts": list(parts),
-        # Wall browse vs agent verbs trust matrix (Host GO). Roles only.
+        # Wall browse vs agent commands trust matrix (Host GO). Roles only.
         "trust": mill_trust(),
     }
 

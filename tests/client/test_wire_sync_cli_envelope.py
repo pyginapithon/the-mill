@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""wire-sync-cli-envelope: connect stamp + verb CLI envelope (no live SQL)."""
+"""wire-sync-cli-envelope: connect stamp + command CLI envelope (no live SQL)."""
 from __future__ import annotations
 
 import json

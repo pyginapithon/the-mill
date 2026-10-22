@@ -2,7 +2,7 @@
 """Security: join never puts a desk on the reserved Admin roster (#674).
 
 The Admin roster is granted only by member-add on the office host. A join
-(open verb, plain HTTP) that names Admin as its project or role, in any
+(open command, plain HTTP) that names Admin as its project or role, in any
 spelling the case- and accent-insensitive name table resolves to Admin, is
 refused with a clear error and writes no member row. Refusal is in SQL
 (mill_join_upsert, authoritative) and in the join handler (clean CoordError).

@@ -69,7 +69,7 @@ def _room(cn):
         "asker",
     )
     rid = int(root["id"])
-    finding = rpc._h_reply(book, {"mail_id": rid, "body": "verb: trail"}, "unit", "asker")
+    finding = rpc._h_reply(book, {"mail_id": rid, "body": "command: trail"}, "unit", "asker")
     fid = int(finding["id"])
     card = rpc._h_open(
         book,
@@ -89,7 +89,7 @@ def test_outsider_trails_a_room_mail(cn) -> None:
     book, rid, fid, card = _room(cn)
     out = rpc._h_trail(book, {"node": f"mail:{fid}"}, "unit", "outsider")
     nodes = {(n["kind"], n["id"]): n for n in out["nodes"]}
-    assert nodes[("mail", fid)]["title"] == "verb: trail"
+    assert nodes[("mail", fid)]["title"] == "command: trail"
     assert nodes[("mail", fid)]["state"] == "sent"
     assert ("todo", card) in nodes
     from agent_coord.server.records import mail as rec_mail

@@ -56,10 +56,10 @@ def test_render_header_counts():
     assert text.isascii()
 
 
-def test_trail_is_a_verb_and_body_carries_node():
-    from agent_coord.client.outbound import VERBS, WALL, body_from_args
+def test_trail_is_a_command_and_body_carries_node():
+    from agent_coord.client.outbound import COMMANDS, WALL, body_from_args
 
-    assert "trail" in VERBS and "trail" in WALL
+    assert "trail" in COMMANDS and "trail" in WALL
     args = SimpleNamespace(cmd="trail", node="mail:1188", type="", as_json=False)
     with patch("agent_coord.client.tokens.resolve_desk_owner", return_value="me"):
         body = body_from_args(args)

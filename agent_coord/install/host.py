@@ -944,7 +944,7 @@ def elevate_windows_scm_helper_argv(
     if extra:
         arglist = f"{arglist} {extra}"
     cmd = (
-        "Start-Process -FilePath powershell.exe -Verb RunAs -WindowStyle Hidden -Wait "
+        "Start-Process -FilePath powershell.exe -Command RunAs -WindowStyle Hidden -Wait "
         f"-ArgumentList '{arglist}'"
     )
     return [
@@ -983,7 +983,7 @@ def windows_scm_unregister_ps1() -> str:
         '  if ($Dest) { $arg += " -Dest" }',
         '  if ($DestPath) { $arg += " -DestPath `"$DestPath`"" }',
         '  if ($Packages) { $arg += " -Packages" }',
-        "  Start-Process powershell -Verb RunAs -WindowStyle Hidden -Wait -ArgumentList $arg",
+        "  Start-Process powershell -Command RunAs -WindowStyle Hidden -Wait -ArgumentList $arg",
         "  exit 0",
         "}",
         "schtasks /End /TN mill-wall /F 2>$null | Out-Null",

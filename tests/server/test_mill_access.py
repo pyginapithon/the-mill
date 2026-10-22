@@ -13,7 +13,7 @@ from agent_coord.server.book import Book
 
 @pytest.fixture(autouse=True)
 def _ws_gate_noop_for_non_ws_tests(monkeypatch):
-    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_verbs."""
+    """These modules test Bearer/handlers, not Hub /ws. Sit is enforced in test_ws_gate_commands."""
     monkeypatch.setattr(
         "agent_coord.server.api.mill.rpc._require_live_ws",
         lambda owner: None,
@@ -130,7 +130,7 @@ def test_dispatch_owner_mismatch_forces_bearer():
     def _doing(book, body, project, owner):
         return {"ok": True, "owner": owner}
 
-    with patch("agent_coord.client.outbound.canonical_verb", return_value="doing"), patch(
+    with patch("agent_coord.client.outbound.canonical_command", return_value="doing"), patch(
         "agent_coord.client.outbound.WALL", frozenset({"doing"})
     ), patch.dict(rpc.HANDLERS, {"doing": _doing}, clear=False):
         out = rpc.dispatch(
@@ -150,7 +150,7 @@ def test_dispatch_here_first_person_forces_bearer_owner():
     def _doing(book, body, project, owner):
         return {"ok": True, "owner": owner}
 
-    with patch("agent_coord.client.outbound.canonical_verb", return_value="doing"), patch(
+    with patch("agent_coord.client.outbound.canonical_command", return_value="doing"), patch(
         "agent_coord.client.outbound.WALL", frozenset({"doing"})
     ), patch.dict(rpc.HANDLERS, {"doing": _doing}, clear=False):
         out = rpc.dispatch(c, {"verb": "doing", "project": "office"}, token="tok-a")
@@ -174,11 +174,11 @@ def test_send_src_must_be_bearer():
     assert "bearer" in str(ei.value).lower() or "src" in str(ei.value).lower()
 
 
-def test_no_mail_edit_verb_in_handlers():
-    """Mail is append-only at the RPC surface - no edit-letter verb."""
+def test_no_mail_edit_command_in_handlers():
+    """Mail is append-only at the RPC surface - no edit-letter command."""
     assert "mail-update" not in rpc.HANDLERS
     assert "edit" not in rpc.HANDLERS
-    # mail-thread is intentional read verb (lean TREE/chain); not an edit.
+    # mail-thread is intentional read command (lean TREE/chain); not an edit.
     for k in rpc.HANDLERS:
         assert "mail" not in k or k in ("send", "inbox", "mail-thread"), k
 
@@ -335,7 +335,7 @@ def test_dispatch_bare_owner_matches_desk_bearer():
     def _doing(book, body, project, owner):
         return {"ok": True, "owner": owner}
 
-    with patch("agent_coord.client.outbound.canonical_verb", return_value="doing"), patch(
+    with patch("agent_coord.client.outbound.canonical_command", return_value="doing"), patch(
         "agent_coord.client.outbound.WALL", frozenset({"doing"})
     ), patch.dict(rpc.HANDLERS, {"doing": _doing}, clear=False):
         out = rpc.dispatch(

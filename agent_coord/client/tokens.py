@@ -365,7 +365,7 @@ def active_desk_path(*, dest: Path | None = None) -> Path:
 
 
 def read_active_desk(*, dest: Path | None = None) -> str:
-    """Sticky desk file. Verbs must not read this to choose a sender."""
+    """Sticky desk file. Commands must not read this to choose a sender."""
     from agent_coord.client.offices import current_host_key, current_office, read_host_active
 
     if current_office(dest=dest):

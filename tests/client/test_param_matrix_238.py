@@ -1,6 +1,6 @@
-"""Every CLI verb and argument has a matrix row (#238).
+"""Every CLI command and argument has a matrix row (#238).
 
-The row list is tests/client/param_rows_238.txt. A new verb or flag
+The row list is tests/client/param_rows_238.txt. A new command or flag
 fails this file until that list gains the row. Omitting a required
 positional exits 2 before any write.
 """
@@ -56,7 +56,7 @@ def walk_rows(parser: argparse.ArgumentParser | None = None) -> list[str]:
             if isinstance(act, argparse._SubParsersAction):
                 for name, child in act.choices.items():
                     path = (prefix + " " + name).strip()
-                    found.append(path + " (verb)")
+                    found.append(path + " (command)")
                     walk(child, path)
                 continue
             if act.dest == "help":
@@ -195,7 +195,7 @@ def test_242_kept_flags_still_parse() -> None:
     ],
 )
 def test_247_alias_calls_exit_2(argv: list[str]) -> None:
-    """#247: old names are not verbs or flags."""
+    """#247: old names are not commands or flags."""
     with pytest.raises(SystemExit) as ei:
         _build_parser().parse_args(argv)
     assert int(ei.value.code or 0) == 2

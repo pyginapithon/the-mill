@@ -45,9 +45,9 @@ def test_target_parses(body, raw, want):
 
 @pytest.mark.parametrize("raw", ["todo:", ":5", "todo:0", "todo:-1", "todo:x", "tree:5", "name:1", "todo:5:6"])
 def test_bad_target_is_refused(body, raw):
-    for verb in ("add", "remove"):
+    for command in ("add", "remove"):
         with pytest.raises(CoordError, match="type:id"):
-            body([verb, raw])
+            body([command, raw])
 
 
 @pytest.mark.parametrize("raw", ["256", "todo", "desk"])
@@ -76,5 +76,5 @@ def test_roster_form_still_maps_to_member_add(body):
     ["reply", "1", "--body-file", "b", "--add-to", "x"],
     ["reply", "1", "--body-file", "b", "--remove-to", "x"],
 ])
-def test_old_verb_and_flags_are_gone(argv):
+def test_old_command_and_flags_are_gone(argv):
     _exit2(argv)

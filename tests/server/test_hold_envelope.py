@@ -12,7 +12,7 @@ def test_taken_hold_envelope_stays_true():
     assert hold_envelope_ok("hold", {"ok": True, "held": True}) is True
 
 
-def test_other_verb_with_false_result_stays_true():
+def test_other_command_with_false_result_stays_true():
     assert hold_envelope_ok("pass", {"ok": False}) is True
 
 

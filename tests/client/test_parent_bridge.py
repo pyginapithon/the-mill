@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Two sitting desks: a verb follows its parent bridge, never host active."""
+"""Two sitting desks: a command follows its parent bridge, never host active."""
 from __future__ import annotations
 
 import json
@@ -84,7 +84,7 @@ def test_parent_bridges_do_not_cross_and_missing_fails_closed(tmp_path, monkeypa
         def forbid_open(file, *args, **kwargs):
             name = str(file).replace("\\", "/")
             if name.endswith("/active") or name.endswith("/active.tmp"):
-                raise AssertionError("verb opened host active: " + name)
+                raise AssertionError("command opened host active: " + name)
             return open_real(file, *args, **kwargs)
 
         import builtins
@@ -186,18 +186,18 @@ def test_bridge_hint_posix_and_nt():
     """POSIX keeps the bash recipe. Windows prints Start-Process (#179, #236)."""
     posix = bridge_hint("posix")
     nt = bridge_hint("nt")
-    bash = "bash -c 'mill connect DESK >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill VERB ARGS'"
+    bash = "bash -c 'mill connect DESK >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill COMMAND ARGS'"
     assert bash in posix
     assert "foreground just blocks" in posix
     assert "bash" not in nt
     assert "/dev/null" not in nt
     assert "Start-Process mill -ArgumentList 'connect','DESK'" in nt
-    assert "mill VERB ARGS" in nt
+    assert "mill COMMAND ARGS" in nt
     for text in (posix, nt):
         assert text.startswith("no sitting mill connect for this process")
         assert "same parent process" in text
         assert "a command outside one has none" in text
-        assert "then retry this verb" not in text
+        assert "then retry this command" not in text
         assert "bound to the process" not in text
         assert "retry loop will not help" not in text
         text.encode("ascii")

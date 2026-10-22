@@ -53,9 +53,9 @@ _WS_PUSH = re.compile(r"\bws push\b.*\bok=1\b")
 _WS_MISS = re.compile(r"\bfanout miss\b|\bmiss=[1-9]")
 _CRASH = re.compile(r"\bserve crash\b|\bTraceback\b", re.I)
 HOST_NOTES = {
-    KPI_API_N: "mill verbs POST /api/mill in window",
-    KPI_API_MS: "p95 ms mill verbs; target 100",
-    KPI_API_BYTES: "mill verb req_b+resp_b in window",
+    KPI_API_N: "mill commands POST /api/mill in window",
+    KPI_API_MS: "p95 ms mill commands; target 100",
+    KPI_API_BYTES: "mill command req_b+resp_b in window",
     KPI_FLOOR_N: "GET /api/floor in window",
     KPI_FLOOR_MS: "p95 ms GET /api/floor; target 100",
     KPI_FLOOR_BYTES: "GET /api/floor resp_b in window",
@@ -102,9 +102,9 @@ from agent_coord.server.wake_first import (  # noqa: E402
     KPI_WAKE_RPC,
     KPI_WRONG_N,
 )
-from agent_coord.server.verbs_to_done import (  # noqa: E402
+from agent_coord.server.commands_to_done import (  # noqa: E402
     BOOK_PERF as _VTD_BOOK_PERF,
-    KPI_VERBS_TO_DONE,
+    KPI_COMMANDS_TO_DONE,
 )
 from agent_coord.server.hold_blocked import (  # noqa: E402
     BOOK_PERF as _HOLD_BOOK_PERF,
@@ -134,7 +134,7 @@ for _kpi in BOOK_PERF:
 
 _TS = re.compile(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?)Z\s+")
 _PERF_OP = re.compile(r"\bop=([^\s]+)")
-_API_VERB = re.compile(r"\bPOST (?:/mill/v1/|/api/mill/)([a-z0-9-]+)\b", re.I)
+_API_COMMAND = re.compile(r"\bPOST (?:/mill/v1/|/api/mill/)([a-z0-9-]+)\b", re.I)
 _FLOOR = re.compile(r"\bGET /api/floor\b|\bop=api\.floor\b", re.I)
 _PERF_DROP = re.compile(r"\bop=ws\.recv\b.*\bdrop=1\b")
 _BC_DROP = re.compile(r"\bhint drop desk=")
@@ -213,8 +213,8 @@ _WAKE_FIRST_OP = re.compile(r"\bop=wake\.first_ok\b")
 _RPC_N = re.compile(r"\brpc=(\d+)")
 _WRONG_N = re.compile(r"\bwrong=(\d+)")
 _RETRY_N = re.compile(r"\bretry=(\d+)")
-_VERBS_TO_DONE_OP = re.compile(r"\bop=card\.verbs_to_done\b")
-_VERBS_N = re.compile(r"\bverbs=(\d+)")
+_COMMANDS_TO_DONE_OP = re.compile(r"\bop=card\.verbs_to_done\b")
+_COMMANDS_N = re.compile(r"\bverbs=(\d+)")
 _HOLD_BLOCKED_OP = re.compile(r"\bop=hold\.blocked\b")
 _NEST_HIT_OP = re.compile(r"\bop=nest\.hit\b")
 _REASK_N = re.compile(r"\breask=(\d+)")
@@ -271,16 +271,16 @@ def measure_wrong_retry(text: str, since: datetime) -> tuple[int, int]:
     return _p50(wrong_vals), _p50(retry_vals)
 
 
-def measure_verbs_to_done(text: str, since: datetime) -> int:
+def measure_commands_to_done(text: str, since: datetime) -> int:
     """p50 verbs= from card.verbs_to_done stamps in window. 0 if none."""
     vals: list[float] = []
     for line in (text or "").splitlines():
         ts = _parse_ts(line)
         if not _in_window(ts, since):
             continue
-        if not _VERBS_TO_DONE_OP.search(line):
+        if not _COMMANDS_TO_DONE_OP.search(line):
             continue
-        vm = _VERBS_N.search(line)
+        vm = _COMMANDS_N.search(line)
         if vm:
             try:
                 vals.append(float(vm.group(1)))
@@ -390,11 +390,11 @@ def count_api(text: str, since: datetime) -> tuple[int, int]:
         ts = _parse_ts(line)
         if not _in_window(ts, since):
             continue
-        m = _API_VERB.search(line)
-        verb = (m.group(1) if m else "").strip().lower()
-        if verb in TICK_OPS:
+        m = _API_COMMAND.search(line)
+        command = (m.group(1) if m else "").strip().lower()
+        if command in TICK_OPS:
             ticks += 1
-        if verb in IDLE_OPS:
+        if command in IDLE_OPS:
             idle += 1
         if _FLOOR.search(line):
             idle += 1
@@ -445,7 +445,7 @@ def _measure_host(dest: Path, since: datetime) -> dict[str, int]:
             continue
         req = int(_REQ_B.search(line).group(1)) if _REQ_B.search(line) else 0
         resp = int(_RESP_B.search(line).group(1)) if _RESP_B.search(line) else 0
-        if _API_VERB.search(line):
+        if _API_COMMAND.search(line):
             out[KPI_API_N] += 1
             out[KPI_API_BYTES] += req + resp
         if _FLOOR.search(line):
@@ -504,7 +504,7 @@ def measure(*, dest: Path | None = None, window_s: int = WINDOW_S, now: datetime
     wake_rpc = 0
     wrong_n = 0
     retry_n = 0
-    verbs_to_done = 0
+    commands_to_done = 0
     hold_blocked_ms = 0
     nest_hit_n = 0
     nest_reask_n = 0
@@ -514,7 +514,7 @@ def measure(*, dest: Path | None = None, window_s: int = WINDOW_S, now: datetime
         perf_text = perf.read_text(encoding="utf-8", errors="replace")
         wake_ms, wake_rpc = measure_wake_first(perf_text, since)
         wrong_n, retry_n = measure_wrong_retry(perf_text, since)
-        verbs_to_done = measure_verbs_to_done(perf_text, since)
+        commands_to_done = measure_commands_to_done(perf_text, since)
         hold_blocked_ms = measure_hold_blocked(perf_text, since)
         nest_hit_n, nest_reask_n = measure_nest_sor(perf_text, since)
         mail_hit_n, mail_reask_n = measure_mail_sor(perf_text, since)
@@ -527,7 +527,7 @@ def measure(*, dest: Path | None = None, window_s: int = WINDOW_S, now: datetime
         KPI_WAKE_RPC: wake_rpc,
         KPI_WRONG_N: wrong_n,
         KPI_RETRY: retry_n,
-        KPI_VERBS_TO_DONE: verbs_to_done,
+        KPI_COMMANDS_TO_DONE: commands_to_done,
         KPI_HOLD_BLOCKED_MS: hold_blocked_ms,
         KPI_NEST_HIT: nest_hit_n,
         KPI_NEST_REASK: nest_reask_n,

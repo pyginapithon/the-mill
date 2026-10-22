@@ -383,9 +383,9 @@ def test_probe_tool_run_exits_0(cn, capsys) -> None:
     spec.loader.exec_module(mod)
 
     def call(body):
-        verb = body["verb"]
+        command = body["verb"]
         project = str(body.get("project") or FIX)
-        result = rpc.HANDLERS[verb](_Book(cn), body, project, "pd_me")
+        result = rpc.HANDLERS[command](_Book(cn), body, project, "pd_me")
         return {"ok": True, "result": result}
 
     assert mod.main(["run", "--project", FIX], call=call) == 0

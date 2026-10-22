@@ -118,7 +118,7 @@ def mill_catalog_open(kind: str) -> bool:
     """True if this desk may mint a name of this kind.
 
     A desk is always allowed. A project, role, or label is allowed when trust
-    is high. Limited trust: Admin catalog verbs mint those. The kind is the
+    is high. Limited trust: Admin catalog commands mint those. The kind is the
     call's argument.
     """
     k = (kind or "").strip().lower()

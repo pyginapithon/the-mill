@@ -10,7 +10,7 @@ import pytest
 
 from agent_coord.server.records import apply, connect
 from agent_coord.server.records.db import conn_kwargs as _conn_kwargs
-from agent_coord.server.score_system import KEEP_BYTES, KEEP_DAYS, SPILL, _note, _wall, note_verb, wall_route
+from agent_coord.server.score_system import KEEP_BYTES, KEEP_DAYS, SPILL, _note, _wall, note_command, wall_route
 from tests.server.records.conftest import seed_names
 
 pytestmark = pytest.mark.sql
@@ -77,15 +77,15 @@ def _doc(cn, stamp: str) -> tuple[dict, str, int] | None:
     return _loads(row[0]), str(row[1]), int(row[2])
 
 
-def test_note_verb_swallows_a_missing_book() -> None:
+def test_note_command_swallows_a_missing_book() -> None:
     class Closed:
         def cursor(self):
             raise RuntimeError("PROCEDURE mill_score_event does not exist")
 
-    note_verb("a", "todo", req_b=4, resp_b=6, ms=3, cn=Closed())
+    note_command("a", "todo", req_b=4, resp_b=6, ms=3, cn=Closed())
 
 
-def test_hour_resets_day_keeps_and_bytes_follow_the_verb(cn) -> None:
+def test_hour_resets_day_keeps_and_bytes_follow_the_command(cn) -> None:
     assert KEEP_DAYS == 30
     assert KEEP_BYTES == 4096
     seed_names(cn, ("score_sys", "desk"))
@@ -194,7 +194,7 @@ def test_spill_keeps_the_document_and_is_logged(cn, monkeypatch) -> None:
         logged.append((op, kv))
 
     monkeypatch.setattr("agent_coord.server.push.perf_log", capture)
-    note_verb(DESK, "doing", req_b=1, resp_b=1, ms=5, cn=cn, now=when)
+    note_command(DESK, "doing", req_b=1, resp_b=1, ms=5, cn=cn, now=when)
     assert logged
     assert logged[0][0] == "score.history"
     assert logged[0][1]["ok"] == 0

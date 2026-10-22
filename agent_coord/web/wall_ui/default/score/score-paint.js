@@ -408,11 +408,11 @@
       if (!want) return false;
       return scoreRowDesk(row).toLowerCase() === want;
     }
-    function evidenceVerbN(row, verb) {
+    function evidenceCommandN(row, command) {
       const v = row && row.value;
       if (!v || typeof v !== "object") return 0;
-      if (!verb || verb === "all") return Number(v.n) || 0;
-      const slot = v[verb];
+      if (!command || command === "all") return Number(v.n) || 0;
+      const slot = v[command];
       if (!slot || typeof slot !== "object") return 0;
       return Number(slot.n) || 0;
     }
@@ -426,7 +426,7 @@
       });
       return best;
     }
-    function scoreVerbNames(row) {
+    function scoreCommandNames(row) {
       const v = row && row.value;
       if (!v || typeof v !== "object") return [];
       return Object.keys(v).filter(function (k) {
@@ -434,10 +434,10 @@
         return !!(v[k] && typeof v[k] === "object");
       }).sort(function (a, b) { return a.localeCompare(b); });
     }
-    function scoreDocStats(row, verb) {
+    function scoreDocStats(row, command) {
       const v = row && row.value;
       if (!v || typeof v !== "object") return { n: null, ms: null };
-      if (!verb || verb === "all") {
+      if (!command || command === "all") {
         let ms = 0;
         let any = false;
         Object.keys(v).forEach(function (k) {
@@ -450,7 +450,7 @@
         });
         return { n: v.n != null ? Number(v.n) : null, ms: any ? ms : null };
       }
-      const slot = v[verb];
+      const slot = v[command];
       if (!slot || typeof slot !== "object") return { n: null, ms: null };
       return {
         n: slot.n != null ? Number(slot.n) : null,
@@ -463,10 +463,10 @@
       if (Math.abs(x - Math.round(x)) < 0.05) return String(Math.round(x));
       return String(Math.round(x * 10) / 10);
     }
-    function scoreVerbDetail(stats) {
+    function scoreCommandDetail(stats) {
       const n = stats && stats.n;
       const ms = stats && stats.ms;
-      if (n == null && ms == null) return "No count for this verb today.";
+      if (n == null && ms == null) return "No count for this command today.";
       const bits = [];
       if (n != null) bits.push(scoreCountText(n) + (Number(n) === 1 ? " time" : " times"));
       if (ms != null) bits.push(scoreCountText(ms) + " ms");
@@ -530,17 +530,17 @@
       };
       return { values: values, labels: [lab(start), lab(start + (nB - 1) * step)] };
     }
-    function scoreSeriesHour(desk, verb) {
+    function scoreSeriesHour(desk, command) {
       const values = new Array(24).fill(0);
       (_scoreEv.hourly || []).forEach(function (row) {
         if (!scoreSameDesk(row, desk)) return;
         const i = evidenceHour(row);
         if (i < 0 || i >= 24) return;
-        values[i] = evidenceVerbN(row, verb);
+        values[i] = evidenceCommandN(row, command);
       });
       return { values: values, labels: ["0h", "12h", "23h"] };
     }
-    function scoreSeriesDay(desk, verb) {
+    function scoreSeriesDay(desk, command) {
       const nB = 30;
       const start = new Date();
       start.setHours(0, 0, 0, 0);
@@ -555,7 +555,7 @@
         if (!scoreSameDesk(row, desk)) return;
         const i = keys.indexOf(evidenceDay(row));
         if (i < 0) return;
-        values[i] = evidenceVerbN(row, verb);
+        values[i] = evidenceCommandN(row, command);
       });
       const lab = function (k) {
         const m = String(k || "").match(/-(\d{2})-(\d{2})$/);
@@ -629,24 +629,24 @@
       box.scrollTop = top;
       _scoreGlanceLock = false;
     }
-    function paintScoreVerbs(verbsEl, graphsEl, desk, evReady, scoreOn) {
-      if (!verbsEl || !graphsEl) return;
+    function paintScoreCommands(commandsEl, graphsEl, desk, evReady, scoreOn) {
+      if (!commandsEl || !graphsEl) return;
       if (!desk) {
-        verbsEl.innerHTML = `<div class="idle">Pick a desk.</div>`;
-        graphsEl.innerHTML = `<div class="idle">Pick a verb.</div>`;
+        commandsEl.innerHTML = `<div class="idle">Pick a desk.</div>`;
+        graphsEl.innerHTML = `<div class="idle">Pick a command.</div>`;
         return;
       }
       if (!evReady) {
         const msg = (scoreOn || _scoreEvBusy) ? "Loading rollups..." : "Rollups load on this tab.";
-        verbsEl.innerHTML = `<div class="score-office-h">Verbs</div><div class="idle" style="padding:.45rem">${esc(msg)}</div>`;
+        commandsEl.innerHTML = `<div class="score-office-h">Commands</div><div class="idle" style="padding:.45rem">${esc(msg)}</div>`;
         graphsEl.innerHTML = `<div class="idle">${esc(msg)}</div>`;
         return;
       }
       const doc = scoreLatestDoc(_scoreEv.daily, desk) || scoreLatestDoc(_scoreEv.hourly, desk);
-      const names = scoreVerbNames(doc);
+      const names = scoreCommandNames(doc);
       const ids = ["all"].concat(names);
-      if (ids.indexOf(scoreSelectedVerb) < 0) scoreSelectedVerb = names[0] || "all";
-      const verb = scoreSelectedVerb || "all";
+      if (ids.indexOf(scoreSelectedCommand) < 0) scoreSelectedCommand = names[0] || "all";
+      const command = scoreSelectedCommand || "all";
       let maxN = 1;
       ids.forEach(function (id) {
         const n = Number(scoreDocStats(doc, id).n) || 0;
@@ -654,20 +654,20 @@
       });
       const rows = ids.map(function (id) {
         const stats = scoreDocStats(doc, id);
-        const sel = id === verb ? " sel" : "";
-        const label = id === "all" ? "all verbs" : id;
+        const sel = id === command ? " sel" : "";
+        const label = id === "all" ? "all commands" : id;
         const pct = Math.max(0, Math.min(100, Math.round(((Number(stats.n) || 0) / maxN) * 100)));
         return `<tr class="${sel}" data-score-verb="${esc(id)}">` +
           `<td><span class="score-verb-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>${esc(label)}</td>` +
           `<td>${esc(scoreCountText(stats.n))}</td><td>${esc(scoreCountText(stats.ms))}</td></tr>`;
       }).join("");
-      verbsEl.innerHTML = `<div class="score-office-h">Verbs</div>` +
-        `<table data-table="score-verbs"><thead><tr><th>verb</th><th>n</th><th>ms</th></tr></thead><tbody>${rows}</tbody></table>`;
-      const stats = scoreDocStats(doc, verb);
-      const verbLabel = verb === "all" ? "all verbs" : verb;
+      commandsEl.innerHTML = `<div class="score-office-h">Commands</div>` +
+        `<table data-table="score-verbs"><thead><tr><th>command</th><th>n</th><th>ms</th></tr></thead><tbody>${rows}</tbody></table>`;
+      const stats = scoreDocStats(doc, command);
+      const commandLabel = command === "all" ? "all commands" : command;
       const activitySeries = scoreSeriesActivity(desk);
-      const hourSeries = scoreSeriesHour(desk, verb);
-      const daySeries = scoreSeriesDay(desk, verb);
+      const hourSeries = scoreSeriesHour(desk, command);
+      const daySeries = scoreSeriesDay(desk, command);
       const activityN = scoreTotal(activitySeries.values);
       const hourN = scoreTotal(hourSeries.values);
       const dayN = scoreTotal(daySeries.values);
@@ -677,22 +677,22 @@
       );
       const hour = scoreWindowBody(
         _scoreEv.missHour,
-        scoreBars(hourSeries.values, hourSeries.labels, "Hour, 24 slots, " + verbLabel + ", total " + scoreCountText(hourN))
+        scoreBars(hourSeries.values, hourSeries.labels, "Hour, 24 slots, " + commandLabel + ", total " + scoreCountText(hourN))
       );
       const day = scoreWindowBody(
         _scoreEv.missDay,
-        scoreBars(daySeries.values, daySeries.labels, "Day, 30 midnights, " + verbLabel + ", total " + scoreCountText(dayN))
+        scoreBars(daySeries.values, daySeries.labels, "Day, 30 midnights, " + commandLabel + ", total " + scoreCountText(dayN))
       );
-      const detail = scoreVerbDetail(stats);
+      const detail = scoreCommandDetail(stats);
       const detailLine = (stats.n == null && stats.ms == null)
         ? detail
-        : (verbLabel + " today: " + detail);
+        : (commandLabel + " today: " + detail);
       graphsEl.innerHTML =
         `<div class="note">${esc(detailLine)}</div>` +
         `<div class="score-charts">` +
         scoreGraphBlock("Activity", activityN, "15 minutes", activity) +
-        scoreGraphBlock("Hour", hourN, "24 hours, this verb", hour) +
-        scoreGraphBlock("Day", dayN, "30 days, this verb", day) +
+        scoreGraphBlock("Hour", hourN, "24 hours, this command", hour) +
+        scoreGraphBlock("Day", dayN, "30 days, this command", day) +
         `</div>`;
     }
     function selectScoreDesk(desk, rows) {

@@ -135,7 +135,7 @@ def test_empty_desk_does_not_write_room_stash(monkeypatch, capsys, tmp_path):
     assert not (tmp_path / "inbox-rooms").exists()
 
 
-def test_raw_and_other_verbs_unchanged(monkeypatch, capsys):
+def test_raw_and_other_commands_unchanged(monkeypatch, capsys):
     rows = [_letter(300, "build-room", 191)]
     reply = {"id": "r3", "ok": True, "mill": "0", "result": rows, "sync": []}
     _, out = _run(monkeypatch, capsys, "inbox", reply, raw=True)

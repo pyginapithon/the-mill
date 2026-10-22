@@ -2047,7 +2047,7 @@
     function wallParts() {
       /* Tab-scoped floor slice only. Strip KPI chips keep last counts via _stripLast
          when a part is absent - do NOT re-append agents/mail/scores/todos every poll
-         (that re-shipped the whole todo book ~400KB and stalled verbs). */
+         (that re-shipped the whole todo book ~400KB and stalled commands). */
       const tabBtn = document.querySelector("nav.tabs button.on");
       const tab = (tabBtn && tabBtn.dataset.tab) || "session";
       let core = "agents";
@@ -3462,9 +3462,9 @@
       if (p.desks_here_without != null && Number(p.desks_here_without) > names.length) who += " and more";
       let html = '<h3 class="svc-h">Platform</h3>';
       html += glanceDl([
-        ["Desks with a verb score", glanceCount(p.desks_with_score)],
-        ["Verbs today", glanceCount(p.verbs_today)],
-        ["Desks here without a verb score", glanceCount(p.desks_here_without)],
+        ["Desks with a command score", glanceCount(p.desks_with_score)],
+        ["Commands today", glanceCount(p.verbs_today)],
+        ["Desks here without a command score", glanceCount(p.desks_here_without)],
         ["Those desks", who],
         ["Ticks", glanceNum(p.ticks) + (glanceTarget(p.ticks) ? (" / " + glanceTarget(p.ticks)) : "")],
         ["Hint drops", glanceNum(p.hint_drop) + (glanceTarget(p.hint_drop) ? (" / " + glanceTarget(p.hint_drop)) : "")],
@@ -6591,7 +6591,7 @@
     let scoreFilter = "needs";
     let scoreMode = "scores";
     let scoreSelectedDesk = "";
-    let scoreSelectedVerb = "";
+    let scoreSelectedCommand = "";
     let _scoreEv = { key: "", min: [], hourly: [], daily: [], missMin: false, missHour: false, missDay: false };
     let _scoreEvBusy = "";
     let _scoreEvAt = 0;
@@ -6605,7 +6605,7 @@
     function cards() { return wallLazyCall("scorePaint", "cards", cards, arguments); }
     function ensureScorePaint() { return wallLazyCall("scorePaint", "ensureScorePaint", ensureScorePaint, arguments); }
     function loadScoreEvidence() { return wallLazyCall("scorePaint", "loadScoreEvidence", loadScoreEvidence, arguments); }
-    function paintScoreVerbs() { return wallLazyCall("scorePaint", "paintScoreVerbs", paintScoreVerbs, arguments); }
+    function paintScoreCommands() { return wallLazyCall("scorePaint", "paintScoreCommands", paintScoreCommands, arguments); }
     function selectScoreDesk() { return wallLazyCall("scorePaint", "selectScoreDesk", selectScoreDesk, arguments); }
     /* WALL_UI_DEFAULT_SCORE: scoreDeskRows from domain module */
     /* WALL_UI_DEFAULT_SCORE: thin bridge - module scoreDeskRows(d, span?) */
@@ -6685,7 +6685,7 @@
     }
     function scoreShowLabel(name) {
       const raw = String(name || "").trim();
-      if (raw === "system") return "verbs";
+      if (raw === "system") return "commands";
       const mapped = (typeof scoreKpiLabel === "function") ? scoreKpiLabel(raw) : raw;
       if (mapped && mapped !== raw) return mapped;
       return raw.replace(/[._]+/g, " ");
@@ -6779,7 +6779,7 @@
     function paintScoreDeskTable(rows) {
       void rows;
       const el = document.getElementById("score-desk-table");
-      const verbsEl = document.getElementById("score-verbs");
+      const commandsEl = document.getElementById("score-verbs");
       const graphsEl = document.getElementById("score-graphs");
       const humanEl = document.getElementById("score-human");
       const productEl = document.getElementById("score-product");
@@ -6831,13 +6831,13 @@
         else selected = desks.length ? desks[0].desk : "";
         if (selected !== scoreSelectedDesk) {
           scoreSelectedDesk = selected;
-          scoreSelectedVerb = "";
+          scoreSelectedCommand = "";
           try { localStorage.setItem("factory-score-desk", scoreSelectedDesk); } catch (eDesk) {}
         }
         if (!desks.length) {
-          el.innerHTML = `<div class="score-office-h">Desks</div><div class="idle" style="padding:.45rem">No desk verb scores yet.</div>`;
-          if (verbsEl) verbsEl.innerHTML = `<div class="idle">Pick a desk.</div>`;
-          if (graphsEl) graphsEl.innerHTML = `<div class="idle">Pick a verb.</div>`;
+          el.innerHTML = `<div class="score-office-h">Desks</div><div class="idle" style="padding:.45rem">No desk command scores yet.</div>`;
+          if (commandsEl) commandsEl.innerHTML = `<div class="idle">Pick a desk.</div>`;
+          if (graphsEl) graphsEl.innerHTML = `<div class="idle">Pick a command.</div>`;
         } else {
           const body = desks.map(function (item) {
             const k = item.kpi;
@@ -6852,7 +6852,7 @@
           const evKey = scoreEvidenceBase().key;
           const evReady = _scoreEv.key === evKey;
           if (scoreOn && (!evReady || (Date.now() - _scoreEvAt) >= 15000)) loadScoreEvidence();
-          paintScoreVerbs(verbsEl, graphsEl, scoreSelectedDesk, evReady, scoreOn);
+          paintScoreCommands(commandsEl, graphsEl, scoreSelectedDesk, evReady, scoreOn);
         }
       }
       if (!humanEl) return;
@@ -7010,9 +7010,9 @@
       if (root && !root._scoreDeskWired) {
         root._scoreDeskWired = true;
         root.addEventListener("click", ev => {
-          const verbHit = ev.target.closest("#score-verbs [data-score-verb]");
-          if (verbHit) {
-            scoreSelectedVerb = verbHit.getAttribute("data-score-verb") || "";
+          const commandHit = ev.target.closest("#score-verbs [data-score-verb]");
+          if (commandHit) {
+            scoreSelectedCommand = commandHit.getAttribute("data-score-verb") || "";
             paintScoreDeskTable(scoreDeskRows(window._floor || {}));
             return;
           }
@@ -7020,7 +7020,7 @@
           if (!hit || !window._floor) return;
           const desk = hit.getAttribute("data-score-desk") || "";
           if (!desk || desk === scoreSelectedDesk) return;
-          scoreSelectedVerb = "";
+          scoreSelectedCommand = "";
           selectScoreDesk(desk, scoreDeskRows(window._floor));
         });
       }

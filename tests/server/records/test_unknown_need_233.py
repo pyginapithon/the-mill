@@ -23,7 +23,7 @@ def test_unknown_and_removed_need_refuses(cn) -> None:
     rec_todo.delete(cn, int(made["id"]), "a")
     assert rec_todo.find(cn, "unit", "c233-live") is None
 
-    for verb in (rpc._h_pass, rpc._h_yield, rpc._h_unpark):
+    for command in (rpc._h_pass, rpc._h_yield, rpc._h_unpark):
         for need in ("c233-missing", "c233-live"):
             with pytest.raises(CoordError, match="no such need: unit/" + need):
-                verb(book, {"need": need}, "unit", "a")
+                command(book, {"need": need}, "unit", "a")

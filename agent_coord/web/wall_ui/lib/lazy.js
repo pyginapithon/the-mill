@@ -116,12 +116,12 @@
       domain: "mail"
     },
     scorePaint: {
-      js: "/score/score-paint.js?v=wow294",
+      js: "/score/score-paint.js?v=wow317",
       marker: "WALL_UI_DEFAULT_SCORE_PAINT",
       domain: "score"
     },
     floorPaint: {
-      js: "/floor/floor-paint.js?v=wow307",
+      js: "/floor/floor-paint.js?v=wow317",
       marker: "WALL_UI_DEFAULT_FLOOR_PAINT",
       with: ["floorMap"]
     },

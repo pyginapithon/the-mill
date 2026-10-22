@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from agent_coord.server.allow import allowed, door_client, is_mill_verb
+from agent_coord.server.allow import allowed, door_client, is_mill_command
 
 
 def test_empty_allow_is_open() -> None:
@@ -44,8 +44,8 @@ def test_asgi_wall_403(monkeypatch) -> None:
     assert r.status_code == 403
 
 
-def test_mill_verb_skip() -> None:
-    assert is_mill_verb("/api/mill/here")
-    assert is_mill_verb("/mill/v1/here")
-    assert not is_mill_verb("/")
-    assert not is_mill_verb("/api/floor")
+def test_mill_command_skip() -> None:
+    assert is_mill_command("/api/mill/here")
+    assert is_mill_command("/mill/v1/here")
+    assert not is_mill_command("/")
+    assert not is_mill_command("/api/floor")

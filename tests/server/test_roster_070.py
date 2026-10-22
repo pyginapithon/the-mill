@@ -51,7 +51,7 @@ def _exit2(argv):
     assert ei.value.code == 2
 
 
-def test_cli_roster_verb_replaces_group_and_role():
+def test_cli_roster_command_replaces_group_and_role():
     a = _parser().parse_args(["create", "roster", "east", "--yes"])
     assert (a.cmd, a.object, a.slug, a.yes) == ("create", "roster", "east", True)
     _exit2(["group", "east", "east", "--yes"])

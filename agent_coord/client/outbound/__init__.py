@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Desk outbound: skill.md verbs -> POST /mill/v1/<verb>.
+"""Desk outbound: skill.md commands -> POST /mill/v1/<command>.
 
-mill-wall may still accept /api/mill/<verb> as an alias.
+mill-wall may still accept /api/mill/<command> as an alias.
 """
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ PATH = "/mill/v1"
 _ALIAS_PATH = "/api/mill"
 
 # skill.md outbound (canonical)
-VERBS = frozenset(
+COMMANDS = frozenset(
     {
         "open",
         "unpark",
@@ -51,8 +51,8 @@ SIT = frozenset({"join", "session", "project"})
 # Test-only RPC (#160). Not in skill.md, no mill subcommand; only
 # tools/probe_deleted_rows.py sends it. Own t-<8 hex> fixture rows only.
 PROBE = frozenset({"probe-delete"})
-# mill-wall also serves these skill.md-adjacent verbs
-WALL = VERBS | SIT | PROBE | frozenset(
+# mill-wall also serves these skill.md-adjacent commands
+WALL = COMMANDS | SIT | PROBE | frozenset(
     {
         "label-remove",
         "member-remove",
@@ -117,28 +117,28 @@ _STR = (
 _INT = ("id", "id_a", "id_b", "rm_id", "after", "limit", "parent_id")
 
 
-def canonical_verb(raw: str) -> str:
+def canonical_command(raw: str) -> str:
     v = slug(str(raw or ""))
     return ALIASES.get(v, v)
 
 
-def verb_path(verb: str) -> str:
-    return f"{PATH}/{canonical_verb(verb)}"
+def command_path(command: str) -> str:
+    return f"{PATH}/{canonical_command(command)}"
 
 
 def parse_path(path: str) -> str | None:
-    """Verb from URL, or None if this is not a mill-verb path with a verb segment."""
+    """Command from URL, or None if this is not a mill-command path with a command segment."""
     p = (path or "").split("?", 1)[0]
     if p.startswith("/api/v1/"):
         p = "/api/" + p[len("/api/v1/") :]
     for pre in (PATH + "/", _ALIAS_PATH + "/"):
         if p.startswith(pre):
             rest = p[len(pre) :].strip("/")
-            return canonical_verb(rest) if rest else None
+            return canonical_command(rest) if rest else None
     return None
 
 
-def is_mill_verb_path(path: str) -> bool:
+def is_mill_command_path(path: str) -> bool:
     p = (path or "").split("?", 1)[0]
     if p.startswith("/api/v1/"):
         p = "/api/" + p[len("/api/v1/") :]
@@ -231,30 +231,30 @@ def _note_fields(args: Any, body: dict[str, Any]) -> None:
         body["started"] = True
 
 
-# Verbs whose project and --doing are checked before the call (#243-#245).
+# Commands whose project and --doing are checked before the call (#243-#245).
 _PROJECT_GUARD = {"open", "todo", "label-add", "label-remove", "unpark"}
 _DOING_GUARD = {"open", "hold"}
 DOING_MAX = 512
 
 
-def _guard_args(verb: str, cmd: str, args: Any) -> None:
+def _guard_args(command: str, cmd: str, args: Any) -> None:
     """Refuse an empty or over-length project and an over-length --doing, plainly."""
     from agent_coord.helpers.errors import CoordError
 
-    name = cmd or verb
-    if verb in _PROJECT_GUARD and hasattr(args, "project"):
+    name = cmd or command
+    if command in _PROJECT_GUARD and hasattr(args, "project"):
         raw = getattr(args, "project")
         if raw is not None:
             p = str(raw).strip()
-            if not p and verb != "todo":
+            if not p and command != "todo":
                 raise CoordError(f"{name}: project required")
             if len(p) > 64:
                 raise CoordError(f"{name}: no such project {p[:64]}")
     # #326: hold with no resource is the lock list, with or without --peek.
-    if verb == "hold" and not str(getattr(args, "resource", "") or "").strip():
+    if command == "hold" and not str(getattr(args, "resource", "") or "").strip():
         if str(getattr(args, "doing", "") or ""):
             raise CoordError(f"{name}: --doing needs a resource")
-    if verb in _DOING_GUARD:
+    if command in _DOING_GUARD:
         doing = str(getattr(args, "doing", "") or "")
         if len(doing) > DOING_MAX:
             raise CoordError(f"{name}: --doing must be 0..{DOING_MAX} chars")
@@ -266,21 +266,21 @@ def body_from_args(args: Any) -> dict[str, Any]:
     if cmd == "create":
         if obj != "todo":
             raise ValueError("mill create todo ROSTER NEED | create roster NAME | create label NAME")
-        verb = "open"
+        command = "open"
     else:
-        verb = canonical_verb(cmd)
+        command = canonical_command(cmd)
     from agent_coord.client.tokens import resolve_desk_owner
     from agent_coord.helpers.errors import CoordError
     from agent_coord.helpers.ident import desk as desk_stem
 
-    _guard_args(verb, cmd, args)
+    _guard_args(command, cmd, args)
     # Actor = sitting connect for this parent pid (never argv, never host active).
     owner = resolve_desk_owner("")
     dst = str(getattr(args, "dst", "") or "")
     src = str(getattr(args, "src", "") or "")
     # inbox dst is mailbox data only; actor/Bearer = connect session (no dst spoof)
     body: dict[str, Any] = {
-        "verb": verb,
+        "verb": command,
         "project": str(getattr(args, "project", "") or "") or "the-mill",
         "owner": owner,
     }
@@ -309,7 +309,7 @@ def body_from_args(args: Any) -> dict[str, Any]:
         if val is None or val == "":
             continue
         body[key] = int(val)
-    if verb == "mark":
+    if command == "mark":
         raw_ids = getattr(args, "ids", None) or []
         if isinstance(raw_ids, (list, tuple)):
             body["ids"] = [str(x) for x in raw_ids]
@@ -319,18 +319,18 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["all"] = bool(args.all)
     if hasattr(args, "star"):
         body["star"] = bool(args.star)
-    if verb == "pass":
+    if command == "pass":
         # #615: the step is named; a repeat never moves a card on by itself.
         body["step"] = "done" if getattr(args, "done", False) else ("back" if getattr(args, "back", False) else "ship")
     if bool(getattr(args, "yes", False)):
         body["yes"] = True
-    if verb == "claim" and bool(getattr(args, "take_over", False)):
+    if command == "claim" and bool(getattr(args, "take_over", False)):
         body["take_over"] = True
     # send/reply: the sender project comes from the seat, never a silent the-mill (#241).
-    if verb in ("send", "reply"):
+    if command in ("send", "reply"):
         body.pop("project", None)
     # mill send: From is the connect desk only.
-    if verb == "send":
+    if command == "send":
         if body.get("owner"):
             body["src"] = str(body["owner"])
         if src and body.get("owner"):
@@ -339,24 +339,24 @@ def body_from_args(args: Any) -> dict[str, Any]:
                     "send: src must be the mill connect desk "
                     f"(got {src!r}; connect is {body.get('owner')!r})"
                 )
-    if verb in ("hold", "drop"):
+    if command in ("hold", "drop"):
         from agent_coord.helpers.bounds import resource_name
 
-        if str(body.get("resource") or "").strip() or verb == "drop":
+        if str(body.get("resource") or "").strip() or command == "drop":
             body["resource"] = resource_name(str(body.get("resource") or ""))
         else:
             body.pop("resource", None)
-    if verb == "hold" and (bool(getattr(args, "peek", False)) or "resource" not in body):
+    if command == "hold" and (bool(getattr(args, "peek", False)) or "resource" not in body):
         body["peek"] = True
     detail_file = str(getattr(args, "detail_file", "") or "").strip()
     if detail_file:
         body["detail"] = resolve_body_file(detail_file, "detail")
-    if verb in ("send", "reply"):
+    if command in ("send", "reply"):
         body_file = str(getattr(args, "body_file", "") or "").strip()
         if not body_file:
-            raise CoordError(f"{verb}: --body-file required")
+            raise CoordError(f"{command}: --body-file required")
         body["body"] = resolve_body_file(body_file)
-    if verb == "mail-thread":
+    if command == "mail-thread":
         mid = getattr(args, "mail_id", None)
         if mid is None:
             mid = getattr(args, "id", None)
@@ -373,14 +373,14 @@ def body_from_args(args: Any) -> dict[str, Any]:
         if scope:
             body["scope"] = scope
     # reply <mail_id> --body-file PATH [--to-desk D]
-    if verb == "reply":
+    if command == "reply":
         mid = getattr(args, "mail_id", None)
         if mid is None:
             mid = getattr(args, "id", None)
         if mid is not None and mid != "":
             body["mail_id"] = int(mid)
     # add|remove TYPE:ID [WHO] (#265). argparse already checked TARGET.
-    if verb in ("add", "remove"):
+    if command in ("add", "remove"):
         tgt = getattr(args, "target", None)
         if isinstance(tgt, tuple):
             body["type"] = tgt[0]
@@ -394,14 +394,14 @@ def body_from_args(args: Any) -> dict[str, Any]:
         if who:
             body["who"] = who
     # --to-desk (send/reply), repeatable
-    if verb in ("send", "reply"):
+    if command in ("send", "reply"):
         raw_desks = getattr(args, "to_desk", None)
         if raw_desks is not None:
             to_desk = [str(x).strip() for x in raw_desks]
             if not all(to_desk):
-                raise CoordError(f"{verb}: --to-desk needs a desk name")
+                raise CoordError(f"{command}: --to-desk needs a desk name")
             kinds = getattr(args, "to_kinds", None) or {}
-            if verb == "send" and isinstance(kinds, dict) and kinds:
+            if command == "send" and isinstance(kinds, dict) and kinds:
                 # send desk|roster NAME: the word rides along so the wall checks it (#274).
                 body["mail_tos"] = [
                     {"deskId": d, "kind": kinds[d]} if d in kinds else d for d in to_desk
@@ -416,24 +416,24 @@ def body_from_args(args: Any) -> dict[str, Any]:
         body["name_type"] = "todo"
         body.pop("slug", None)
         body.pop("confirm", None)
-    if verb == "todo" and bool(getattr(args, "done", False)):
+    if command == "todo" and bool(getattr(args, "done", False)):
         body["done"] = True
-    if verb == "todo" and bool(getattr(args, "fixtures", False)):
+    if command == "todo" and bool(getattr(args, "fixtures", False)):
         body["fixtures"] = True
-    if verb == "todo" and bool(getattr(args, "mine", False)):
+    if command == "todo" and bool(getattr(args, "mine", False)):
         # #667: the wall sends only this desk's cards; focus.order_mine still ranks them.
         body["mine"] = True
     if bool(getattr(args, "dead", False)):
         body["dead"] = True
-    if verb == "score" and bool(getattr(args, "retire_score", False)):
+    if command == "score" and bool(getattr(args, "retire_score", False)):
         body["retire"] = True
-    if verb == "note":
+    if command == "note":
         _note_fields(args, body)
-    if verb == "label-add" and hasattr(args, "ord") and getattr(args, "ord") is not None:
+    if command == "label-add" and hasattr(args, "ord") and getattr(args, "ord") is not None:
         from agent_coord.helpers.label_ord import parse_label_ord
 
         body["ord"] = parse_label_ord(getattr(args, "ord"))
-    if verb == "trail":
+    if command == "trail":
         node = str(getattr(args, "node", "") or "").strip()
         label = str(body.get("label") or getattr(args, "label", "") or "").strip()
         if label and node:
@@ -444,13 +444,13 @@ def body_from_args(args: Any) -> dict[str, Any]:
             body["node"] = node
         if label:
             body["label"] = label
-    if verb == "watcher" and bool(getattr(args, "remove", False)):
+    if command == "watcher" and bool(getattr(args, "remove", False)):
         body["remove"] = True
-    if verb == "trust":
+    if command == "trust":
         level = str(getattr(args, "level", "") or "").strip()
         if level:
             body["level"] = level
-    if verb == "invite":
+    if command == "invite":
         seat = str(getattr(args, "seat", "") or "").strip()
         if seat:
             body["verb"] = "invite-seat"

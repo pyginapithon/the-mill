@@ -1,15 +1,15 @@
 (mill) version
 (mill) verbose
 (mill) raw
-briefing (verb)
+briefing (command)
 briefing kind
 briefing office
 briefing yes
-help (verb)
-help verb
+help (command)
+help command
 help office
 help yes
-init (verb)
+init (command)
 init yes
 init host
 init port
@@ -23,18 +23,18 @@ init lan
 init config_path
 init link_file
 init office
-hold (verb)
+hold (command)
 hold resource
 hold peek
 hold doing
 hold group_by
 hold office
 hold yes
-drop (verb)
+drop (command)
 drop resource
 drop office
 drop yes
-send (verb)
+send (command)
 send to
 send to_desk
 send body_file
@@ -42,14 +42,14 @@ send roster
 send name
 send office
 send yes
-reply (verb)
+reply (command)
 reply mail_id
 reply body_file
 reply to_desk
 reply roster
 reply office
 reply yes
-mail-thread (verb)
+mail-thread (command)
 mail-thread mail_id
 mail-thread scope
 mail-thread full
@@ -57,17 +57,17 @@ mail-thread page
 mail-thread after
 mail-thread office
 mail-thread yes
-mark (verb)
+mark (command)
 mark ids
 mark office
 mark yes
-trail (verb)
+trail (command)
 trail node
 trail label
 trail as_json
 trail office
 trail yes
-clear-human (verb)
+clear-human (command)
 clear-human project
 clear-human ids
 clear-human human
@@ -75,7 +75,7 @@ clear-human token
 clear-human by_agent
 clear-human office
 clear-human yes
-inbox (verb)
+inbox (command)
 inbox all
 inbox limit
 inbox group_by
@@ -83,7 +83,7 @@ inbox full
 inbox page
 inbox office
 inbox yes
-score (verb)
+score (command)
 score project
 score name
 score value
@@ -95,13 +95,13 @@ score limit
 score at
 score office
 score yes
-score-add (verb)
+score-add (command)
 score-add name
 score-add target
 score-add note
 score-add office
 score-add yes
-score-tick (verb)
+score-tick (command)
 score-tick once
 score-tick loop
 score-tick every
@@ -109,23 +109,23 @@ score-tick window
 score-tick register
 score-tick office
 score-tick yes
-kpi-import (verb)
+kpi-import (command)
 kpi-import project
 kpi-import root
 kpi-import office
 kpi-import yes
-wall (verb)
+wall (command)
 wall bind
 wall port
 wall roots
 wall api_only
 wall office
 wall yes
-update (verb)
+update (command)
 update dry_run
 update office
 update yes
-install (verb)
+install (command)
 install role
 install apply
 install dry_run
@@ -143,7 +143,7 @@ install tap
 install generate
 install office
 install yes
-uninstall (verb)
+uninstall (command)
 uninstall apply
 uninstall dest
 uninstall packages
@@ -152,7 +152,7 @@ uninstall as_json
 uninstall mill_agent
 uninstall office
 uninstall yes
-drain (verb)
+drain (command)
 drain project
 drain eta_at
 drain reason
@@ -161,7 +161,7 @@ drain drain_id
 drain dst
 drain office
 drain yes
-connect (verb)
+connect (command)
 connect project
 connect desk
 connect vendor
@@ -169,21 +169,21 @@ connect refuse
 connect session
 connect office
 connect yes
-route (verb)
-route list (verb)
+route (command)
+route list (command)
 route list office
 route list yes
-route add (verb)
+route add (command)
 route add key
 route add argv
 route add office
 route add yes
-route rm (verb)
+route rm (command)
 route rm key
 route rm office
 route rm yes
 route office
-connect-wait (verb)
+connect-wait (command)
 connect-wait project
 connect-wait desk
 connect-wait vendor
@@ -191,77 +191,77 @@ connect-wait session
 connect-wait refuse
 connect-wait office
 connect-wait yes
-reset (verb)
+reset (command)
 reset kind
 reset desk
 reset yes
 reset dead
 reset office
-reclaim (verb)
+reclaim (command)
 reclaim kind
 reclaim slug
 reclaim need
 reclaim yes
 reclaim office
-rename (verb)
+rename (command)
 rename kind
 rename old
 rename new
 rename yes
 rename office
-retire (verb)
+retire (command)
 retire kind
 retire slug
 retire score_name
 retire yes
 retire office
-member (verb)
+member (command)
 member office
 member yes
-add (verb)
+add (command)
 add kind
 add group
 add desks
 add hint
 add office
 add yes
-remove (verb)
+remove (command)
 remove kind
 remove group
 remove desks
 remove yes
 remove office
-watch (verb)
+watch (command)
 watch type
 watch target
 watch hint
 watch office
 watch yes
-unwatch (verb)
+unwatch (command)
 unwatch type
 unwatch target
 unwatch office
 unwatch yes
-label (verb)
+label (command)
 label type
 label id
 label label
 label ord
 label office
 label yes
-unlabel (verb)
+unlabel (command)
 unlabel type
 unlabel id
 unlabel label
 unlabel office
 unlabel yes
-doing (verb)
+doing (command)
 doing project
 doing doing
 doing office
 doing yes
-create (verb)
-create todo (verb)
+create (command)
+create todo (command)
 create todo project
 create todo need
 create todo doing
@@ -272,16 +272,16 @@ create todo parent_type
 create todo parent_id
 create todo yes
 create todo office
-create roster (verb)
+create roster (command)
 create roster slug
 create roster yes
 create roster office
-create label (verb)
+create label (command)
 create label slug
 create label yes
 create label office
 create office
-todo (verb)
+todo (command)
 todo project
 todo group_by
 todo need
@@ -295,7 +295,7 @@ todo page
 todo fixtures
 todo office
 todo yes
-note (verb)
+note (command)
 note project
 note need
 note text
@@ -306,7 +306,7 @@ note started
 note full
 note office
 note yes
-claim (verb)
+claim (command)
 claim project
 claim need
 claim eta
@@ -314,32 +314,32 @@ claim msg
 claim take_over
 claim office
 claim yes
-unclaim (verb)
+unclaim (command)
 unclaim project
 unclaim need
 unclaim office
 unclaim yes
-unpark (verb)
+unpark (command)
 unpark project
 unpark need
 unpark parent_type
 unpark parent_id
 unpark office
 unpark yes
-assign (verb)
+assign (command)
 assign project
 assign need
 assign desk
 assign office
 assign yes
-pass (verb)
+pass (command)
 pass project
 pass need
 pass done
 pass back
 pass office
 pass yes
-invite (verb)
+invite (command)
 invite door
 invite rotate
 invite mint
@@ -359,17 +359,17 @@ invite party_id
 invite lan_only
 invite office
 invite yes
-admin (verb)
+admin (command)
 admin owner
 admin by
 admin office
 admin yes
-connected (verb)
+connected (command)
 connected project
 connected limit
 connected office
 connected yes
-attach (verb)
+attach (command)
 attach project
 attach type_a
 attach id_a
@@ -378,7 +378,7 @@ attach id_b
 attach tree
 attach office
 attach yes
-move (verb)
+move (command)
 move project
 move type
 move id
@@ -387,34 +387,34 @@ move parent_id
 move tree
 move office
 move yes
-prune (verb)
+prune (command)
 prune project
 prune type
 prune id
 prune tree
 prune office
 prune yes
-detach (verb)
+detach (command)
 detach project
 detach type
 detach id
 detach tree
 detach office
 detach yes
-wall-check (verb)
+wall-check (command)
 wall-check base
 wall-check project_filter
 wall-check expect_empty
 wall-check office
 wall-check yes
-wall-src (verb)
+wall-src (command)
 wall-src src
 wall-src apply
 wall-src git_root
 wall-src dest
 wall-src office
 wall-src yes
-join (verb)
+join (command)
 join link
 join link_file
 join link_stdin
@@ -428,10 +428,10 @@ join websocket
 join wake_on
 join office
 join yes
-local (verb)
+local (command)
 local office
 local yes
-trust (verb)
+trust (command)
 trust level
 trust office
 trust yes

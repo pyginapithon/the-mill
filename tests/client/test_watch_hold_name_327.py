@@ -29,8 +29,8 @@ def test_cli_watch_hold_by_name(monkeypatch):
     from agent_coord.client import outbound
 
     monkeypatch.setattr("agent_coord.client.tokens.resolve_desk_owner", lambda _x="": "me")
-    for verb in ("watch", "unwatch"):
-        a = translate(_build_parser().parse_args([verb, "hold", "deploy"]))
+    for command in ("watch", "unwatch"):
+        a = translate(_build_parser().parse_args([command, "hold", "deploy"]))
         body = outbound.body_from_args(a)
         assert body["type"] == "hold" and body["ref"] == "deploy" and "id" not in body
 

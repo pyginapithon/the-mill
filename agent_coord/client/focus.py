@@ -43,15 +43,15 @@ class FocusError(Exception):
 
 
 def _read(call: Callable[[dict], Any], body: dict) -> Any:
-    """One read for the connect focus line; FocusError names the verb and cause."""
-    verb = str(body.get("verb") or "")
+    """One read for the connect focus line; FocusError names the command and cause."""
+    command = str(body.get("verb") or "")
     try:
         reply = call(body)
     except Exception as e:
-        raise FocusError(f"{verb} read failed: {e or type(e).__name__}") from e
+        raise FocusError(f"{command} read failed: {e or type(e).__name__}") from e
     if not isinstance(reply, dict) or reply.get("ok") is not True:
         err = reply.get("error") if isinstance(reply, dict) else None
-        raise FocusError(f"{verb} read refused: {err or 'no answer'}")
+        raise FocusError(f"{command} read refused: {err or 'no answer'}")
     return reply.get("result")
 
 

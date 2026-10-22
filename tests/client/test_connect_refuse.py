@@ -47,12 +47,12 @@ def _mill_home(tmp_path, monkeypatch):
     yield
 
 
-@pytest.mark.parametrize("verb", ["connect", "connect-wait"])
-def test_refuse_flag_parses(verb: str) -> None:
+@pytest.mark.parametrize("command", ["connect", "connect-wait"])
+def test_refuse_flag_parses(command: str) -> None:
     p = _build_parser()
-    assert p.parse_args([verb, "alice", "-r"]).refuse is True
-    assert p.parse_args([verb, "alice", "--refuse"]).refuse is True
-    assert p.parse_args([verb, "alice"]).refuse is False
+    assert p.parse_args([command, "alice", "-r"]).refuse is True
+    assert p.parse_args([command, "alice", "--refuse"]).refuse is True
+    assert p.parse_args([command, "alice"]).refuse is False
 
 
 def test_refuse_adds_query_param() -> None:

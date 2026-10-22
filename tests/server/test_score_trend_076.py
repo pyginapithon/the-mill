@@ -1,4 +1,4 @@
-"""F38 (score-trend-met, #307) and the 0.7.6 score verb forms, no SQL.
+"""F38 (score-trend-met, #307) and the 0.7.6 score command forms, no SQL.
 
 Gardener's live series: three zeros read improving, and 14 then 16 with better
 down read improving. The newest step now decides; equal values are never
@@ -133,7 +133,7 @@ def test_retire_passes_admin_flag(rec) -> None:
     assert [c[2]["admin"] for c in calls] == [True, False]
 
 
-def test_cli_retire_score_rides_the_score_verb(monkeypatch) -> None:
+def test_cli_retire_score_rides_the_score_command(monkeypatch) -> None:
     from agent_coord.__main__ import _build_parser
     from agent_coord.client import language
     from agent_coord.client import outbound

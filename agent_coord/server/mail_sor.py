@@ -32,7 +32,7 @@ def _who(desk: str) -> str:
 
 def note_mail(
     desk: str | None,
-    verb: str,
+    command: str,
     result: Any,
     *,
     body: dict[str, Any] | None = None,
@@ -40,12 +40,12 @@ def note_mail(
     """Stamp mail.hit when mill mail-thread peeks one TREE-backed mail.
 
     Formula:
-    - verb must be mail-thread
+    - command must be mail-thread
     - body must carry mail_id / id
     - result is a dict with thread truthy (TREE-backed envelope)
     - first (desk, mail_id) -> reask=0; later -> reask=1
     """
-    v = (verb or "").strip().lower()
+    v = (command or "").strip().lower()
     if v != "mail-thread":
         return
     body = body or {}

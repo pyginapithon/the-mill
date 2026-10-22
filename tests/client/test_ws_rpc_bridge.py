@@ -109,7 +109,7 @@ def test_a_sit_session_one_socket_rpc_and_hint() -> None:
 
 
 def test_b_mill_ws_call_uses_bridge_not_websockets(monkeypatch) -> None:
-    """Verb hits localhost bridge; websockets.connect must not run (no second /ws)."""
+    """Command hits localhost bridge; websockets.connect must not run (no second /ws)."""
     secret = "bridge-secret"
     ws_cli.write_rpc_bridge("DESK_alice", port=12345, secret=secret, pid=os.getpid())
     hits = {"ws": 0, "conn": 0}
@@ -403,8 +403,8 @@ def test_wait_for_sitting_desk_polls_only_while_starting(monkeypatch) -> None:
     assert sleeps and set(sleeps) == {ws_cli.CONNECT_START_POLL_S}
 
 
-def test_verb_finds_a_connect_that_starts_after_it(monkeypatch) -> None:
-    """`mill connect DESK & mill VERB`: the starting file appears a moment later."""
+def test_command_finds_a_connect_that_starts_after_it(monkeypatch) -> None:
+    """`mill connect DESK & mill COMMAND`: the starting file appears a moment later."""
     seen = {"n": 0}
 
     def starting(parent_pid=None):
@@ -686,7 +686,7 @@ def test_foreground_tip_only_on_a_terminal(monkeypatch) -> None:
     monkeypatch.setattr(ws_cli.sys, "stdin", Tty())
     monkeypatch.setattr(ws_cli.sys, "stderr", Tty())
     tip = ws_cli.foreground_tip("alice")
-    assert "bash -c 'mill connect alice >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill VERB ARGS'" in tip
+    assert "bash -c 'mill connect alice >/dev/null 2>&1 & trap \"kill $!\" EXIT; mill COMMAND ARGS'" in tip
     assert "blocks" in tip
     monkeypatch.setattr(ws_cli.sys, "stdin", Pipe())
     assert ws_cli.foreground_tip("alice") == ""

@@ -26,8 +26,8 @@ pytestmark = pytest.mark.sql
 SPELLINGS = ("admin", "ADMIN", " Admin ", "aDmIn", "\u00c1dmin", "adm\u00edn")
 
 
-def _member(cn, verb, group, owner, desk="", host=False):
-    body = {"verb": verb, "group": group}
+def _member(cn, command, group, owner, desk="", host=False):
+    body = {"verb": command, "group": group}
     if desk:
         body["desk"] = desk
     if host:

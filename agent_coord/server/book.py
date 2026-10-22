@@ -1,4 +1,4 @@
-# mill-wall MySQL + token check. Not leftover Coord verbs.
+# mill-wall MySQL + token check. Not leftover Coord commands.
 from __future__ import annotations
 
 from typing import Any

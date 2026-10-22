@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""mill connect sits on /ws. It does not POST the join verb.
+"""mill connect sits on /ws. It does not POST the join command.
 mill join = tokenhash+cert; mill connect = establish desk id.
 """
 from types import SimpleNamespace

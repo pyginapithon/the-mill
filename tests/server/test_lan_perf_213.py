@@ -41,8 +41,8 @@ def _rows(text: str) -> list[dict]:
 
 def lane_stall(rows: list[dict]) -> str:
     """Name the shape of this fixture. Not a server helper."""
-    verbs = [r for r in rows if r["op"] == "verb" and r["ms"] >= 5000]
-    desks = {r.get("desk") for r in verbs if r.get("desk")}
+    commands = [r for r in rows if r["op"] == "verb" and r["ms"] >= 5000]
+    desks = {r.get("desk") for r in commands if r.get("desk")}
     slow_sql = [r for r in rows if str(r["op"]).startswith("sql.") and r["ms"] >= 500]
     by_sec: dict[str, int] = {}
     for row in rows:

@@ -16,11 +16,11 @@ def test_help_unknown_is_one_line_with_closest(capsys):
     assert out.out == "" and out.err.count("\n") == 1
 
 
-def test_help_known_verb_unchanged():
+def test_help_known_command_unchanged():
     assert help_text("label").startswith("# mill label")
 
 
-def test_one_liner_keeps_the_verb_exit_code():
+def test_one_liner_keeps_the_command_exit_code():
     rc = subprocess.run(["bash", "-c", 'sleep 30 >/dev/null 2>&1 & trap "kill $!" EXIT; exit 3']).returncode
     assert rc == 3
 

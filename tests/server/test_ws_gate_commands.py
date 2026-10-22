@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Hub /ws gate: HTTP desk-acting verbs refuse; identity is the sitting socket."""
+"""Hub /ws gate: HTTP desk-acting commands refuse; identity is the sitting socket."""
 from __future__ import annotations
 
 import asyncio
@@ -70,8 +70,8 @@ def test_socket_seated_requires_exact_ws() -> None:
     assert socket_seated("alice", b) is False
 
 
-def test_http_desk_verb_refused_even_when_sitting(monkeypatch) -> None:
-    """HTTP path is cut: sit-stamp does not unlock POST /mill/v1 desk verbs."""
+def test_http_desk_command_refused_even_when_sitting(monkeypatch) -> None:
+    """HTTP path is cut: sit-stamp does not unlock POST /mill/v1 desk commands."""
     _sit("alice")
     monkeypatch.setitem(
         rpc.HANDLERS, "inbox", lambda c, body, project, owner: [{"id": 1}]
@@ -88,22 +88,22 @@ def test_http_desk_verb_refused_even_when_sitting(monkeypatch) -> None:
 
 
 @pytest.mark.parametrize(
-    "verb",
+    "command",
     ["inbox", "send", "reply", "mail-thread", "todo", "doing", "hold", "claim"],
 )
-def test_http_no_ws_refuses_desk_acting_verbs(verb: str) -> None:
+def test_http_no_ws_refuses_desk_acting_commands(command: str) -> None:
     assert desk_sitting("alice") is False
     with pytest.raises(CoordError) as ei:
         rpc.dispatch(
             _Book(),
-            {"verb": verb, "project": "the-mill"},
+            {"verb": command, "project": "the-mill"},
             token="tok",
         )
     assert str(ei.value) == SESSION_WS_RPC_ONLY
 
 
 def test_join_open_skips_ws_gate(monkeypatch) -> None:
-    """join stays OPEN_VERBS: mint token before /ws sit."""
+    """join stays OPEN_COMMANDS: mint token before /ws sit."""
     monkeypatch.setitem(
         rpc.HANDLERS, "join", lambda c, body, project, owner: {"token": "new"}
     )

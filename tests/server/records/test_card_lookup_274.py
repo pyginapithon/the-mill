@@ -67,7 +67,7 @@ def test_bad_ref_refused_one_line(cn, board, ref, typ, msg):
     assert _counts(cn) == before
 
 
-def test_label_verb_named_as_typed(cn, board):
+def test_label_command_named_as_typed(cn, board):
     with pytest.raises(CoordError, match="^label: no card"):
         _card_ref_id(cn, {"type": "todo", "ref": f"{R}/nope"}, "label-add")
 

@@ -134,7 +134,7 @@ def allowed(
     return _in_rules(ip, rules)
 
 
-def is_mill_verb(path: str) -> bool:
-    from agent_coord.client.outbound import is_mill_verb_path
+def is_mill_command(path: str) -> bool:
+    from agent_coord.client.outbound import is_mill_command_path
 
-    return is_mill_verb_path(path)
+    return is_mill_command_path(path)

@@ -31,8 +31,8 @@ def _win(ppid: int, *, in_venv: bool = False) -> int:
     return shell_parent_pid(ppid, platform="win32", table=TREE, in_venv=in_venv, python_exe="python.exe")
 
 
-def test_mill_exe_connect_and_verb_agree_on_shell():
-    # connect (python 602, parent 601) and verb (python 612, parent 611)
+def test_mill_exe_connect_and_command_agree_on_shell():
+    # connect (python 602, parent 601) and command (python 612, parent 611)
     assert _win(601) == SHELL
     assert _win(611) == SHELL
 
@@ -85,7 +85,7 @@ def test_default_is_getppid_off_windows(monkeypatch):
         assert shell_parent_pid() == 4242
 
 
-def test_bridge_written_by_mill_exe_connect_found_by_mill_exe_verb(tmp_path, monkeypatch):
+def test_bridge_written_by_mill_exe_connect_found_by_mill_exe_command(tmp_path, monkeypatch):
     """End to end on the bridge file: both sides resolve the shell pid."""
     from agent_coord.client import ws
 
@@ -96,10 +96,10 @@ def test_bridge_written_by_mill_exe_connect_found_by_mill_exe_verb(tmp_path, mon
     # connect side: python 602 whose parent is launcher 601
     monkeypatch.setattr(ws, "_shell_ppid", lambda: _win(601))
     ws.write_rpc_bridge("desk-a", port=1234, secret="s", pid=602)
-    # verb side: python 612 whose parent is launcher 611
+    # command side: python 612 whose parent is launcher 611
     monkeypatch.setattr(ws, "_shell_ppid", lambda: _win(611))
     row = ws.bridge_for_parent()
     assert row is not None and row["desk"] == "desk-a"
-    # A verb from a different shell must not match
+    # A command from a different shell must not match
     monkeypatch.setattr(ws, "_shell_ppid", lambda: 777)
     assert ws.bridge_for_parent() is None

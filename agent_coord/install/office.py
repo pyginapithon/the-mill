@@ -21,7 +21,7 @@ _BRIEFINGS = (
     "join",
     "human",
     "usecases",
-    "verbs",
+    "commands",
     "skill",
     "howto-ai",
     "spawn",
@@ -36,7 +36,7 @@ _BRIEFING_PATH = {
     "human": ("README.md",),
     "join": ("docs", "JOIN.md"),
     "usecases": ("docs", "protocol", "usecases.md"),
-    "verbs": ("docs", "protocol", "verbs.md"),
+    "commands": ("docs", "protocol", "verbs.md"),
     "skill": ("docs", "protocol", "skill.md"),
     "howto-ai": ("docs", "protocol", "howto-ai.md"),
     "spawn": ("docs", "protocol", "spawn.md"),
@@ -176,10 +176,10 @@ def markdown_h2_section(text: str, heading: str) -> str:
     return "\n".join(lines[start:end]).rstrip() + "\n"
 
 
-def help_text(verb: str = "") -> str:
-    """mill help: docs/protocol/cli-desk.md; mill help VERB: that verb's rows in cli-*.md."""
+def help_text(command: str = "") -> str:
+    """mill help: docs/protocol/cli-desk.md; mill help COMMAND: that command's rows in cli-*.md."""
     files = ("cli-desk.md", "cli-admin.md", "cli-install.md")
-    want = (verb or "").strip().lower()
+    want = (command or "").strip().lower()
     if not want:
         return markdown_tty(mill_markdown("docs", "protocol", "cli-desk.md").read_text(encoding="utf-8"))
     hits: list[str] = []
@@ -192,9 +192,9 @@ def help_text(verb: str = "") -> str:
             if ln.startswith("|") and ("`mill " + want + " " in ln or "`mill " + want + "`" in ln):
                 hits.append(ln)
     if not hits:
-        text = verbs_text(want)
-        return help_unknown(want) if "# unknown verb" in text else text
-    return "\n".join(["# mill " + want, "", "| verb | CLI | what |", "|---|---|---|", *hits, ""]) + "\n"
+        text = commands_text(want)
+        return help_unknown(want) if "# unknown command" in text else text
+    return "\n".join(["# mill " + want, "", "| command | CLI | what |", "|---|---|---|", *hits, ""]) + "\n"
 
 
 _HELP_SYNONYMS = {"tag": "label", "tags": "label", "team": "roster", "project": "roster", "message": "send", "mail": "send", "task": "todo"}
@@ -215,11 +215,11 @@ def help_unknown(want: str) -> str:
     return f"mill help: no such topic {want!r}{tail}\n"
 
 
-def verbs_text(verb: str = "") -> str:
-    """docs/protocol/verbs.md - mill help / mill briefing verbs."""
+def commands_text(command: str = "") -> str:
+    """docs/protocol/verbs.md - mill help / mill briefing commands."""
     path = mill_markdown("docs", "protocol", "verbs.md")
     text = path.read_text(encoding="utf-8")
-    want = (verb or "").strip().lower()
+    want = (command or "").strip().lower()
     if not want:
         return markdown_tty(text)
     aliases = {"needs": "todo", "ask": "open", "volunteer": "claim"}
@@ -227,8 +227,9 @@ def verbs_text(verb: str = "") -> str:
     lines = text.splitlines()
     hit = [ln for ln in lines if ln.startswith("| **`") and f"**`{want}`**" in ln]
     if not hit:
-        return text + f"\n\n# unknown verb {want!r} - full list above\n"
-    hdr = next((ln for ln in lines if ln.startswith("| verb ")), "| verb | intent | CALL |")
+        return text + f"\n\n# unknown command {want!r} - full list above\n"
+    # The docs table header may still read "| verb |" until the docs rename lands.
+    hdr = next((ln for ln in lines if ln.startswith(("| command ", "| verb "))), "| command | intent | CALL |")
     sep = "|---|---|---|"
     return "\n".join(["# mill " + want, "", hdr, sep, *hit, ""]) + "\n"
 
@@ -246,8 +247,8 @@ def briefing_text(kind: str = "") -> str:
         return mill_briefing_index()
     if name not in _BRIEFING_PATH:
         raise ValueError(f"briefing must be one of {', '.join(_BRIEFINGS)}")
-    if name == "verbs":
-        return verbs_text()
+    if name == "commands":
+        return commands_text()
     text = mill_markdown(*_BRIEFING_PATH[name]).read_text(encoding="utf-8")
     h2 = _BRIEFING_H2.get(name)
     if h2:

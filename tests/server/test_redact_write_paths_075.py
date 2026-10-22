@@ -18,7 +18,7 @@ import pytest
 
 from agent_coord.server.api.mill import rpc
 from agent_coord.server.book import Book
-from agent_coord.server.redact import PH, TEXT_KEYS, WRITE_VERBS, err_text
+from agent_coord.server.redact import PH, TEXT_KEYS, WRITE_COMMANDS, err_text
 
 R = random.Random(5)
 ROOT = Path(__file__).resolve().parents[2]
@@ -51,13 +51,13 @@ CASES = [
 ]
 
 
-@pytest.mark.parametrize("verb,args,key", CASES, ids=[f"{v}-{k}" for v, _, k in CASES])
-def test_ws_write_is_redacted_before_the_handler(monkeypatch, verb, args, key):
+@pytest.mark.parametrize("command,args,key", CASES, ids=[f"{v}-{k}" for v, _, k in CASES])
+def test_ws_write_is_redacted_before_the_handler(monkeypatch, command, args, key):
     tok = fake_token()
     store: dict = {}
-    monkeypatch.setitem(rpc.HANDLERS, verb, _capture(store))
+    monkeypatch.setitem(rpc.HANDLERS, command, _capture(store))
     body = {k: (v.format(t=tok) if isinstance(v, str) else v) for k, v in args.items()}
-    rpc.dispatch_ws(MagicMock(spec=Book), "desk-a", verb, body, req_id=None)
+    rpc.dispatch_ws(MagicMock(spec=Book), "desk-a", command, body, req_id=None)
     assert tok not in store["body"][key]
     assert PH["token"] in store["body"][key]
 
@@ -73,7 +73,7 @@ def test_http_join_doing_is_redacted(monkeypatch):
     assert tok not in store["body"]["doing"]
 
 
-def test_read_verbs_are_left_alone(monkeypatch):
+def test_read_commands_are_left_alone(monkeypatch):
     tok = fake_token()
     store: dict = {}
     monkeypatch.setitem(rpc.HANDLERS, "todo", _capture(store))
@@ -81,9 +81,9 @@ def test_read_verbs_are_left_alone(monkeypatch):
     assert store["body"]["find"] == tok
 
 
-def test_every_text_verb_is_listed():
-    for verb in ("send", "reply", "note", "open", "score", "doing", "join", "claim", "unclaim", "pass", "hold", "assign"):
-        assert verb in WRITE_VERBS
+def test_every_text_command_is_listed():
+    for command in ("send", "reply", "note", "open", "score", "doing", "join", "claim", "unclaim", "pass", "hold", "assign"):
+        assert command in WRITE_COMMANDS
     for key in ("body", "doing", "msg", "note", "detail", "value", "target"):
         assert key in TEXT_KEYS
 

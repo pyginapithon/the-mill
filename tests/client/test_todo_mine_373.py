@@ -36,7 +36,7 @@ def _wall(monkeypatch, rows, owner="desk-a", seen=None):
 
 def _run(capsys, **kw):
     base = dict(cmd="todo", project="", need="", find="", group_by="roster", raw=False,
-                said_verb="", full=False, page=0, mine=True)
+                said_command="", full=False, page=0, mine=True)
     base.update(kw)
     rc = http.mill_http_from_args(SimpleNamespace(**base))
     out = capsys.readouterr().out.strip().splitlines()
