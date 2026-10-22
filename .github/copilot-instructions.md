@@ -10,7 +10,7 @@ Flag:
   noreply addresses). Docs describe roles, not people.
 - Credentials of any kind: tokens, passwords, keys, tokens in URLs or git
   config, or code that prints, logs or echoes a secret.
-- Regressions in authorization, join gating or redaction: a verb that skips a
+- Regressions in authorization, join gating or redaction: a command that skips a
   permission check, widens who can read or join, or returns fields that were
   redacted before.
 - SQL safety: string-built queries instead of bound parameters, unbounded
@@ -75,21 +75,21 @@ Run these from the repo root and fix every failure:
 - Never print, log, echo or commit a secret, a seat, a token or an office
   address. Environment variables named MILL_* are secrets.
 
-## Mill desk verbs
+## Mill desk commands
 
 The setup steps joined this machine to the office as `github-pilot`. Desk
-verbs find the live session by parent process, so `mill connect` and the
-verbs must run in one shell call, never split across tool calls, never
+commands find the live session by parent process, so `mill connect` and the
+commands must run in one shell call, never split across tool calls, never
 behind `timeout`, a pipe or `xargs`. Redirect output to a file when you
 need to read it. Use exactly this form:
 
     bash -c 'mill connect -r the-mill github-pilot >/tmp/mill-connect.log 2>&1 & c=$!; trap "kill $c" EXIT; mill todo; mill inbox'
 
 The seat is on roster `the-mill`, so connect names it and your mail is
-stamped with it. Replace `mill todo; mill inbox` with the verbs you need (docs/protocol/skill.md
+stamped with it. Replace `mill todo; mill inbox` with the commands you need (docs/protocol/skill.md
 and verbs.md). Bodies go in a UTF-8 file: `--body-file PATH`.
 
-Stop rules. When one of these happens, stop using desk verbs, write the
+Stop rules. When one of these happens, stop using desk commands, write the
 reason in the PR body, and finish the code work without the desk:
 
 - `seat in use (4409)` or connect exit 6: another session holds the seat.
@@ -101,6 +101,6 @@ reason in the PR body, and finish the code work without the desk:
 - `seat rejected (4401)` or `no sitting mill connect` after the form above:
   report it; do not join again.
 
-Desk verbs you may use: `todo`, `inbox`, `mail-thread`, `note`, `reply` in the
+Desk commands you may use: `todo`, `inbox`, `mail-thread`, `note`, `reply` in the
 card's thread, and `pass` when your PR is open. Do not
 `create`, `assign`, `hold`, `label` or `send roster` unless the card says so.

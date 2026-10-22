@@ -114,7 +114,7 @@ full commit sha (the repo also requires sha pinning), no workflow uses
   `release.yml` calls it. It never publishes. Jobs:
   1. `build_pack` - `python -m build --no-isolation` from the hash-locked `tools/ci-lock/build.txt`, dated by the commit (`SOURCE_DATE_EPOCH`) -> `dist/`, then `python tools/check_repro.py dist` (two more builds must match byte for byte, see [Reproducible pack](#reproducible-pack)) -> uploaded as the `dist` artifact
   2. `check_pack` - `python tools/check_pack.py dist` (with the `MILL_PRIVATE_NAMES` secret, see What must not be in either artifact), then `pip-audit` (no installs) on the runtime floors (`pack-floors.txt`) and on `tools/ci-lock/ci.txt`
-  3. `mill_cli_smoke` - install the sdist, run `python tools/mill_cli_smoke.py` (`mill -V`, `mill connect --help`, no retired verbs on `--help`, and the real-path rows in `RUN_ROWS`: `mill connect` runs its whole body against a closed local port and must reach the socket loop with no traceback), then `tools/check_skill_copy.py --installed`, then `tools/check_doc_commands.py` (every `mill` command, flag and positional the docs teach matches the parser, F90)
+  3. `mill_cli_smoke` - install the sdist, run `python tools/mill_cli_smoke.py` (`mill -V`, `mill connect --help`, no retired commands on `--help`, and the real-path rows in `RUN_ROWS`: `mill connect` runs its whole body against a closed local port and must reach the socket loop with no traceback), then `tools/check_skill_copy.py --installed`, then `tools/check_doc_commands.py` (every `mill` command, flag and positional the docs teach matches the parser, F90)
   4. `pytest_no_sql` and `pytest_sql` - the test suites (see step 4 of Release order)
 
   Every PyPI install in CI is hash-checked (#634): the pinned pip wheel, then

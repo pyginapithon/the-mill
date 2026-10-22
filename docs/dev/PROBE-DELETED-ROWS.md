@@ -1,6 +1,6 @@
 # Probe: deleted todo and score rows (#160)
 
-The mill has no delete verb, and the verb freeze keeps it that way. That left
+The mill has no delete command, and the command freeze keeps it that way. That left
 the deleted state (#91, #92, #93) and the Wall deleted pill checked only by
 unit tests. `tools/probe_deleted_rows.py` makes real deleted rows on a live
 office so a checker can confirm the whole path.
@@ -18,7 +18,7 @@ Real cards and other desks' rows cannot be touched. The delete uses the soft
 delete procedures that already ship (`mill_todo_delete`, `mill_score_delete`).
 No SQL changes.
 
-`probe-delete` is an RPC on the office, not a verb. It is not in skill.md, it
+`probe-delete` is an RPC on the office, not a command. It is not in skill.md, it
 has no `mill` subcommand, and only this tool sends it. It needs an office at
 0.6.30 or later. An older office answers `unknown mill verb probe-delete`.
 

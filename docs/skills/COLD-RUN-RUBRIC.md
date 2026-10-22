@@ -30,7 +30,7 @@ Optional: Scout co-eval notes (free text) when Office Skill Scout (or sibling) c
 | 1 | **Preflight / skill pull** | Desk pulled **mill-desk** first **and** the correct `office-*` skill for the ask | Skipped mill-desk; wrong office skill; invented adapter |
 | 2 | **Product match** | Answer stays on catalog **product / mode** for that skill (e.g. research = Decision brief; competitive = mode not 2nd product) | Wrong desk product (wiki dump, eng ship, QA pack, marketing creative brief, etc.) |
 | 3 | **Inputs gate** | If Inputs missing: gap **noted** + `send` asker / `waiting_on` (no fake progress). If Inputs complete: does **not** invent missing facts | Fakes progress / invents criteria / silent draft from gaps |
-| 4 | **Lingo -> mill** | Only day-one verbs; no invented CLI; `drop` != `unclaim`; `note` != `send` | Invented verbs (`brief`, `synthesize`, `decide`, `clear`, ...); hold/unclaim or note/mail confusion |
+| 4 | **Lingo -> mill** | Only day-one commands; no invented CLI; `drop` != `unclaim`; `note` != `send` | Invented commands (`brief`, `synthesize`, `decide`, `clear`, ...); hold/unclaim or note/mail confusion |
 | 5 | **SoR discipline** | Domain SoR **linked** not cloned (forge / CRM / ATS / CLM / ledger / CMS / CI / wiki / Drive as applicable) | Clones external SoR into mill card as source of truth |
 | 6 | **Handoff** | Correct desk **mailed / assigned** when the skill says (asker, eng, qa, ops, support, sales/marketing, legal/finance, auditor, ...) | Skips required handoff; steals claim instead of `send`; wrong desk |
 | 7 | **human_required** | Honored when skill/product requires (offer / clear / approve / brand approve / spend, ...) | Clears, approves, or offers inside the wrong desk; invents human click away |

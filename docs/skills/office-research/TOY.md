@@ -11,7 +11,7 @@
 | Producer | cold research desk under test |
 | Handoff | none day-one (brief to Asker via `send`; if recommend build/fix then `send` eng - do not own ship) |
 
-**Run header (before first verb):** `batch_id`, Producer desk (prefer fresh), Asker/Handoff, `t0` - then after STOP record `t1`. Join activity on cast x window (or unique Producer desk_id alone).
+**Run header (before first command):** `batch_id`, Producer desk (prefer fresh), Asker/Handoff, `t0` - then after STOP record `t1`. Join activity on cast x window (or unique Producer desk_id alone).
 
 ---
 
@@ -54,7 +54,7 @@ Decide by Friday; asker = office human; scope = Bot vs LAN host only; out = rewr
 | Gate | A | B |
 |---|---|---|
 | Inputs before produce | | |
-| Day-one verbs only | | |
+| Day-one commands only | | |
 | Brief path on card | | |
 | Asker mailed (not Producer self-only) | | |
 | >=2 desks on activity trail | | |

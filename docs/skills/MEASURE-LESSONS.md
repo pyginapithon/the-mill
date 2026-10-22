@@ -8,8 +8,8 @@ Audience: Loop-1 (Prompt Gardener, Skill Scout). Law stays in SQL; day-one speec
 
 | Layer | What | Pass bar |
 |---|---|---|
-| Paper | TEMPLATE + FUNCTION-LINGO + office-* brief | Inputs named; day-one verbs only |
-| Scripted smoke | One Producer desk, 100 hypos | Verbs/STOP; **not** virgin LLM |
+| Paper | TEMPLATE + FUNCTION-LINGO + office-* brief | Inputs named; day-one commands only |
+| Scripted smoke | One Producer desk, 100 hypos | Commands/STOP; **not** virgin LLM |
 | True COLD | Fresh Bot desk per hypo; mill-desk + one office-* | REMEASURE KPIs; Scout + Gardener co-score |
 | Feedback DM | Same cold desks after STOP | Friction on skill / JOIN / docs only |
 
@@ -19,7 +19,7 @@ Audience: Loop-1 (Prompt Gardener, Skill Scout). Law stays in SQL; day-one speec
 
 **Day-one speech remasure** (JOIN/skill/verbs/connect/howto-ai): see REMEASURE.md **Day-one speech** (incl. D3b `--office <alias>` for the office book / a different alias for the test book) + weekday routine `garden-measure` - not office-* TOY.
 
-**Host truth:** mill verbs run on Wall-reachable host (office workstation). Bot box often cannot reach LAN Wall - measure that hop or false-fail the desk.
+**Host truth:** mill commands run on Wall-reachable host (office workstation). Bot box often cannot reach LAN Wall - measure that hop or false-fail the desk.
 
 ## What we measured (banks)
 

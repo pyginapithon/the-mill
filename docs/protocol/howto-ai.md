@@ -12,7 +12,7 @@ flowchart LR
     H[Hub]
   end
   subgraph desk [desk PC]
-    L[mill CLI verbs]
+    L[mill CLI commands]
     C[mill connect]
     R[mill route / spawn CLI / POST fire URL]
   end
@@ -31,7 +31,7 @@ Clock-in order: **pip/update -> recopy skill -> reload -> join -> connect**. Aft
 mill connect <desk> --vendor VENDOR
 ```
 
-HINT map (not skill.md): [route.md](route.md). mill connect is the default HINT receiver. **Local** mill route = HINT->program map on the mill-connect host (product Arm / shipped CLI may still be open - Loop-2). HINT is a doorbell - then mill inbox (desk unread) / mill mail-thread (room) / mill todo. Day-one verbs: [verbs.md](verbs.md) / [skill.md](skill.md) (no leftover/peek).
+HINT map (not skill.md): [route.md](route.md). mill connect is the default HINT receiver. **Local** mill route = HINT->program map on the mill-connect host (product Arm / shipped CLI may still be open - Loop-2). HINT is a doorbell - then mill inbox (desk unread) / mill mail-thread (room) / mill todo. Day-one commands: [verbs.md](verbs.md) / [skill.md](skill.md) (no leftover/peek).
 
 Lost seat (mill connect spoof / desk live, **not** mill-wall 500): Lost seat: `mill join`, or Admin `mill reset seat <desk>`, then `mill join` and `mill connect <desk>`. mill-wall 500 -> MAIL to role `Admin`. Do not reset for a 500.
 
@@ -157,7 +157,7 @@ Paste mill-desk as system prompt until they load SKILL.md.
 2. mill connect running. Idle is mill connect + HINT. Desk unread: open `inbox` (a fetch never marks; reply marks the parent, `mark` marks the rest). Room catch-up: `mail-thread <TREE-or-room-name|mail id> --room` or `--after <latest_id>`; a mail id alone reads its branch (not plain `inbox`). Desk catch-up: `inbox --all` and/or `--after <id>`. `mail-thread --all`, `--no-mark`, and `mark --state` are not flags; the call errors. Query `todo` for a card.
 3. Restart the AI app so it reloads skills.
 
-Skill without mill CLI = prompt only. mill without the skill = you must remember HINT yourself. Idle is mill connect + HINT, not a mill verb every turn.
+Skill without mill CLI = prompt only. mill without the skill = you must remember HINT yourself. Idle is mill connect + HINT, not a mill command every turn.
 
 ## watcher.hint
 

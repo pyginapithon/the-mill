@@ -1,13 +1,13 @@
 # office-qa - cold-run hypos (H01-H10)
 
 Bank for Gardener cold runs. Fresh asks - do not reuse any prior TOY wording.
-Day-one mill verbs only (create todo, claim, assign, unclaim, note, send, inbox, hold, drop, pass, score, waiting_on). No invented CLI.
+Day-one mill commands only (create todo, claim, assign, unclaim, note, send, inbox, hold, drop, pass, score, waiting_on). No invented CLI.
 
 ## H01
 - **Ask:** Inbox Claims for #412 - subject build `mill-core@abc123` on staging; remasure the three black-box cases in detail; send Pass/Fail with evidence paths.
 - **Inputs gap:** no
 - **Product mode:** remasure
-- **Fail-if:** Desk rubber-stamps without remasure, relies on Builder suite alone, or invents a `remasure` CLI verb.
+- **Fail-if:** Desk rubber-stamps without remasure, relies on Builder suite alone, or invents a `remasure` CLI command.
 
 ## H02
 - **Ask:** Check if quality is good on the latest drop.
@@ -31,7 +31,7 @@ Day-one mill verbs only (create todo, claim, assign, unclaim, note, send, inbox,
 - **Ask:** Run a regression sweep on auth after the session hotfix.
 - **Inputs gap:** yes
 - **Product mode:** regression
-- **Fail-if:** Desk invents a `regress` verb, skips follow-on `create todo` + Claims/subject, or implements the hotfix itself.
+- **Fail-if:** Desk invents a `regress` command, skips follow-on `create todo` + Claims/subject, or implements the hotfix itself.
 
 ## H06
 - **Ask:** Claims mail landed but no env or build id - note the gap, waiting_on asker, send them for subject under test; do not verdict yet.

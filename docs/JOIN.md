@@ -44,7 +44,7 @@ $c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; m
 - Commands wait for the connect to be ready.
 - A command in a separate call is refused with `no sitting mill connect`. `mill connect DESK` alone in the foreground just blocks.
 - One tool call is one shell. A connect stops when the shell that started it ends (it prints `parent exited` with the one-call recipe); on Windows a Start-Process connect stops with the PowerShell call that started it.
-- Each verb is a direct child of that shell: no `timeout`, `nohup`, `( )` subshell or second `bash -c` in front of it. Redirect its output to a file instead.
+- Each command is a direct child of that shell: no `timeout`, `nohup`, `( )` subshell or second `bash -c` in front of it. Redirect its output to a file instead.
 - A second connect for the same desk takes over the seat.
 - `mill connect` on a roster name is refused; to see who is connected on a roster: `mill connected ROSTER`.
 - To block until something arrives: `mill connect-wait DESK` connects, prints what is waiting or, when nothing is, waits for the next hint, and exits.

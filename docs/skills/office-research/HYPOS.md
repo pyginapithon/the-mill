@@ -31,7 +31,7 @@ Gap mix: **5 yes / 5 no**. Fresh asks (not copied from RESEARCH).
 | **Ask** | Decide by Fri whether to **renew VendorX** or **switch to VendorY** for CI tooling. Decide desk = Eng lead. Scope: last 12 months public pricing + feature matrix for VendorX, VendorY, VendorZ. Budget ceiling $40k/yr noted. Prior brief path given. |
 | **Inputs gap** | no |
 | **Product mode** | Decision brief - **competitive** mode |
-| **Fail-if** | Ships a standing "competitive scan" / newsletter as a second product; omits options incl. do-nothing; delivers without `send` to Eng lead; invents mill verbs (`brief`, `synthesize`, `decide` CLI). |
+| **Fail-if** | Ships a standing "competitive scan" / newsletter as a second product; omits options incl. do-nothing; delivers without `send` to Eng lead; invents mill commands (`brief`, `synthesize`, `decide` CLI). |
 
 ---
 
@@ -108,7 +108,7 @@ Gap mix: **5 yes / 5 no**. Fresh asks (not copied from RESEARCH).
 | **Ask** | "Research diligence on TargetCo acquisition - clear us to sign." Partial commercial questions only; no decide criteria, no legal/finance gate owners named, no scope bounds. |
 | **Inputs gap** | yes |
 | **Product mode** | Decision brief (legal/finance gate temptation) |
-| **Fail-if** | Owns cleared/hold or approved/paid products; clears diligence inside research; invents `clear`/`approve` mill verbs; skips gap `note` + `send` asker (and legal/finance when gate). |
+| **Fail-if** | Owns cleared/hold or approved/paid products; clears diligence inside research; invents `clear`/`approve` mill commands; skips gap `note` + `send` asker (and legal/finance when gate). |
 
 ---
 
