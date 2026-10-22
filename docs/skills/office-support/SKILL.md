@@ -50,7 +50,7 @@ ITSM/forge database into mill.
 | duplicate | `note` canonical + `pass` |
 | resolve / close | `pass` when user unblocked **or** fix owned elsewhere |
 | blocked (reporter/eng/vendor) | `waiting_on` + `send` / `note` |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 | SLA (and optional CSAT) | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | exclusive file lock | omit day-one (`hold`/`drop` only if office leases) |
 

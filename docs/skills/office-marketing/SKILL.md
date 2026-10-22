@@ -53,7 +53,7 @@ Not inputs: "grow reach," CMS upload as mill's job, analytics warehouse as mill'
 | handoff to sales/support | `send` + `assign` |
 | KPI (reach/conversion) | `score` - a row in the score table (`kpi`, `value`, `target`) |
 | publish / launch | `pass` (+ optional Wall glance) |
-| park / later | `create todo` `<project> <need> --status parked` |
+| park / later | `create todo` `<roster> <need> --status parked` |
 
 Teach `hold`/`drop` only when the office leases a shared creative station.
 Never teach `open` / `yield` / bare `create` / `done`.

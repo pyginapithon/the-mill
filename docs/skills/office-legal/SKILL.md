@@ -53,7 +53,7 @@ body dumped into mill as SoR.
 | drop the claim | `unclaim` |
 | progress / diary | `note` (not mail) |
 | blocked on others | waiting_on + `send` / `note` |
-| park / defer | `create todo` `<project> <need> --status parked` |
+| park / defer | `create todo` `<roster> <need> --status parked` |
 | cycle-time KPI (optional) | `score` - a row in the score table (`kpi`, `value`, `target`) |
 
 ## Handoffs

@@ -28,7 +28,7 @@ A scorecard is a row in the score table (`kpi`, `value`, `target`). A KPI is tha
 | **L2 mill-wall** | server/records / server/sql / mill-wall / CLI wall-only | mill-perf p95 (`api.floor`, heartbeat, fanout miss); mill-api **500**; mail_to health | SCORE Last vs Target (e.g. floor p95 **100**) | **one** wall/records/sql card |
 | **L3 Wall glance** | `wall_ui/**` | human SESSION / TODO / MAIL / SCORE without asking an agent | can a human see who/what/KPIs? | **one** `wall_ui` card |
 
-Template tree on the-mill: `#24 self-improve` -> L1/L2/L3 + HOWTO (`#25`-`#28`). New project: `mill create todo <proj> self-improve` and mirror the children.
+Template tree on the-mill: `#24 self-improve` -> L1/L2/L3 + HOWTO (`#25`-`#28`). New project: `mill create todo <roster> self-improve` and mirror the children.
 
 ## Cycle (every time)
 
@@ -82,7 +82,7 @@ Other offices / vendors keep **their own** `skill.md` (domain goals, tools, KPIs
 
 1. `mill join` + `mill connect --vendor ...` (leave running).
 2. Mill desks: recopy pack `skill.md` -> mill-desk `SKILL.md` after `mill update`. Project desks: keep **their** skill beside it (or as their primary map).
-3. Open `self-improve` + L1/L2/L3 under **their** `project_id`.
+3. Open `self-improve` + L1/L2/L3 under **their** roster.
 4. Set `target` on **their** score rows (`kpi`, `value`, `target`).
 5. Each cycle: measure -> judge -> one card -> pass (L1 often tunes **their** skill/prompts).
 6. Spawn labs: skill-only + one card; profile; feed **their** L1.
