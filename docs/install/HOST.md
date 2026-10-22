@@ -174,7 +174,8 @@ When mill-wall serves static:
 
 | Asset | `Cache-Control` (product) |
 |---|---|
-| Board HTML, JS, CSS, and other wall files | `public, max-age=60`. Board HTML also sends `ETag` (304 on `If-None-Match`) |
+| Pinned wall files (query carries `?v=`, e.g. `boot.js?v=wow285`) | `public, max-age=31536000, immutable` plus `ETag` |
+| Board HTML and unpinned wall files | `public, max-age=60` plus `ETag` (304 on `If-None-Match`) |
 | API JSON | `no-store` (default) |
 
 Gzip is at the ASGI layer (above). A front httpd can still add its own deflate/expires when you restore the catalog shape.

@@ -292,9 +292,26 @@ _STATIC_TYPES = {
 }
 
 
-def _static_cache_control(_path_with_query: str, _ctype: str) -> str:
-    """Wall pages and static files stay fresh. One minute, then the browser rechecks."""
-    return "public, max-age=60"
+_PIN_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
+STATIC_CACHE_PINNED = "public, max-age=31536000, immutable"
+STATIC_CACHE_SHORT = "public, max-age=60"
+
+
+def _static_cache_control(path_with_query: str, _ctype: str) -> str:
+    """A ?v= pinned asset never changes at that URL, so cache it for a year.
+
+    The page and unpinned files stay short (one minute, then an ETag recheck),
+    so a new pin or an edited unpinned file is picked up (#712).
+    """
+    query = urlparse(path_with_query or "").query
+    pins = parse_qs(query, keep_blank_values=True).get("v") or []
+    if len(pins) == 1 and _PIN_RE.fullmatch(pins[0]):
+        return STATIC_CACHE_PINNED
+    return STATIC_CACHE_SHORT
+
+
+def _static_etag(body: bytes) -> str:
+    return '"%s"' % hashlib.sha256(body).hexdigest()[:16]
 
 
 
@@ -1137,12 +1154,17 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                     found = _safe_static(rel)
                     if found is not None:
                         ctype = _STATIC_TYPES.get(found.suffix.lower(), "application/octet-stream")
-                        self._send(
-                            200,
-                            found.read_bytes(),
-                            ctype,
-                            extra=[("Cache-Control", _static_cache_control(self.path, ctype))],
-                        )
+                        body = found.read_bytes()
+                        etag = _static_etag(body)
+                        extra = [
+                            ("Cache-Control", _static_cache_control(self.path, ctype)),
+                            ("ETag", etag),
+                        ]
+                        inm = (self.headers.get("If-None-Match") or "").strip()
+                        if inm and etag in [t.strip() for t in inm.split(",")]:
+                            self._send(304, b"", ctype, extra=extra)
+                            return
+                        self._send(200, body, ctype, extra=extra)
                         return
             if path in (
                 "/mill/v1/version",
