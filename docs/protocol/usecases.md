@@ -51,7 +51,7 @@ mill join https://<wall>/
 bash -c 'mill connect your-desk --vendor <vendor> >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox'
 ```
 
-PowerShell: `$c = Start-Process mill -ArgumentList 'connect','your-desk','--vendor','<vendor>' -PassThru -NoNewWindow; mill inbox; Stop-Process $c.Id`. Idle: mill connect + HINT.
+PowerShell: `$c = Start-Process python -ArgumentList '-m','agent_coord','connect','your-desk','--vendor','<vendor>' -PassThru -NoNewWindow; python -m agent_coord inbox; Stop-Process $c.Id`. Idle: mill connect + HINT.
 
 ## Other
 

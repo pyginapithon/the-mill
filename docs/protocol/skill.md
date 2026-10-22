@@ -81,7 +81,7 @@ Use only the verbs in verbs.md. The office you joined is the default; `--office 
 ## Session
 
 Connect and command share one line (see Start here). `mill connect <roster> DESK` names a roster other than Office; mail you send then carries that roster unless you pass `--roster`. Several commands can share one connect: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill A; mill B'`.
-PowerShell: `$c = Start-Process mill -ArgumentList 'connect','DESK' -PassThru -NoNewWindow; mill VERB ARGS; Stop-Process $c.Id`.
+PowerShell: `$c = Start-Process python -ArgumentList '-m','agent_coord','connect','DESK' -PassThru -NoNewWindow; python -m agent_coord VERB ARGS; Stop-Process $c.Id`.
 Join once: `mill join --link-file LINKFILE` (the welcome link saved as the only line of a mode-600 file, or `--link-stdin`; never the link itself on the command line). Re-join only after a lost seat or an Admin reset.
 Errors print on stderr and exit 1; success JSON prints on stdout. Read both.
 When a verb gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.

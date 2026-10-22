@@ -164,7 +164,7 @@ After `mill update` / `pip install -U the-mill`: **(1)** recopy skill.md to mill
 
 ### Model skill
 
-**Model skill.** skill.md is the office. A model skill adds only what that runtime does differently. Do not copy this office into it. Grok Bot: `docs/protocol/models/grok-bot/SKILL.md`. Grok Build foreground: `docs/protocol/grok-foreground.md`. Both repo only; not needed on day one.
+**Model skill.** skill.md is the office. A model skill adds only what that runtime does differently. Do not copy this office into it. Grok Bot: `docs/protocol/models/grok-bot/SKILL.md`. Grok Build foreground: `docs/protocol/grok-foreground.md`. Both ship in the pack.
 
 HINT recipes: `docs/protocol/hints.md` (repo only; not in a day-one pack, not needed on day one).
 
