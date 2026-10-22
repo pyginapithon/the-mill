@@ -93,3 +93,17 @@ def test_trusted_proxies_is_the_only_way_to_widen(monkeypatch) -> None:
 def test_direct_loopback_still_passes(monkeypatch) -> None:
     cfg = _config(monkeypatch, "*")
     assert _get(cfg, "127.0.0.1", "") != 403
+
+
+@pytest.mark.parametrize("door", ["ip", "path"])
+@pytest.mark.parametrize("fai", ["*", None])
+def test_nginx_edge_forged_leftmost_allowed_hop_is_403(monkeypatch, door, fai) -> None:
+    # Validator's case: a public client (198.51.100.7, not allowed) through the
+    # loopback nginx edge puts an allow-listed address first. nginx appends the
+    # real peer, so the client is the last hop; door=ip and the human Wall ACL
+    # both refuse it, with or without uvicorn's env trust (#791 on top of #731).
+    monkeypatch.setenv("AGENT_COORD_DOOR", door)
+    cfg = _config(monkeypatch, fai)
+    assert _get(cfg, "127.0.0.1", f"{ALLOWED}, 198.51.100.7") == 403
+    assert _get(cfg, "127.0.0.1", "127.0.0.1, 198.51.100.7") == 403
+    assert _get(cfg, "127.0.0.1", f"198.51.100.7, {ALLOWED}") != 403
