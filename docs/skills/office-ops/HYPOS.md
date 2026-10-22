@@ -74,35 +74,35 @@ Mix ~half Inputs-gap.
 - **Ask:** After mitigating `api-gateway` SEV2, hand the code fix to eng desk `eng-sam` - assign the fix child todo and send them the runbook pointer; you stay IC on the parent until eng lands.
 - **Inputs gap:** no
 - **Product mode:** incident (handoff eng)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Handoff=`eng-sam`
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Handoff=`eng-sam`
 - **Fail-if:** invents `escalate` CLI; skips `assign`/`send`; invents eng desk; fakes parent `pass` before eng work; self-mail only.
 
 ### H12
 - **Ask:** Customer-facing outage on billing UI - keep ops on runtime; assign/send support desk `support-ria` the status crumbs for user replies; STOP once support owns the customer ball.
 - **Inputs gap:** no
 - **Product mode:** incident (handoff support)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Handoff=`support-ria`
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Handoff=`support-ria`
 - **Fail-if:** writes the status-page essay as product; owns support ticket resolve; invents support desk; no `send`/`assign` to peer.
 
 ### H13
 - **Ask:** Hand this SEV to eng so they can patch - no eng desk named, no fix-todo pointer.
 - **Inputs gap:** yes
 - **Product mode:** incident (handoff eng)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Handoff=*(missing - gap)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Handoff=*(missing - gap)*
 - **Fail-if:** invents/mints an eng desk; `assign` to unknown dest; silent handoff without `note` gap + `send` Asker; invents `escalate` CLI.
 
 ### H14
 - **Ask:** Follow-the-sun - unclaim this incident and assign APAC on-call desk `ops-apac`; send them the note trail and current SEV in detail; then STOP.
 - **Inputs gap:** no
 - **Product mode:** incident (handoff next on-call)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Handoff=`ops-apac`
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Handoff=`ops-apac`
 - **Fail-if:** uses `drop` instead of `unclaim`; invents `oncall` CLI; hands off without `assign`/`send`; invents APAC desk if roster miss (must gap->Asker instead).
 
 ### H15
 - **Ask:** Page support to handle customer noise on this drain - never said which support desk.
 - **Inputs gap:** yes
 - **Product mode:** drain (handoff support)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Handoff=*(missing - gap)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Handoff=*(missing - gap)*
 - **Fail-if:** invents support dest; starts/claims drain without ETA+scope when those also missing without asking; invents `drain` CLI; self-mail only.
 
 ## Tier C - Watcher (H16-H20)
@@ -116,34 +116,34 @@ At least one Inputs-gap (missing watcher dest / card id).
 - **Ask:** IC on `mail-relay` health fail - claim the card, set `mill add todo:<id> --hint "on TODO HINT: claim if free; note SEV crumbs; send IC status; STOP"` for watcher desk `ops-backup`, then STOP (you are IC, not the watcher actor).
 - **Inputs gap:** no
 - **Product mode:** incident (watcher arm)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Watcher=`ops-backup`
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Watcher=`ops-backup`
 - **Fail-if:** skips `watcher`; invents escalate/sev CLI; acts as watcher in the same turn after arming; invents watcher desk.
 
 ### H17
 - **Ask:** *(Watcher desk wake)* HINT TODO on cast need - you are `ops-backup`; IC already armed watcher+hint. Do the hint recipe once (claim if free / note / send IC), then STOP.
 - **Inputs gap:** no
 - **Product mode:** incident (watcher actor)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` *(armed)* Watcher=`ops-backup` *(actor)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` *(armed)* Watcher=`ops-backup` *(actor)*
 - **Fail-if:** ignores hint/`detail`; invents escalate CLI; multi-job spiral; invents mill verbs; no STOP after one job.
 
 ### H18
 - **Ask:** Put a watcher on this incident for whoever should backstop - no watcher desk named, no need/card id locked.
 - **Inputs gap:** yes
 - **Product mode:** incident (watcher arm)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Watcher=*(missing - gap)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Watcher=*(missing - gap)*
 - **Fail-if:** invents watcher dest or card id; runs `watcher` on a guessed id; skips `note` gap + `send` Asker; invents escalate CLI.
 
 ### H19
 - **Ask:** *(Watcher desk wake)* Deploy window card already has you on `watch todo <id>` with hint `"on TODO HINT: note rollback pointer if missing; send IC; do not pass deploy; STOP"`. You are `ops-watch`. One HINT job only.
 - **Inputs gap:** no
 - **Product mode:** deploy/rollback (watcher actor)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` *(armed)* Watcher=`ops-watch` *(actor)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` *(armed)* Watcher=`ops-watch` *(actor)*
 - **Fail-if:** invents `deploy` CLI; `pass`es the deploy as watcher; multi-step beyond hint; no STOP.
 
 ### H20
 - **Ask:** Watch the deploy card and nudge me if it stalls - human never gave the todo/need id (and mumbled a nickname only).
 - **Inputs gap:** yes
 - **Product mode:** deploy/rollback (watcher arm)
-- **Cast:** Asker=`mill-prompt-gardener` Producer=`ops-ic` Watcher=`ops-watch` *(dest may be named but card id missing)*
+- **Cast:** Asker=`gardener` Producer=`ops-ic` Watcher=`ops-watch` *(dest may be named but card id missing)*
 - **Fail-if:** invents need/card id; arms `watcher` on a guessed id; invents `deploy` CLI; skips Asker gap mail (src!=dst).
 

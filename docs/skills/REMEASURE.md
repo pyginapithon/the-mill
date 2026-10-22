@@ -41,7 +41,7 @@ HYPOS / TOY.md must list **Cast:** Asker=... Producer=... Handoff=... (omit hand
 |---|---|
 | `batch_id` | Short unique id for the batch (e.g. `cold-20260921-a`) |
 | `hypo_id` / TOY scenario | `H01` or `A`/`B` |
-| `Producer` | Prefer a **fresh desk** per Producer under test (or per batch). Reusing `mill-prompt-gardener` for smoke is not a scored cold run |
+| `Producer` | Prefer a **fresh desk** per Producer under test (or per batch). Reusing `gardener` for smoke is not a scored cold run |
 | `Asker` / `Handoff` | Named desks (bare desk name) |
 | `t0` / `t1` | Wall-clock **start** and **end** (office local). Join: `activity.desk_id IN cast AND updated BETWEEN t0 AND t1` |
 

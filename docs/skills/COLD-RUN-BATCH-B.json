@@ -3,7 +3,7 @@
   "t0": "2026-09-20 23:13:45",
   "t1": "2026-09-20 23:17:58",
   "producer": "cold-batch-a",
-  "asker": "mill-prompt-gardener",
+  "asker": "gardener",
   "stats": {
     "ok": 50,
     "pass": 100,
