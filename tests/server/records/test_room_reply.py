@@ -348,8 +348,8 @@ def test_mail_thread_off_tree_single(cn) -> None:
     assert got["chain"][0]["sender"] == {"deskId": "a", "roster": "unit"}  # SP insert stamps project
 
 
-def test_mail_thread_stranger_refused(cn) -> None:
-    from agent_coord.helpers.errors import CoordError
+def test_mail_thread_stranger_reads_direct_letter(cn) -> None:
+    from agent_coord.server.records import mail as rec_mail
 
     seed_names(cn, ("unit", "roster"), ("a", "desk"), ("b", "desk"), ("z", "desk"))
     book = _Book(cn)
@@ -360,12 +360,10 @@ def test_mail_thread_stranger_refused(cn) -> None:
         "a",
     )
     mid = int(sent["id"])
-    with pytest.raises(CoordError) as ei:
-        rpc._h_mail_thread(book, {"mail_id": mid}, "unit", "z")
-    msg = str(ei.value).lower()
-    # #sec S-3: a plain (off-tree) letter is private; no reply-to-join, only mill add.
-    assert "private" in msg and "mill add" in msg
-    assert "mill reply" not in msg
+    # #672 S-3: a direct letter is readable by every desk; the read joins no one.
+    got = rpc._h_mail_thread(book, {"mail_id": mid}, "unit", "z")
+    assert {int(m["id"]) for m in got["chain"]} == {mid}
+    assert "z" not in rec_mail.room_participants(cn, mid)
 
 
 def test_mail_thread_after_filters_newer(cn) -> None:
@@ -502,7 +500,7 @@ def test_mail_thread_after_includes_sibling_replies(cn) -> None:
 
 
 def test_mail_thread_root_cast_omitted_reader(cn) -> None:
-    """A reply that drops a desk is hidden from that desk (#191)."""
+    """#672 S-3: a reply that drops a desk is still readable by that desk."""
     seed_names(cn, ("unit", "roster"), ("a", "desk"), ("b", "desk"), ("c", "desk"))
     book = _Book(cn)
     root = rpc._h_send(
@@ -518,18 +516,15 @@ def test_mail_thread_root_cast_omitted_reader(cn) -> None:
     _node(book, "remove", cid, "c", "b")
     # Per-mail: c not on reply mail_tos
     assert "c" not in _desks(cn, cid)
-    # c is still in the room via the root, and still sees that root letter.
-    # The reply that removed c is not shown.
     full_c = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "c")
-    assert {int(m["id"]) for m in full_c["chain"]} == {rid}
-    # The hidden reply is not the latest id and is not in the count (#206).
-    assert full_c["latest_id"] == rid
-    assert full_c["room_letters"] == 1
+    assert {int(m["id"]) for m in full_c["chain"]} == {rid, cid}
+    assert full_c["latest_id"] == cid
+    assert full_c["room_letters"] == 2
     via_rep = rpc._h_mail_thread(book, {"scope": "room", "mail_id": cid}, "unit", "c")
-    assert {int(m["id"]) for m in via_rep["chain"]} == {rid}
+    assert {int(m["id"]) for m in via_rep["chain"]} == {rid, cid}
     after_c = rpc._h_mail_thread(book, {"tree": "catchup-cast", "after": rid}, "unit", "c")
-    assert {int(m["id"]) for m in after_c["chain"]} == set()
-    assert after_c["latest_id"] == rid
+    assert {int(m["id"]) for m in after_c["chain"]} == {cid}
+    assert after_c["latest_id"] == cid
 
 
 def test_mail_thread_by_tree_name(cn) -> None:
@@ -557,7 +552,7 @@ def test_mail_thread_by_tree_name(cn) -> None:
 
 
 def test_mail_thread_counts_skip_hidden_letters(cn) -> None:
-    """#206: latest_id, room_letters, and the hint count only visible letters."""
+    """#206 then #672: latest_id, room_letters, and the hint count the whole room."""
     seed_names(cn, ("unit", "roster"), ("a", "desk"), ("b", "desk"), ("c", "desk"))
     book = _Book(cn)
     root = rpc._h_send(
@@ -572,19 +567,18 @@ def test_mail_thread_counts_skip_hidden_letters(cn) -> None:
     _node(book, "remove", int(hid["id"]), "c", "b")
     pid, hid_id = int(pub["id"]), int(hid["id"])
     got = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "c")
-    assert {int(m["id"]) for m in got["chain"]} == {rid, pid}
-    assert got["latest_id"] == max(rid, pid)
-    assert got["latest_id"] != hid_id
-    assert got["room_letters"] == 2
+    assert {int(m["id"]) for m in got["chain"]} == {rid, pid, hid_id}
+    assert got["latest_id"] == max(rid, pid, hid_id)
+    assert got["room_letters"] == 3
     branch = rpc._h_mail_thread(book, {"mail_id": pid}, "unit", "c")
-    assert hid_id not in {int(m["id"]) for m in branch["chain"]}
-    assert branch["room_letters"] == 2
-    assert branch["latest_id"] == max(rid, pid)
-    assert "all 2" in branch["hint"]
+    assert hid_id not in {int(m["id"]) for m in branch["chain"]}  # another branch
+    assert branch["room_letters"] == 3
+    assert branch["latest_id"] == max(rid, pid, hid_id)
+    assert "all 3" in branch["hint"]
 
 
 def test_reply_joiner_sees_the_room_root(cn) -> None:
-    """#209: a desk that joined by replying still sees the root. Other private letters stay hidden."""
+    """#209 then #672: a desk that joined by replying sees the root and every letter."""
     seed_names(cn, ("unit", "roster"), ("a", "desk"), ("b", "desk"), ("c", "desk"))
     book = _Book(cn)
     root = rpc._h_send(
@@ -605,10 +599,9 @@ def test_reply_joiner_sees_the_room_root(cn) -> None:
     sid = int(secret["id"])
     got = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "c")
     ids = {int(m["id"]) for m in got["chain"]}
-    assert rid in ids and jid in ids
-    assert sid not in ids
-    assert got["latest_id"] == max(rid, jid)
-    assert got["room_letters"] == 2
+    assert ids == {rid, jid, sid}
+    assert got["latest_id"] == max(rid, jid, sid)
+    assert got["room_letters"] == 3
     whole = rpc._h_mail_thread(book, {"scope": "room", "mail_id": rid}, "unit", "a")
     assert {int(m["id"]) for m in whole["chain"]} == {rid, jid, sid}
     assert whole["room_letters"] == 3
@@ -824,7 +817,7 @@ def test_tree_todo_returns_every_card_on_the_tree(cn) -> None:
 
 def test_room_participant_on_later_letter_reads_room(cn) -> None:
     """A desk added on a later letter (not the root cast) can mail-thread the room."""
-    from agent_coord.helpers.errors import CoordError
+    from agent_coord.server.records import mail as rec_mail
 
     seed_names(
         cn, ("unit", "roster"), ("ra", "desk"), ("rb", "desk"), ("rc", "desk"), ("rz", "desk")
@@ -845,15 +838,15 @@ def test_room_participant_on_later_letter_reads_room(cn) -> None:
         assert {int(m["id"]) for m in got["chain"]} == {rid, cid}
     got_b = rpc._h_mail_thread(book, {"mail_id": rid, "scope": "room"}, "unit", "rb")
     assert {int(m["id"]) for m in got_b["chain"]} == {rid, cid}
-    # outsider still refused, by name and by id
+    # #672 S-3: an outsider reads it too, by name and by id, and is not joined
     for handle in ({"tree": slug}, {"mail_id": rid}, {"mail_id": cid}):
-        with pytest.raises(CoordError) as ei:
-            rpc._h_mail_thread(book, dict(handle), "unit", "rz")
-        assert "not a participant" in str(ei.value).lower()
+        got = rpc._h_mail_thread(book, dict(handle, scope="room"), "unit", "rz")
+        assert {int(m["id"]) for m in got["chain"]} == {rid, cid}
+    assert "rz" not in rec_mail.room_participants(cn, rid)
 
 
-def test_room_read_hides_a_letter_the_desk_was_not_on(cn) -> None:
-    """#191: --room hides a letter addressed only to one other desk."""
+def test_room_read_shows_a_letter_the_desk_was_not_on(cn) -> None:
+    """#672 S-3 (was #191): --room shows a letter addressed only to one other desk."""
     seed_names(
         cn, ("unit", "roster"), ("ra", "desk"), ("rb", "desk"), ("rc", "desk")
     )
@@ -877,13 +870,11 @@ def test_room_read_hides_a_letter_the_desk_was_not_on(cn) -> None:
         )
         return {int(m["id"]) for m in got["chain"]}
 
-    assert seen("ra") == {rid, bid}
-    # rc joined on a later letter. The root is shown (#209). The private letter stays.
+    assert seen("ra") == {rid, bid, pid}
     assert seen("rc") == {rid, bid, pid}
     assert seen("rb") == {rid, bid, pid}
     branch = rpc._h_mail_thread(book, {"mail_id": pid, "scope": "branch"}, "unit", "ra")
-    assert pid not in {int(m["id"]) for m in branch["chain"]}
-    assert all("only rc" not in str(m.get("body") or "") for m in branch["chain"])
+    assert pid in {int(m["id"]) for m in branch["chain"]}
 
 
 def test_room_reply_all_reaches_every_participant(cn) -> None:

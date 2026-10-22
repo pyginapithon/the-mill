@@ -1821,7 +1821,9 @@ def build_scores(
 ) -> list[dict]:
     """Scores isolate: mill_score_select per project and Office; dedupe owner|kpi|aff."""
     kpis: list[dict] = []
-    score_ps = list(dict.fromkeys([*(mail_ps or []), CONST_OFFICE]))
+    from agent_coord.server.admin.guard import office_name
+
+    score_ps = list(dict.fromkeys([*(mail_ps or []), office_name(cn)]))  # #722: id 1's name
     seen_kpi: set[tuple] = set()
     for mp, mp_rows in _score_by_aff(cn, score_ps):
         for r in mp_rows:
@@ -1890,53 +1892,15 @@ def build_agents(
     return agents
 
 
-def _room_casts(cn, mail_ids: list[int]) -> dict[int, set[str]]:
-    """Room cast per root = sender U mail_tos deskIds (bare). One letter query, one dest query."""
-
-    ids: list[int] = []
-    seen: set[int] = set()
-    for raw in mail_ids or []:
-        try:
-            mid = int(raw or 0)
-        except (TypeError, ValueError):
-            continue
-        if mid and mid not in seen:
-            seen.add(mid)
-            ids.append(mid)
-    if not ids:
-        return {}
-    letters = rec_mail.letters_by_id(cn, ids)
-    dests = rec_mail.tos_by_id(cn, ids)
-    out: dict[int, set[str]] = {}
-    for mid in ids:
-        letter = letters.get(mid)
-        if letter is None:
-            got = rec_mail.get(cn, mid)
-            letter = got[0] if got else {}
-        desks: set[str] = set()
-        sender = _nm(letter.get("desk") or "")
-        if sender:
-            desks.add(sender)
-        for r in dests.get(mid, []):
-            d = _nm(r.get("desk") or "")
-            if d:
-                desks.add(d)
-        out[mid] = desks
-    return out
-
-
 def build_rooms(
     cn,
     want: set[str] | None = None,
     roster_ids: list[int] | None = None,
-    *,
-    membership_desk: str | None = None,
 ) -> list[dict]:
     """Lean mail room roots only (type=mail lft=1). No letter bodies.
 
-    When membership_desk is set (limited Wall / desk-scoped), keep only roots
-    whose room cast includes that desk. high trust Wall omits this filter
-    (may browse book). Admin bypass is caller-side.
+    Every room, at every trust level (#672, S-3): nothing is private between
+    desks in an office, and the Wall shows humans every room.
     """
 
     aff = roster_ids
@@ -1944,15 +1908,9 @@ def build_rooms(
         aff = _v1_aff_ids(cn, want)
     names = {int(r["id"]): str(r.get("name") or "") for r in rec_name.select(cn)}
     rows = rec_tree.mail_room_root_rows(cn, aff)
-    desk_bare = _nm(membership_desk or "") if membership_desk else ""
-    casts = (
-        _room_casts(cn, [int(raw.get("id") or 0) for raw in rows]) if desk_bare else {}
-    )
     enriched: list[dict] = []
     for raw in rows:
         rid = int(raw.get("id") or 0)
-        if desk_bare and desk_bare not in casts.get(rid, set()):
-            continue
         try:
             aff_id = int(raw.get("roster_id") or 0)
         except (TypeError, ValueError):
@@ -1982,31 +1940,17 @@ def v1_rooms(
     desk: str | None = None,
     scope: str | None = None,
 ) -> dict[str, Any]:
-    """Rooms isolate. Stamp trust. limited + desk => membership filter.
+    """Rooms isolate. Stamp trust. Every room at every trust level (#672, S-3).
 
-    Hook for wall-ui: pass ?desk=<deskId> (and optionally ?scope=membership).
-    When office trust is limited (or scope=membership), filter to room cast.
-    high trust without scope=membership => browse book (no desk filter).
-    Admin glass: omit desk / use Admin desk after is_role_admin (wall-ui).
+    ?desk= and ?scope=membership are still accepted (older Wall glass sends them
+    under limited trust) but no longer filter: nothing is private between desks
+    in an office, and the Wall shows humans every room.
     """
-    from agent_coord.config import mill_trust
-    from agent_coord.server.admin.guard import is_role_admin
-
     _mail_ps, want = _v1_project_scope(project, projects)
     out = _v1_envelope(["rooms"])
-    trust = mill_trust()
-    scope_s = str(scope or "").strip().lower()
-    membership = None
-    if desk:
-        if is_role_admin(cn, desk):
-            membership = None  # Admin: everything
-        elif trust == "limited" or scope_s in ("membership", "desk", "cast"):
-            membership = desk
-    out["trees"] = build_rooms(cn, want, membership_desk=membership)
+    out["trees"] = build_rooms(cn, want)
     if desk:
         out["desk"] = desk
-    if membership:
-        out["scope"] = "membership"
     return out
 
 
