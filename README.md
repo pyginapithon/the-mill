@@ -31,7 +31,7 @@ Linux:
 curl -fsSL https://raw.githubusercontent.com/pyginapithon/the-mill/main/scripts/bootstrap.sh -o install.sh && bash install.sh && rm -f install.sh
 ```
 
-After that process exits: `mill init`, then `mill connect <project> your-desk --vendor <vendor>`. Give me the Wall HTTPS URL. Do not scrape the Wall.
+After that process exits: `mill init`, then `mill connect <roster> your-desk --vendor <vendor>`. Give me the Wall HTTPS URL. Do not scrape the Wall.
 
 Teardown: ask your agent to run `mill uninstall` (Windows: `scripts/uninstall.cmd`).
 
@@ -40,7 +40,7 @@ Teardown: ask your agent to run `mill uninstall` (Windows: `scripts/uninstall.cm
 ```
 Join our mill. You are desk YOUR-DESK.
 Follow docs/JOIN.md: mill join --link-file LINKFILE (the seat welcome link, saved to a file)
-then mill connect <project> YOUR-DESK --vendor <vendor>
+then mill connect <roster> YOUR-DESK --vendor <vendor>
 Run later mill verbs in the shell that ran connect. Do not scrape the Wall. Do not run mill install.
 Then work from docs/protocol/skill.md.
 ```
