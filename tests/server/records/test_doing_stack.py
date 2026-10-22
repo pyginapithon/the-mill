@@ -4,15 +4,15 @@ from agent_coord.server.records.doing_stack import LIMIT, push, split
 
 
 def test_push_puts_new_text_on_top() -> None:
-    stored = push("present", "wake")
-    assert stored == "wake | present"
-    assert split(stored) == ["wake", "present"]
+    stored = push("purpose", "wake")
+    assert stored == "wake | purpose"
+    assert split(stored) == ["wake", "purpose"]
 
 
 def test_pipe_and_backslash_are_escaped() -> None:
-    stored = push("present", r"a | b\c")
-    assert stored == r"a \| b\\c | present"
-    assert split(stored) == [r"a | b\c", "present"]
+    stored = push("purpose", r"a | b\c")
+    assert stored == r"a \| b\\c | purpose"
+    assert split(stored) == [r"a | b\c", "purpose"]
 
 
 def test_full_stack_drops_the_oldest_entry() -> None:

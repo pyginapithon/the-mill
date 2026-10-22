@@ -112,6 +112,27 @@ def push_doing(cn, project: str, desk: str, text: str) -> list[dict]:
     return doing(cn, project, desk_b, push(stored, piece))
 
 
+def touch(cn, project: str, desk: str) -> list[dict]:
+    """Bump the seat and join activity; doing keeps the desk's own text (#635)."""
+    from .db import scalar
+    from .doing_stack import clean
+
+    from agent_coord.server.records.name import bare
+
+    desk_b = bare(desk, CONST_DESK) if desk else ""
+    if not desk_b:
+        return []
+    current = scalar(
+        cn,
+        "SELECT j.doing FROM `join` j "
+        "JOIN name n ON n.id = j.desk_id WHERE n.type = 'desk' AND n.name = %s",
+        (desk_b,),
+    )
+    if current is None:
+        return []
+    return doing(cn, project, desk_b, clean(str(current)))
+
+
 def delete(cn, project: str, desk: str) -> list[dict]:
     from agent_coord.server.records.name import bare
 
