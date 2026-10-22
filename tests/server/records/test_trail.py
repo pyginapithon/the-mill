@@ -140,10 +140,12 @@ def test_trail_from_room_root_and_todo(cn) -> None:
     ]
 
 
-def test_trail_mail_needs_cast(cn) -> None:
+def test_trail_mail_reads_without_cast(cn) -> None:
+    # #672 S-3: every desk in the office trails any mail.
     br = _branch(cn)
-    with pytest.raises(CoordError):
-        rpc._h_trail(br["book"], {"node": f"mail:{br['fid']}"}, "unit", "outsider")
+    out = rpc._h_trail(br["book"], {"node": f"mail:{br['fid']}"}, "unit", "outsider")
+    assert out["nodes"][0]["id"] == br["fid"]
+    assert all(n["state"] != "hidden" for n in out["nodes"])
 
 
 def test_trail_bad_and_missing_ids(cn) -> None:
