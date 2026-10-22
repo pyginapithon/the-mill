@@ -1,28 +1,28 @@
-"""Fail when the docs name a mill verb or flag the CLI does not have.
+"""Fail when the docs name a mill command or flag the CLI does not have.
 
 The CLI parser (`agent_coord.__main__._build_parser`) is the authority: the
 same object `mill VERB --help` prints from. Every `mill ...` command written
 in a code span or a code block of the checked docs is read token by token:
 
-  unknown-verb      `mill VERB` where VERB is not a verb (e.g. `mill mail`)
+  unknown-command   `mill VERB` where VERB is not a command (e.g. `mill mail`)
   unknown-sub       `mill route VERB` / `mill create TYPE` not in its choices
-  unknown-flag      a `--flag` (or `-x`) the verb does not take
+  unknown-flag      a `--flag` (or `-x`) the command does not take
   missing-arg       a command in a code block with fewer positionals than the
-                    verb requires (e.g. `mill connected` without a roster)
+                    command requires (e.g. `mill connected` without a roster)
   retired-word      a retired name (RETIRED below) anywhere in the text
   bad-choice        a literal positional outside its choices (`mill install foo`)
-  stale-placeholder `<project>` where the verb's positional is now a roster
-  undocumented-verb a verb `mill -h` lists that no checked doc names
+  stale-placeholder `<project>` where the command's positional is now a roster
+  undocumented-command a command `mill -h` lists that no checked doc names
   undocumented-flag a flag `mill VERB -h` lists that no checked doc names
   help-*            the same command checks run on the parser's own help text
 
 Placeholders (VERB, <verb>, ...) and bracketed forms (`[--full | --page N]`)
 are read as the docs write them. A line can opt out with the marker
-`doc-verbs: skip` in an HTML comment on the line itself or the line above.
+`doc-commands: skip` in an HTML comment on the line itself or the line above.
 
 Usage:
-  python tools/check_doc_verbs.py          # exit 0 clean, 1 on any mismatch
-  python tools/check_doc_verbs.py --list   # print every verb and its flags
+  python tools/check_doc_commands.py          # exit 0 clean, 1 on any mismatch
+  python tools/check_doc_commands.py --list   # print every command and its flags
 """
 from __future__ import annotations
 
@@ -36,8 +36,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# The docs a desk or a mill developer reads for verbs. Design docs that
-# propose verbs or flags not built yet (NOT_CHECKED) are not checked.
+# The docs a desk or a mill developer reads for commands. Design docs that
+# propose commands or flags not built yet (NOT_CHECKED) are not checked.
 DOC_GLOBS = (
     "README.md",
     "docs/*.md",
@@ -53,23 +53,23 @@ DOC_GLOBS = (
 )
 NOT_CHECKED = {"docs/dev/VERB-LEXICON-PROPOSAL.md", "docs/dev/DETERMINISTIC-OFFICE.md"}
 
-# Flags read before the parser runs (main / _run_parsed), valid on any verb.
-ANY_VERB_FLAGS = {"--office", "--yes", "-h", "--help"}
-# Top-level flags, valid only before the verb.
+# Flags read before the parser runs (main / _run_parsed), valid on any command.
+ANY_COMMAND_FLAGS = {"--office", "--yes", "-h", "--help"}
+# Top-level flags, valid only before the command.
 TOP_FLAGS = {"--raw", "-v", "--verbose", "-V", "--version", "--agent", "--office", "-h", "--help"}
 
-# Names the CLI dropped. A doc that still uses one teaches a verb that is gone.
+# Names the CLI dropped. A doc that still uses one teaches a command that is gone.
 RETIRED = {
     "mill_wait": "the MCP wait tool is gone: a desk waits with mill connect + HINT or a webhook",
-    "mill leftover": "removed verb: idle is mill connect + HINT",
+    "mill leftover": "removed command: idle is mill connect + HINT",
 }
 
-# Verbs the CLI dropped; named in prose they still count as a verb.
-GONE_VERBS = {"mail", "mcp", "mcp-config", "leftover", "leftover-done", "heartbeat", "sync", "done", "spend", "issues", "here", "presence", "acquire", "yield", "open"}
+# Commands the CLI dropped; named in prose they still count as a command.
+GONE_COMMANDS = {"mail", "mcp", "mcp-config", "leftover", "leftover-done", "heartbeat", "sync", "done", "spend", "issues", "here", "presence", "acquire", "yield", "open"}
 
-SKIP_MARK = "doc-verbs: skip"
+SKIP_MARK = "doc-commands: skip"
 PLACEHOLDER = re.compile(r"^(<[^>]*>|[A-Z][A-Z0-9_]*|\.\.\.|\u2026|VERB|verb|\$\w+|\{[^}]*\}|[A-Z_]+\.\.\.)$")
-VERB_TOKEN = re.compile(r"^[a-z][a-z0-9-]*$")
+COMMAND_TOKEN = re.compile(r"^[a-z][a-z0-9-]*$")
 FLAG_TOKEN = re.compile(r"^(--[a-z][a-z0-9-]*|-[a-zA-Z])(=.*)?$")
 # A `mill` word that starts a command: not part of mill-wall, the-mill, etc.
 MILL_AT = re.compile(r"(?<![\w./-])mill (?=\S)")
@@ -78,7 +78,7 @@ END = {";", "&&", "||", ">", ">>", "2>", "2>&1", "&", "<", "|"}
 
 
 @dataclass(frozen=True)
-class Verb:
+class Command:
     name: str
     flags: frozenset
     takes_value: frozenset
@@ -89,7 +89,7 @@ class Verb:
     parser: argparse.ArgumentParser
 
 
-def _verb_of(name: str, p: argparse.ArgumentParser) -> Verb:
+def _command_of(name: str, p: argparse.ArgumentParser) -> Command:
     flags, takes = set(), set()
     required = 0
     names = []
@@ -97,7 +97,7 @@ def _verb_of(name: str, p: argparse.ArgumentParser) -> Verb:
     subs: dict = {}
     for act in p._actions:
         if isinstance(act, argparse._SubParsersAction):
-            subs = {n: _verb_of(n, c) for n, c in act.choices.items()}
+            subs = {n: _command_of(n, c) for n, c in act.choices.items()}
             if act.required:
                 required += 1
             continue
@@ -110,21 +110,21 @@ def _verb_of(name: str, p: argparse.ArgumentParser) -> Verb:
             choices.append(tuple(c for c in act.choices if c) if act.choices else ())
             if act.nargs in (None, "+") or isinstance(act.nargs, int):
                 required += act.nargs if isinstance(act.nargs, int) else 1
-    return Verb(name, frozenset(flags), frozenset(takes), required, tuple(names), tuple(choices), subs, p)
+    return Command(name, frozenset(flags), frozenset(takes), required, tuple(names), tuple(choices), subs, p)
 
 
-def load_verbs() -> dict:
+def load_commands() -> dict:
     from agent_coord.__main__ import _build_parser
 
     top = _build_parser()
     for act in top._actions:
         if isinstance(act, argparse._SubParsersAction):
-            return {n: _verb_of(n, c) for n, c in act.choices.items()}
-    raise SystemExit("check_doc_verbs: the mill parser has no verbs")
+            return {n: _command_of(n, c) for n, c in act.choices.items()}
+    raise SystemExit("check_doc_commands: the mill parser has no commands")
 
 
-def shown_verbs() -> set:
-    """Verbs `mill -h` lists (a verb with help=SUPPRESS is hidden on purpose)."""
+def shown_commands() -> set:
+    """Commands `mill -h` lists (a command with help=SUPPRESS is hidden on purpose)."""
     from agent_coord.__main__ import _build_parser
 
     for act in _build_parser()._actions:
@@ -133,16 +133,16 @@ def shown_verbs() -> set:
     return set()
 
 
-def shown_flags(verb: Verb) -> set:
+def shown_flags(command: Command) -> set:
     return {
         o
-        for act in verb.parser._actions
+        for act in command.parser._actions
         if act.option_strings and act.help != argparse.SUPPRESS
         for o in act.option_strings
     } - {"-h", "--help", "--yes", "--office"}
 
 
-def help_texts(verbs: dict):
+def help_texts(commands: dict):
     """(where, text) for every help and description string the parser prints."""
     from agent_coord.__main__ import _build_parser
 
@@ -237,7 +237,7 @@ def tokens_after(piece: str, start: int, prose: bool) -> list:
 
 
 def _negated(piece: str, start: int, end: int) -> bool:
-    """`no mill sync verb`, `do not run mill install`, `mill leftover: retired`,
+    """`no mill sync command`, `do not run mill install`, `mill leftover: retired`,
     `mill install cloud --ssh` (planned): the line says the form is not a shipped one."""
     before = piece[max(0, start - 24) : start].lower()
     after = piece[end : end + 48].lower()
@@ -247,7 +247,7 @@ def _negated(piece: str, start: int, end: int) -> bool:
     )
 
 
-def check_command(piece: str, start: int, verbs: dict, mode: str, where: str):
+def check_command(piece: str, start: int, commands: dict, mode: str, where: str):
     prose = mode == "prose"
     toks = tokens_after(piece, start, prose)
     i = 0
@@ -256,27 +256,27 @@ def check_command(piece: str, start: int, verbs: dict, mode: str, where: str):
     if i >= len(toks):
         return
     name = toks[i][0]
-    if not VERB_TOKEN.match(name) or PLACEHOLDER.match(name):
+    if not COMMAND_TOKEN.match(name) or PLACEHOLDER.match(name):
         return
     rest = toks[i + 1 :]
-    verb = verbs.get(name)
-    if verb is None:
+    command = commands.get(name)
+    if command is None:
         # In prose `mill` is also a noun ("the mill office"): there a word is
-        # read as a verb only when it is a known dropped verb or flags follow.
-        if prose and name not in GONE_VERBS and not any(FLAG_TOKEN.match(t) for t, _ in rest[:2]):
+        # read as a command only when it is a known dropped command or flags follow.
+        if prose and name not in GONE_COMMANDS and not any(FLAG_TOKEN.match(t) for t, _ in rest[:2]):
             return
-        yield Finding("unknown-verb", where, f"mill {name}", f"no verb {name!r}")
+        yield Finding("unknown-command", where, f"mill {name}", f"no command {name!r}")
         return
-    if verb.subs and rest:
+    if command.subs and rest:
         sub = rest[0][0]
-        if VERB_TOKEN.match(sub) and not PLACEHOLDER.match(sub):
-            if sub not in verb.subs:
+        if COMMAND_TOKEN.match(sub) and not PLACEHOLDER.match(sub):
+            if sub not in command.subs:
                 if not prose:
                     yield Finding(
-                        "unknown-sub", where, f"mill {name} {sub}", f"{name} takes {', '.join(sorted(verb.subs))}"
+                        "unknown-sub", where, f"mill {name} {sub}", f"{name} takes {', '.join(sorted(command.subs))}"
                     )
                 return
-            verb, rest = verb.subs[sub], rest[1:]
+            command, rest = command.subs[sub], rest[1:]
             name = f"{name} {sub}"
     positional = 0
     j = 0
@@ -285,35 +285,35 @@ def check_command(piece: str, start: int, verbs: dict, mode: str, where: str):
         fm = FLAG_TOKEN.match(tok)
         if fm:
             flag = fm.group(1)
-            if flag not in verb.flags and flag not in ANY_VERB_FLAGS:
+            if flag not in command.flags and flag not in ANY_COMMAND_FLAGS:
                 yield Finding("unknown-flag", where, f"mill {name} {flag}", f"{name} has no {flag}")
-            elif flag in verb.takes_value and not fm.group(2):
+            elif flag in command.takes_value and not fm.group(2):
                 nxt = rest[j + 1][0] if j + 1 < len(rest) else ""
                 if not FLAG_TOKEN.match(nxt):
                     j += 1
         else:
             word = tok.strip("<>").lower()
-            if word == "project" and "project" not in verb.positionals:
+            if word == "project" and "project" not in command.positionals:
                 yield Finding(
-                    "stale-placeholder", where, f"mill {name} {tok}", f"{name} takes {' '.join(verb.positionals) or 'no positional'}"
+                    "stale-placeholder", where, f"mill {name} {tok}", f"{name} takes {' '.join(command.positionals) or 'no positional'}"
                 )
             if depth == 0 and tok not in ("|", "or", "POS") or tok == "POS":
                 k = positional
                 if (
-                    k < len(verb.choices)
-                    and verb.choices[k]
-                    and VERB_TOKEN.match(tok)
+                    k < len(command.choices)
+                    and command.choices[k]
+                    and COMMAND_TOKEN.match(tok)
                     and not PLACEHOLDER.match(tok)
                     and "|" not in tok
-                    and tok not in verb.choices[k]
+                    and tok not in command.choices[k]
                     and not prose
                 ):
-                    yield Finding("bad-choice", where, f"mill {name} {tok}", f"{name} takes {', '.join(verb.choices[k])}")
+                    yield Finding("bad-choice", where, f"mill {name} {tok}", f"{name} takes {', '.join(command.choices[k])}")
                 positional += 1
         j += 1
-    if mode == "block" and positional < verb.required and not verb.subs:
+    if mode == "block" and positional < command.required and not command.subs:
         yield Finding(
-            "missing-arg", where, f"mill {name}", f"{name} needs {verb.required} positional, got {positional}"
+            "missing-arg", where, f"mill {name}", f"{name} needs {command.required} positional, got {positional}"
         )
 
 
@@ -322,7 +322,7 @@ def check_command(piece: str, start: int, verbs: dict, mode: str, where: str):
 BLOCK_AT = re.compile(r"(?:^\s*(?:\$\s+|>\s+)?|(?:;|&&?|\|\|?|\(|\$\(|'|\bthen|\bdo)\s*)mill (?=\S)")
 
 
-def check_text(text: str, verbs: dict, where: str, prose: bool = False):
+def check_text(text: str, commands: dict, where: str, prose: bool = False):
     pieces = ((0, text, "prose", "", ""),) if prose else code_pieces(text)
     for n, piece, mode, before, after in pieces:
         loc = f"{where}:{n}" if n else where
@@ -334,7 +334,7 @@ def check_text(text: str, verbs: dict, where: str, prose: bool = False):
                 stop = m.end() + 24
             if _negated(before + piece + after, len(before) + m.start(), len(before) + stop):
                 continue
-            yield from check_command(piece, m.end(), verbs, mode, loc)
+            yield from check_command(piece, m.end(), commands, mode, loc)
 
 
 def retired(text: str, where: str):
@@ -353,29 +353,29 @@ def retired_in(text: str, where: str):
 
 
 def run(root: Path = ROOT) -> list:
-    verbs = load_verbs()
+    commands = load_commands()
     found: list = []
     named: set = set()
     alltext: list = []
     for rel in doc_files(root):
         text = (root / rel).read_text(encoding="utf-8")
-        found += list(check_text(text, verbs, rel))
+        found += list(check_text(text, commands, rel))
         found += list(retired(text, rel))
         named.update(re.findall(r"(?<![\w./-])mill ([a-z][a-z0-9-]*)", text))
         named.update(re.findall(r"^\| `([a-z][a-z0-9-]*)` \|", text, re.M))
         alltext.append(text)
-    for where, text in help_texts(verbs):
-        for f in check_text(text, verbs, f"help[{where}]", prose=True):
+    for where, text in help_texts(commands):
+        for f in check_text(text, commands, f"help[{where}]", prose=True):
             found.append(Finding("help-" + f.kind, f.where, f.text, f.why))
         for f in retired_in(text, f"help[{where}]"):
             found.append(Finding("help-" + f.kind, f.where, f.text, f.why))
-    shown = shown_verbs()
+    shown = shown_commands()
     for name in sorted(shown):
         if name not in named:
-            found.append(Finding("undocumented-verb", "docs", f"mill {name}", "in mill --help, named in no checked doc"))
+            found.append(Finding("undocumented-command", "docs", f"mill {name}", "in mill --help, named in no checked doc"))
     blob = "\n".join(alltext)
     for name in sorted(shown):
-        for sub in [verbs[name], *verbs[name].subs.values()]:
+        for sub in [commands[name], *commands[name].subs.values()]:
             for flag in sorted(shown_flags(sub)):
                 if not re.search(re.escape(flag) + r"(?![\w-])", blob):
                     where = f"mill {name}" + (f" {sub.name}" if sub.name != name else "")
@@ -385,14 +385,14 @@ def run(root: Path = ROOT) -> list:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n", 1)[0])
-    ap.add_argument("--list", action="store_true", help="print every verb and its flags, then exit 0")
+    ap.add_argument("--list", action="store_true", help="print every command and its flags, then exit 0")
     args = ap.parse_args(argv)
     if args.list:
         def show(vs, pre=""):
             for n, v in sorted(vs.items()):
                 print(f"{pre}{n} [{v.required} positional] {' '.join(sorted(v.flags - {'-h', '--help'}))}")
                 show(v.subs, f"{pre}{n} ")
-        show(load_verbs())
+        show(load_commands())
         return 0
     found = run()
     for f in found:
@@ -401,9 +401,9 @@ def main(argv=None) -> int:
     for f in found:
         kinds[f.kind] = kinds.get(f.kind, 0) + 1
     if found:
-        print("check_doc_verbs: FAIL " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())), file=sys.stderr)
+        print("check_doc_commands: FAIL " + ", ".join(f"{k} {v}" for k, v in sorted(kinds.items())), file=sys.stderr)
         return 1
-    print(f"check_doc_verbs: ok ({len(doc_files())} docs, every mill verb and flag matches the CLI)")
+    print(f"check_doc_commands: ok ({len(doc_files())} docs, every mill command and flag matches the CLI)")
     return 0
 
 

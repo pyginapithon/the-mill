@@ -39,13 +39,13 @@ python tools/check_sql.py --sql path/to/agent_coord/server/sql
 
 Exit 1 when a pack routine is missing. Extra live routines are listed and do not fail the check. It does not apply SQL.
 
-## check_doc_verbs.py
+## check_doc_commands.py
 
-Hold the docs to the CLI. It builds the mill parser (the one `mill VERB --help` prints from) and reads every `mill ...` command in the code spans and code blocks of README.md, docs/*.md, docs/protocol, docs/dev, docs/install, docs/requirements and the office skills. It fails on a verb that is gone (`mill mail`), a flag the verb does not take, a code-block command short of its positionals (`mill connected` with no roster), a literal outside a positional's choices, a `<project>` where the verb takes a roster, a retired word (`mill_wait`), the same drift in the parser's own help text, and a verb or flag `mill -h` lists that no doc names. Hidden verbs and flags are not owed a doc. A line that names a form only to say it does not exist passes when it says so (no, not, never, retired); otherwise mark it `<!-- doc-verbs: skip -->`.
+Hold the docs to the CLI. It builds the mill parser (the one `mill VERB --help` prints from) and reads every `mill ...` command in the code spans and code blocks of README.md, docs/*.md, docs/protocol, docs/dev, docs/install, docs/requirements and the office skills. It fails on a command that is gone (`mill mail`), a flag the command does not take, a code-block command short of its positionals (`mill connected` with no roster), a literal outside a positional's choices, a `<project>` where the command takes a roster, a retired word (`mill_wait`), the same drift in the parser's own help text, and a command or flag `mill -h` lists that no doc names. Hidden commands and flags are not owed a doc. A line that names a form only to say it does not exist passes when it says so (no, not, never, retired); otherwise mark it `<!-- doc-commands: skip -->`.
 
 ```bash
-python tools/check_doc_verbs.py          # exit 0 clean, 1 on any mismatch
-python tools/check_doc_verbs.py --list   # every verb, its positional count and flags
+python tools/check_doc_commands.py          # exit 0 clean, 1 on any mismatch
+python tools/check_doc_commands.py --list   # every command, its positional count and flags
 ```
 
 CI runs it in the `mill_cli_smoke` job (F90).

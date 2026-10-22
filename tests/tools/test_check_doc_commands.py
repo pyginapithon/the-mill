@@ -1,31 +1,31 @@
-"""F90 (doc-verbs): tools/check_doc_verbs.py holds every doc's mill verbs and flags to the CLI parser.
+"""F90 (doc-commands): tools/check_doc_commands.py holds every doc's mill commands and flags to the CLI parser.
 
-The repo docs pass clean; each kind of drift (a verb that is gone, a flag a verb
+The repo docs pass clean; each kind of drift (a command that is gone, a flag a command
 does not take, a missing positional, a retired word, a stale placeholder, a
-choice outside the list, a verb or flag `mill -h` lists that no doc names) fails.
+choice outside the list, a command or flag `mill -h` lists that no doc names) fails.
 """
 from __future__ import annotations
 
 import pytest
 
-from tools import check_doc_verbs as cdv
+from tools import check_doc_commands as cdc
 
-VERBS = cdv.load_verbs()
+COMMANDS = cdc.load_commands()
 
 
 def kinds(text: str) -> list[str]:
-    return [f.kind for f in cdv.check_text(text, VERBS, "t.md")] + [f.kind for f in cdv.retired(text, "t.md")]
+    return [f.kind for f in cdc.check_text(text, COMMANDS, "t.md")] + [f.kind for f in cdc.retired(text, "t.md")]
 
 
 def test_repo_docs_match_the_cli(capsys):
-    assert cdv.main([]) == 0, capsys.readouterr().out
+    assert cdc.main([]) == 0, capsys.readouterr().out
 
 
 @pytest.mark.parametrize(
     "text, kind",
     [
-        ("Read it with `mill mail 12`.", "unknown-verb"),
-        ("```\nmill mcp\n```", "unknown-verb"),
+        ("Read it with `mill mail 12`.", "unknown-command"),
+        ("```\nmill mcp\n```", "unknown-command"),
         ("`mill todo the-mill --bogus`", "unknown-flag"),
         ("`mill connect --owner desk-a`", "unknown-flag"),
         ("`mill invite --seat d1 --project p`", "unknown-flag"),
@@ -56,14 +56,14 @@ def test_drift_fails(text, kind):
         "`mill route add KEY -- argv`",
         "`mill reset seat <desk> --yes`",
         "`mill wall-check [--base URL] [--filter PROJECT]`",
-        "No `mill sync` verb.",
+        "No `mill sync` command.",
         "There is no `mill use`.",
         "HINT poke (not mill_wait).",
-        "mill leftover verb: retired.",
+        "mill leftover command: retired.",
         "`mill install cloud --ssh <user>@<host>` (planned, not in this pack)",
         "```mermaid\nflowchart TD\n  X[no connect: mill holds data]\n  P[mill pass]\n```",
         "Join with `mill join --link-file LINKFILE`; then `mill connect <desk>`.",
-        "<!-- doc-verbs: skip -->\n`mill mail 12`",
+        "<!-- doc-commands: skip -->\n`mill mail 12`",
     ],
 )
 def test_documented_forms_pass(text):
@@ -71,16 +71,16 @@ def test_documented_forms_pass(text):
 
 
 def test_help_text_is_checked_too():
-    found = list(cdv.check_text("see mill todo --nope", VERBS, "help[x]", prose=True))
+    found = list(cdc.check_text("see mill todo --nope", COMMANDS, "help[x]", prose=True))
     assert [f.kind for f in found] == ["unknown-flag"]
 
 
-def test_a_verb_no_doc_names_fails(tmp_path):
+def test_a_command_no_doc_names_fails(tmp_path):
     (tmp_path / "README.md").write_text("`mill send --to-desk d --body-file P`\n", encoding="utf-8")
-    found = cdv.run(tmp_path)
-    undocumented = {f.text for f in found if f.kind == "undocumented-verb"}
+    found = cdc.run(tmp_path)
+    undocumented = {f.text for f in found if f.kind == "undocumented-command"}
     assert "mill todo" in undocumented and "mill send" not in undocumented
-    # Hidden verbs (help suppressed) are not owed a doc.
+    # Hidden commands (help suppressed) are not owed a doc.
     assert "mill drain" not in undocumented
     flags = {f.text for f in found if f.kind == "undocumented-flag"}
     assert "mill todo --mine" in flags and "mill send --to-desk" not in flags
