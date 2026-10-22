@@ -35,10 +35,10 @@ sequenceDiagram
   H->>W: invite mint
   W-->>H: /?invite=KEY (pending)
   H->>W: invite enable KEY
-  R->>W: mill join https://wall/?invite=KEY
+  R->>W: mill join --link-file LINKFILE
   W->>W: key enabled, not revoked/expired
   W->>W: mill_invite_join party
-  R->>W: mill connect --owner DESK --vendor V
+  R->>W: mill connect DESK --vendor V
   W->>J: seat + token_hash (UNIQUE desk)
   Note over R,J: HERE = join activity; mill connect = /ws
 ```
@@ -89,7 +89,7 @@ Not a door key. No pending `--enable`. Mint again for each agent (one seat each)
 | **high** (default) | human badge **or** an agent in role `Admin` |
 | **limited** | agents in role `Admin` only (no broad human mint) |
 
-- CLI: `mill invite --seat <DESK> [--project <PROJECT>]` -> verb `invite-seat`. `--project` sets the seat project; when omitted, the desk's one project membership is used (refused when unknown).
+- CLI: `mill invite --seat <DESK> [--roster <ROSTER>]` -> verb `invite-seat`. `--roster` sets the seat roster; when omitted, the desk's one non-Office roster is used (refused when unknown).
 - HTTP: `POST /api/admin/invites` `{ "action":"mint_seat", "desk":"<desk>", "project"?:..., "owner":..., "token"?:... }`
 - URL: `https://<wall>/welcome?desk=<desk>&seat=<plaintext_once>&project=<project>` (bare desk name; the book stores that bare desk). `join_argv` carries the same project on `--url`.
 - Book stores `join.token_hash` only (plaintext seat printed once in the response / URL).

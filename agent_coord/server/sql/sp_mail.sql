@@ -296,7 +296,7 @@ BEGIN
   -- An unknown caller desk (NULL) is never the sender and never Admin.
   IF IFNULL(v_desk, 0) <> v_sender
      AND NOT EXISTS (SELECT 1 FROM member
-                      WHERE name_id = MILL_NAME_GET('roster', 'Admin')
+                      WHERE name_id = 2  -- the reserved Admin roster (#722)
                         AND desk_id = IFNULL(v_desk, 0)) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'mail: only the sender or an Admin desk may change this letter';
@@ -331,7 +331,7 @@ BEGIN
   -- An unknown caller desk (0) is never the sender and never Admin.
   IF v_sender IS NOT NULL AND v_desk <> v_sender
      AND NOT EXISTS (SELECT 1 FROM member
-                      WHERE name_id = MILL_NAME_GET('roster', 'Admin')
+                      WHERE name_id = 2  -- the reserved Admin roster (#722)
                         AND desk_id = v_desk) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'mail: only the sender or an Admin desk may change this letter';

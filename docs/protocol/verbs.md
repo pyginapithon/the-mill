@@ -42,19 +42,19 @@ mill send roster <name> --body-file PATH
 mill reply <mail_id> --body-file PATH [--to-desk <desk>]
 mill add mail:<id> <desk>    /  mill remove mail:<id> <desk>
 mill mark <mail_id> [<mail_id>...]
-mill todo <project> [<need>] [--full | --page N]
-mill create todo <project> <need> [--detail TEXT | --detail-file PATH] [--status parked]
-mill claim <project> <need> [--take-over]
-mill note <project> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
+mill todo <roster> [<need>] [--full | --page N]
+mill create todo <roster> <need> [--detail TEXT | --detail-file PATH] [--status parked]
+mill claim <roster> <need> [--take-over]
+mill note <roster> <need> --note TEXT [--supersedes "OLD LINE"] [--full]
 mill hold [<resource>]
 mill drop <resource>
-mill pass <project> <need> [--done | --back]
-mill unclaim <project> <need>
-mill unpark <project> <need> [--parent-type mail|todo --parent-id <id>]
+mill pass <roster> <need> [--done | --back]
+mill unclaim <roster> <need>
+mill unpark <roster> <need> [--parent-type mail|todo --parent-id <id>]
 mill label <mail|todo> <id> <label> [--ord N]
 mill trail --label <label>
 mill trail mail:<id>
-mill label <name> <name> --yes
+mill create label <name> --yes
 ```
 
 - `inbox` lists unread for this desk. It takes no project and no desk; the desk is the sitting connect. The page is cut in the database: unread is the oldest `--limit` (default 100) unread letters, oldest first; `--all` is the newest `--limit` letters, newest first. Regression row F21 (inbox-unread-page).
@@ -78,7 +78,7 @@ mill label <name> <name> --yes
 - `drop` releases a hold. `unclaim` releases a card. `pass` moves claimed to shipped; the asker's `pass --done` moves shipped to done; `pass --back` steps a card back one stage (done to shipped, shipped to claimed). A step that does not fit the card is refused and changes nothing (F67).
 - `todo <project> <need>` returns that card, including a done card. The board list hides done cards; add `--done` or `--status done` to list them.
 - The board list (`todo`, `todo <project>`, `todo --all`) prints short rows by default: `id`, `need_id`, `status` and `volunteer` (empty when unclaimed), 50 cards a page in the wall's order, grouped as usual. A `page` block says `n`, `of`, `size`, `cards`, `next` (`--page N+1`, only when there is one) and, when every card on the page sits on one roster, `roster` once instead of `project_id` on each row. `--page N` reads page N; a page past the last is refused with the page count. `--full` prints every field of every card with no paging, the reply as it was before short rows. A one-card peek, `--find` and `--raw` keep their own shapes; `--page` with them is refused. Regression row F51 (todo-short-rows).
-- `todo --mine` lists this desk's cards, the desk of the sitting connect: first its focus cards (the cards wearing the label named after the desk, skipping parked ones unless `--status parked` and ones another desk holds) in rank order, each with `focus` set to its `--ord`, then the cards whose `volunteer` is this desk (exact name; a desk whose name merely contains yours does not match), each card once. Without `--group-by` the list stays flat so the rank order holds. It is built before `--find` and paging, so the `page` block counts only these cards, and the note says how many of each. It combines with `--status`, `--done`, `--all`, `--find`, `--full`, `--page` and `--raw`; it lists only cards the board lists, so without `--done` done cards stay hidden. A one-card peek with `--mine` is refused. Pick your next card with `todo --mine`, not by reading the board. Regression rows F57 (todo-mine) and F58 (desk-focus).
+- `todo --mine` lists this desk's cards, the desk of the sitting connect: first its focus cards (the cards wearing the label named after the desk, skipping parked ones unless `--status parked` and ones another desk holds) in rank order, each with `focus` set to its `--ord`, then the cards whose `volunteer` is this desk (exact name; a desk whose name merely contains yours does not match), each card once. Without `--group-by` the list stays flat so the rank order holds. It is built before `--find` and paging, so the `page` block counts only these cards, and the note says how many of each. It combines with `--status`, `--done`, `--all`, `--find`, `--full`, `--page` and `--raw`; it lists only cards the board lists, so without `--done` done cards stay hidden. A one-card peek with `--mine` is refused. The wall sends only the cards this desk holds or that wear its label (the read carries `mine`), so the read costs this desk's cards, not the whole board; an older wall sends the board and the CLI trims it the same way. Pick your next card with `todo --mine`, not by reading the board. Regression rows F57 (todo-mine), F58 (desk-focus) and F83 (todo-mine-wire).
 - Desk focus: the label whose name is a desk id is that desk's priority list. Anyone ranks a card for a desk with `label todo <id> <desk> --ord N` (0 pinned, 65535 unplaced). Nothing creates that label for you: the first `label todo` that uses the desk's name creates it when office trust is high; on limited trust an Admin runs `create label <desk>` first. Focus lists only cards the desk can work on: not done, not parked, and not held by another desk (unclaimed, or claimed by this desk). Rank is `ord` ascending (0 first), ties by card id. Once seated, `mill connect` prints one `{"kind": "focus", "label", "cards", "rest"}` line after the ready and sync lines: the top 5 such cards (`id`, `project_id`, `need_id`, `status`, `volunteer`, `rank`), so the desk knows what to work on next. It reads the same board as `todo --mine` (the desk's rosters), so focus cards on any of those rosters show. None: no line. When a focus read fails, connect keeps sitting and prints one stderr line, `connect: focus not shown: <cause>`. All of it runs in the client on reads the wall already serves. Regression row F59 (focus-any-roster). Regression row F58 (desk-focus).
 - `inbox` and `mail-thread <id> --room` print short letter rows by default: `id`, `created`, `from` (desk), `parent_id`, `tree` (left out where the list or the room already names it) and `body`, the first 100 characters on one line, with `body_trunc` true when that is not the whole body. `mill mail-thread <id>` reads one letter whole. At most 50 letters a page with a `page` block (`n`, `of`, `size`, `letters`, `next` only when a next page exists). The inbox pages in the wall's order; a room's page 1 is its newest 50 letters, oldest first, and `--page 2` the 50 before them. Room pointers on the inbox cover every letter fetched (`--limit`), not only the page. `--full` (`--room --full` on mail-thread) prints the reply as before short rows; `--full` alone on mail-thread is still the whole branch. `--after`, `--subtree`, a branch read and a room summary are unchanged, and `--page` with them, or with `--raw`, is refused. The `note` reply prints `detail_chars` and `last_line` instead of the whole `detail`; `note --full` prints it. Regression row F53 (mail-short-rows).
 - A card's notes share one budget: the stored card (title, detail and fields) is at most 4096 characters. Every `note` reply says `detail_left`; a note that would go over is refused, nothing written, with the characters it needs and the characters left, and points long text at a room letter (`mill reply <mail_id> --body-file PATH`) whose mail id goes in the note. The budget is the card's database column itself; there is no separate per-note cap, and `note --supersedes` and `claim --msg` draw on the same budget. Regression row F56 (note-detail-budget).
@@ -93,12 +93,12 @@ A finding is one letter in room `agent-ux`. Each idea tried is a card under it. 
 ```
 finding          mill reply <agent-ux root id> --body-file PATH   (first one joins you)
 read             mill mail-thread agent-ux          (summary; --room for all; after you joined)
-try <id>         mill create todo <project> <need> --parent-type mail|todo --parent-id <id> --detail TEXT
-                 mill claim <project> <need>
-dead-end <need>  mill note <project> <need> --note "dead-end: <why>"
-                 mill pass <project> <need>
-solved <need>    mill note <project> <need> --note "solved: <evidence>"
-                 mill pass <project> <need>
+try <id>         mill create todo <roster> <need> --parent-type mail|todo --parent-id <id> --detail TEXT
+                 mill claim <roster> <need>
+dead-end <need>  mill note <roster> <need> --note "dead-end: <why>"
+                 mill pass <roster> <need>
+solved <need>    mill note <roster> <need> --note "solved: <evidence>"
+                 mill pass <roster> <need>
 trail <id>       mill trail mail:<finding id>   (or todo:<card id>)
 ```
 
@@ -384,8 +384,8 @@ Trust default **high**; Admin may set **limited** (or back to high). Show: `mill
 | **`reclaim`** | Admin: undelete a retired name (name twice + `--yes`). Acts on the TYPE named (F60). A retired desk comes back with no seat: `invite --seat` it (F65). | `mill_name_reclaim` |
 | **`rename`** | Admin (or desk self-rename by hash). Acts on the TYPE named (F60). | `mill_name_rename` |
 | **`retire`** | Admin: flag `name.deleted`. A desk retired this way also loses its seat, so that seat stops connecting (F65). Acts on the TYPE named: `retire label d1` leaves desk `d1` alone, as a desk-focus label needs; a request with no type for a name two types share is refused with both forms (F60). | `mill_name_retire` |
-| **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only | `mill_member_put` |
-| **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident | `mill_member_delete` |
+| **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only, in any spelling of the name (#675) | `mill_member_put`; Admin: `mill_member_admin_put` |
+| **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident. `Admin` revoke = host loopback and an Admin caller, in any spelling (#675) | `mill_member_delete`; Admin: `mill_member_admin_delete` |
 | **`trust`** | show office trust (any seated desk). `mill trust high` / `mill trust limited` = Admin set. Pack/wall must ship verb first | - |
 
 **Always Admin (either trust):** invite; rename/retire/reclaim/reset; `mill trust high` / `mill trust limited`; `Admin` grant/revoke via **host loopback only** (`mill join --Admin` does not grant; connect-on-host does not grant).

@@ -28,7 +28,7 @@ Every verb takes `--office ALIAS` (before or after the verb) and `-h`. Trust is 
 | verb | form | what |
 |---|---|---|
 | `create` | `mill create roster <name> [--yes]` / `mill create label <name> [--yes]` | Create a name. Asks y/N; the name is typed once. |
-| `rename` | `mill rename <roster|label|desk> <old> <new> [--yes]` | Admin (or desk self-rename). Retype the new name at the prompt. |
+| `rename` | `mill rename <roster|label|desk> <old> <new> [--yes]` | Admin (or desk self-rename). Retype the new name at the prompt. The reserved rosters Office and Admin keep their names (F92). |
 | `retire` | `mill retire <roster|label|desk> <name> [--yes]` | Admin: soft delete. Retype the name at the prompt. `mill retire score <roster> <name>` is the desk form for a score (cli-desk.md). |
 | `reclaim` | `mill reclaim <roster|label|desk> <name> [--yes]` | Admin: undelete a retired name. Asks y/N. |
 

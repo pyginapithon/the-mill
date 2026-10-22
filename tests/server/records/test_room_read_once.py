@@ -92,12 +92,12 @@ def test_outsider_refusal_text_unchanged(cn, room):
 
 
 def test_admin_exists(cn, room):
-    rec_member.put(cn, "Admin", "ro_a")
+    rec_member.put_admin(cn, "ro_a")
     assert is_role_admin(cn, "ro_a")
     assert not is_role_admin(cn, "ro_b")
     assert not is_role_admin(cn, "")
     assert not is_role_admin(cn, "Admin")
     got = rpc._h_mail_thread(room["book"], {"scope": "room", "mail_id": room["ids"][3]}, "ro", "ro_a")
     assert {int(m["id"]) for m in got["chain"]} == set(room["ids"])
-    rec_member.delete(cn, "Admin", "ro_a")
+    rec_member.delete_admin(cn, "ro_a")
     assert not is_role_admin(cn, "ro_a")

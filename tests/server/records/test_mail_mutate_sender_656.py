@@ -20,7 +20,7 @@ def _letter(cn, body: str) -> int:
 
 def _make_admin(cn, desk: str) -> None:
     did = int(scalar(cn, "SELECT id FROM name WHERE type='desk' AND name=%s", (desk,)))
-    aid = int(scalar(cn, "SELECT id FROM name WHERE type='roster' AND name='Admin'"))
+    aid = 2  # the reserved Admin roster id (#722)
     cur = cn.cursor()
     cur.execute("INSERT IGNORE INTO member (name_id, desk_id) VALUES (%s, %s)", (aid, did))
     cur.close()
