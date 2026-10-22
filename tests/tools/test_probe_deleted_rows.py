@@ -102,7 +102,7 @@ def test_run_flags_a_row_that_did_not_go_deleted(capsys) -> None:
 
 
 def test_default_run_makes_its_roster_and_retires_it(capsys) -> None:
-    """#644: 0.7 rosters must exist; the tool makes its own and retires it (F81)."""
+    """#644: 0.7 rosters must exist; the tool makes its own and retires it (F82)."""
     mod = _tool()
     fake = _Fake()
     assert mod.main(["run"], call=fake) == 0

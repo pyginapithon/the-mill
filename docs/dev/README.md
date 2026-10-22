@@ -14,4 +14,5 @@ Office / customer desks do **not** load this folder. They use:
 | [AGENTS.md](AGENTS.md) | Repo contributor always-on (tiny) |
 | [BUILD.md](BUILD.md) | Pack, pipeline, PyPI, mill update |
 | [PROBE-DELETED-ROWS.md](PROBE-DELETED-ROWS.md) | Test-only probe that makes deleted todo and score rows live (#160) |
+| [DETERMINISTIC-OFFICE.md](DETERMINISTIC-OFFICE.md) | Design for scripted, self-checking office steps (#282) |
 | [OPTIMIZATION.md](OPTIMIZATION.md) | Query and read-path principles, plus the log of optimization examples |
