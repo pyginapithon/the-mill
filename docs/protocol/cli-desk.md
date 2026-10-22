@@ -53,7 +53,7 @@ Every verb takes `--yes` (skips a prompt; a no-op where there is none) and `--of
 | `label` | `mill label <mail|todo> <id> <label> [--ord N]` (a todo also by `ROSTER/NEED`) | Tag an activity. A new label is created on first use when trust is high (limited: Admin runs `mill create label NAME`). |
 | `unlabel` | `mill unlabel <mail|todo> <id> <label>` | Remove a tag. |
 | `trail` | `mill trail [node] [--label L] [--json]` | Read the tree under `mail:<id>` or `todo:<id>`, or everything wearing a label. |
-| `attach` | `mill attach <roster> <type_a> <id_a> <type_b> <id_b> [--tree T]` | Put child under parent. |
+| `attach` | `mill attach <roster> <type_a> <id_a> <type_b> <id_b> [--tree T]` | Put child under parent. A todo id can also be `ROSTER/NEED`, here and in `move`, `prune` and `detach` (`mill attach agent-ux todo agent-ux/parent todo agent-ux/child`). |
 | `move` | `mill move <roster> <type> <id> <parent_type> <parent_id> [--tree T]` | Move under a new parent. |
 | `prune` | `mill prune <roster> <type> <id> [--tree T]` | Remove a branch. |
 | `detach` | `mill detach <roster> <type> <id> [--tree T]` | Take off the plan, keep children. |

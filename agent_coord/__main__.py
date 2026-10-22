@@ -751,7 +751,7 @@ def _build_parser() -> MillArgumentParser:
     kp.add_argument("name", nargs="?", default="", metavar="NAME")
     kp.add_argument("value", nargs="?", default="", metavar="VALUE")
     kp.add_argument("--target", default="", help="the number to reach (gap and met are read against it); alone, sets it without a point")
-    kp.add_argument("--note", default="", help="what this try changed (one line, kept with the point)")
+    kp.add_argument("--note", default="", help="what this try changed (one line, at most 200 characters, kept with the point)")
     kp.add_argument("--better", default="", choices=("", "up", "down"), help="up (default) or down, e.g. tokens")
     kp.add_argument("--unit", default="", help="unit shown with the points, e.g. ms, bytes, tokens")
     kp.add_argument("--limit", type=int, default=0, help="points to show on a read (default 10)")
@@ -1297,9 +1297,9 @@ def _build_parser() -> MillArgumentParser:
     )
     att.add_argument("project")
     att.add_argument("type_a", nargs="?", default="")
-    att.add_argument("id_a", nargs="?", type=int, default=None)
+    att.add_argument("id_a", nargs="?", default=None, help="parent id; a todo also by ROSTER/NEED")
     att.add_argument("type_b", nargs="?", default="")
-    att.add_argument("id_b", nargs="?", type=int, default=None)
+    att.add_argument("id_b", nargs="?", default=None, help="child id; a todo also by ROSTER/NEED")
     att.add_argument("--tree", default="", help="plan name when the card is on more than one plan")
 
     mv = sub.add_parser(
@@ -1308,21 +1308,21 @@ def _build_parser() -> MillArgumentParser:
     )
     mv.add_argument("project")
     mv.add_argument("type", nargs="?", default="")
-    mv.add_argument("id", nargs="?", type=int, default=None)
+    mv.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     mv.add_argument("parent_type", nargs="?", default="")
-    mv.add_argument("parent_id", nargs="?", type=int, default=None)
+    mv.add_argument("parent_id", nargs="?", default=None, help="parent id; a todo also by ROSTER/NEED")
     mv.add_argument("--tree", default="")
 
     prn = sub.add_parser("prune", help="kill that branch")
     prn.add_argument("project")
     prn.add_argument("type", nargs="?", default="")
-    prn.add_argument("id", nargs="?", type=int, default=None)
+    prn.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     prn.add_argument("--tree", default="")
 
     det = sub.add_parser("detach", help="take off the plan, keep children")
     det.add_argument("project")
     det.add_argument("type", nargs="?", default="")
-    det.add_argument("id", nargs="?", type=int, default=None)
+    det.add_argument("id", nargs="?", default=None, help="id; a todo also by ROSTER/NEED")
     det.add_argument("--tree", default="")
 
     wchk = sub.add_parser(

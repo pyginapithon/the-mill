@@ -317,7 +317,7 @@ def test_trail_label_order_access_deleted_and_bound(cn, monkeypatch) -> None:
     after = _ids("a")
     assert ("todo", early) not in after
 
-    rec_member.put(cn, "Admin", "c", "roster")
+    rec_member.put_admin(cn, "c")
     admin_ids = _ids("c")
     assert ("mail", secret) in admin_ids
     assert ("mail", room) in admin_ids
