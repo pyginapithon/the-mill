@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agent_coord.const import CONST_OFFICE, CONST_ROSTER
+from agent_coord.const import CONST_ROSTER
 
 from .db import call
 
@@ -37,5 +37,18 @@ def select(cn, group: str = "", desk: str = "", kind: str = "") -> list[dict]:
     return call(cn, "mill_member_select", [k, slot, d])
 
 
+def put_admin(cn, desk: str) -> list[dict]:
+    """Office host only (#675): the caller has checked the wall-set host flag."""
+    return call(cn, "mill_member_admin_put", [(desk or "").strip()])
+
+
+def delete_admin(cn, desk: str) -> list[dict]:
+    """Office host only (#675): the caller has checked host and Admin."""
+    return call(cn, "mill_member_admin_delete", [(desk or "").strip()])
+
+
 def put_office(cn, desk: str) -> list[dict]:
-    return put(cn, CONST_OFFICE, desk)
+    # #722: the Office roster is id 1 whatever an Admin renamed it to.
+    from agent_coord.server.admin.guard import office_name
+
+    return put(cn, office_name(cn), desk)

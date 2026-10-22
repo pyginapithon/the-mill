@@ -6,6 +6,7 @@ Bearer or PRIVATE-TOKEN. mill-wall does not write ~/.mill/session for laptops.
 """
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 import threading
@@ -28,6 +29,8 @@ from agent_coord.helpers.errors import CoordError
 from agent_coord.helpers.ident import desk as desk_stem
 from agent_coord.helpers.ident import desk_name, slug
 
+_log = logging.getLogger("mill.rpc")
+
 
 def _stored(value: Any) -> str:
     """Catalog name as stored."""
@@ -44,8 +47,23 @@ def _live_projects(cn) -> list[str]:
         nm = _stored(raw)
         if nm:
             names.append(nm)
-    names.sort(key=lambda s: (s != CONST_OFFICE, s.lower()))
+    office = _office(cn)
+    names.sort(key=lambda s: (s != office, s.lower()))
     return names
+
+
+def _office(cn) -> str:
+    """Stored name of the Office roster, id 1 (an Admin may rename it, #722)."""
+    from agent_coord.server.admin.guard import office_name
+
+    return office_name(cn)
+
+
+def _project_alias(cn, project: str) -> str:
+    """The protocol name Office means roster id 1, whatever it is called now (#722)."""
+    if project and project.casefold() == CONST_OFFICE.casefold() and cn is not None:
+        return _office(cn)
+    return project
 
 
 def _require_live_project(cn, project: str, verb: str) -> str:
@@ -79,21 +97,23 @@ def _seat_roster(cn, desk: str) -> str:
     """Sender roster from the seat: the desk's single non-Office roster (Admin counts), else Office."""
     from agent_coord.server.records import member as rec_member
 
+    office = _office(cn)
     if not desk:
-        return CONST_OFFICE
+        return office
     names = {str(r.get("slot") or "") for r in (rec_member.select(cn, "", desk, CONST_ROSTER) or [])}
     names.discard("")
-    names.discard(CONST_OFFICE)
-    return names.pop() if len(names) == 1 else CONST_OFFICE
+    names.discard(office)
+    return names.pop() if len(names) == 1 else office
 
 
 def _connect_roster(cn, desk: str, name: str) -> str:
     """Sender roster named at mill connect ROSTER DESK (#337); the desk must be on it."""
     from agent_coord.server.records import member as rec_member
 
-    want = _stored(name)
-    if want == CONST_OFFICE:
-        return CONST_OFFICE
+    want = _project_alias(cn, _stored(name))
+    office = _office(cn)
+    if want == office:
+        return office
     names = {_stored(r.get("slot")) for r in (rec_member.select(cn, "", desk, CONST_ROSTER) or [])}
     if want not in names:
         raise CoordError(
@@ -233,10 +253,13 @@ def _issue_here(c: Book, body: dict[str, Any]) -> dict[str, Any]:
     owner_raw = str(body.get("owner") or "").strip()
     if not project_raw or not owner_raw:
         raise CoordError("mill here: project and owner required")
-    project = _stored(project_raw)
+    project = _project_alias(getattr(c, "_cn", None), _stored(project_raw))
     owner = _stored(owner_raw)
     role_raw = str(body.get("role") or "").strip()
-    if role_raw.lower() == "admin":
+    from agent_coord.server.admin.guard import is_admin_roster
+
+    cn = getattr(c, "_cn", None)
+    if role_raw and is_admin_roster(cn, role_raw):
         raise CoordError(
             f"{CONST_ROSTER} {CONST_ADMIN} is granted only by member-add on the office host"
         )
@@ -251,10 +274,20 @@ def _issue_here(c: Book, body: dict[str, Any]) -> dict[str, Any]:
     doing = str(body.get("doing") or "present")[:64]
     # Join posts Office as a placeholder; the seat's one roster replaces it.
     # mill connect with no roster sends Office on purpose and keeps it.
-    if project == CONST_OFFICE and body.get("placeholder"):
+    office = _office(c._cn)
+    if project == office and body.get("placeholder"):
         seated = _seat_roster(c._cn, owner)
-        if seated and seated != CONST_OFFICE:
+        # An Admin desk keeps Admin; its join row sits on Office (#674).
+        if seated and seated != office and not is_admin_roster(cn, seated):
             project = seated
+    # #674: join never adds a desk to the reserved Admin roster, in any spelling
+    # the book resolves to it. mill_join_upsert refuses the same in SQL.
+    if is_admin_roster(cn, project):
+        _log.warning("join refused: project resolves to the Admin roster (desk %s)", owner[:64])
+        raise CoordError(
+            f"join: {CONST_ROSTER} {CONST_ADMIN} is not a join roster; "
+            f"{CONST_ROSTER} {CONST_ADMIN} is granted only by member-add on the office host"
+        )
     token = str(body.get("token") or "").strip() or secrets.token_urlsafe(24)
     rows = rec_join.upsert(
         c._cn,
@@ -474,9 +507,24 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
     return card
 
 
-def _todo_many(c: Book, body: dict[str, Any], want_st: str, with_done: bool, show_fix: bool) -> dict:
+def _mine_cards(cards: list[dict], owner: str | None) -> list[dict]:
+    """todo --mine (#667): the cards the desk holds or that wear its focus label.
+
+    The client still ranks and trims them (focus.order_mine); the wall only stops
+    sending every other card on the board.
+    """
+    desk = _stored(owner or "")
+    if not desk:
+        return []
+    return [r for r in cards if r.get("volunteer") == desk or desk in (r.get("labels") or [])]
+
+
+def _todo_many(
+    c: Book, body: dict[str, Any], want_st: str, with_done: bool, show_fix: bool, owner: str | None = None
+) -> dict:
     """Board for several rosters in one read: the cards each per-roster `todo` call
-    would list, in the given roster order. {"cards": [...], "rosters": n}."""
+    would list, in the given roster order. {"cards": [...], "rosters": n}.
+    With mine, only the sitting desk's cards (#667)."""
     from agent_coord.lib.observe import is_fixture_project
     from agent_coord.server.records import todo as rec_todo
 
@@ -502,6 +550,8 @@ def _todo_many(c: Book, body: dict[str, Any], want_st: str, with_done: bool, sho
         st = r.get("status") or "open"
         fields = rec_todo.unpack(r.get("body") or "", r.get("id"))
         cards.append(_todo_card(r, _stored(r.get("roster") or ""), st, fields))
+    if _truthy(body.get("mine")):
+        cards = _mine_cards(cards, owner)
     return {"cards": cards, "rosters": len(names)}
 
 
@@ -521,7 +571,7 @@ def _h_todo(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     show_fix = _truthy(body.get("fixtures"))
     if "rosters" in body and not raw_need:
         # One read for `mill todo` and `mill todo --all` (was one call per roster).
-        return _todo_many(c, body, want_st, with_done, show_fix)
+        return _todo_many(c, body, want_st, with_done, show_fix, owner)
     out = []
 
     def _visible(rows: list[dict]) -> list[dict]:
@@ -585,6 +635,8 @@ def _h_todo(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         if number is not None:
             raise CoordError("todo: no card %s in %s" % (number, project))
         raise CoordError("todo: no card %s in %s" % (raw_need, project))
+    if _truthy(body.get("mine")) and not raw_need:
+        out = _mine_cards(out, owner)
     return out
 
 
@@ -700,7 +752,13 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     target = _stored(str(body.get("desk") or owner or ""))
     self_desk = _stored(owner or "")
     g = _stored(group)
-    admin_slot = bool(g) and g == CONST_ADMIN
+    # #675: the name table matches any case or accent, so gate on the roster the
+    # name resolves to, not the raw string. SQL refuses Admin on the generic path.
+    from agent_coord.server.admin.guard import is_admin_roster
+
+    admin_slot = bool(g) and is_admin_roster(getattr(c, "_cn", None), g)
+    if admin_slot:
+        g = CONST_ADMIN
     if admin_slot and not body.get("host"):
         raise CoordError(f"{CONST_ROSTER} {CONST_ADMIN}: office host only (loopback)")
     if admin_slot and verb == "member-remove":
@@ -716,13 +774,19 @@ def _h_member(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
         was_admin = is_role_admin(c._cn, target)
     slot_kind = CONST_ROSTER
     if verb == "member-add":
-        rows = rec_member.put(c._cn, g, target, slot_kind)
+        if admin_slot:
+            rows = rec_member.put_admin(c._cn, target)
+        else:
+            rows = rec_member.put(c._cn, g, target, slot_kind)
         # Name the desk and roster, not only ids (#274).
         rows = [{"desk": target, "roster": g, "op": "added", **dict(r)} for r in (rows or [])]
         if admin_slot and not was_admin:
             _mail_role_admin(c, project, owner, target, added=True)
     else:
-        rows = rec_member.delete(c._cn, g, target, slot_kind)
+        if admin_slot:
+            rows = rec_member.delete_admin(c._cn, target)
+        else:
+            rows = rec_member.delete(c._cn, g, target, slot_kind)
         if admin_slot and was_admin:
             _mail_role_admin(c, project, owner, target, added=False)
     return rows
@@ -1271,7 +1335,18 @@ def _h_reply(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                 _add_dest(bare, None)
 
     if not dest_set:
-        raise CoordError("reply: no destinations after the reply-all default")
+        # A letter needs a reader other than its sender (no self-To). Name the
+        # forms that work instead of the reply-all default (letters 2199/2200).
+        if isinstance(raw_tos, list) and raw_tos:
+            raise CoordError(
+                "reply: --to-desk names only you, and a reply never goes to its sender; "
+                f"post to the room with mill reply {mail_id} --body-file PATH (reply-all), "
+                "name another desk with --to-desk DESK, or keep a private line with mill note on a card"
+            )
+        raise CoordError(
+            f"reply: you are the only desk on it, so reply-all reaches no one; "
+            f"name a desk with mill reply {mail_id} --to-desk DESK --body-file PATH"
+        )
 
     # If parent is not on a TREE, open a room: parent becomes root, reply nests under it.
     if not rec_tree.on_tree(c._cn, "mail", mail_id):
@@ -1494,7 +1569,7 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
         if room.tree_id and _open_room(room.tree):
             raise CoordError(
                 "mail-thread: not a participant in this room; "
-                f"run mill reply {root_id} <body> to join, "
+                f"run mill reply {root_id} --body-file PATH to join, "
                 "or ask a participant to mill add you at a letter of it"
             )
         # Private letter or a room opened from one: no open-join (#sec S-3).
@@ -1892,16 +1967,26 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     elif step == "done":
         if st != "shipped":
             raise CoordError(f"pass --done: {need} is {st}, not shipped; nothing changed")
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass shipped->done is the asker")
+        # #655: an asker that does not resolve is not a pass for everyone;
+        # only the volunteer may still finish the card.
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass shipped->done is the asker"
+                if ask
+                else "who-may: pass shipped->done is the asker; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "done"
     else:
         if st not in ("shipped", "done"):
             raise CoordError(
                 f"pass --back: {need} is {st}; only shipped or done steps back (unclaim releases a claim)"
             )
-        if ask and who and ask != who and vol != who:
-            raise CoordError("who-may: pass --back is the asker or the volunteer")
+        if who and ask != who and vol != who:
+            raise CoordError(
+                "who-may: pass --back is the asker or the volunteer"
+                if ask
+                else "who-may: pass --back is the asker or the volunteer; the card's asker does not resolve, so only the volunteer may"
+            )
         nxt = "shipped" if st == "done" else ("claimed" if vol else "open")
     rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=nxt)
     rec = {"ok": True, "need": need, "status": nxt, "was": st, "id": int(hit["id"])}
@@ -2041,7 +2126,7 @@ def _h_hold(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     from agent_coord.helpers.bounds import resource_name
 
     # The lock is global. 0.7.x clients send no roster; the record is tagged Office.
-    project = project or CONST_OFFICE
+    project = project or _office(getattr(c, "_cn", None))
     _require_live_project(getattr(c, "_cn", None), project, "hold")
     # No resource is the lock list, with or without peek (#326).
     if not str(body.get("resource") or "").strip():
@@ -2086,7 +2171,7 @@ def _h_drop(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
 
     from agent_coord.helpers.bounds import resource_name
 
-    project = project or CONST_OFFICE
+    project = project or _office(getattr(c, "_cn", None))
     _require_live_project(getattr(c, "_cn", None), project, "drop")
     key = resource_name(str(body.get("resource") or ""))
     out = rec_hold.drop(c._cn, _stored(project), _stored(owner or ""), key)
@@ -2172,6 +2257,12 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     unit = str(body.get("unit") or "").strip() or None
     if unit is not None and len(unit) > 16:
         raise CoordError("score: --unit must be 1..16 characters; nothing stored")
+    note = str(body.get("note") or "")
+    if len(note) > ss.NOTE_MAX:
+        # #707: say the limit, not the book's column error.
+        raise CoordError(
+            f"score: --note is {len(note)} characters; the most is {ss.NOTE_MAX}, one line; nothing stored"
+        )
     if at and not has_value:
         raise CoordError("score: --at needs a VALUE; nothing stored")
     if at and not ss.at_ok(at):
@@ -2188,7 +2279,7 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                 name,
                 value,
                 target=target,
-                note=str(body.get("note") or ""),
+                note=note,
                 better=better,
                 unit=unit,
                 at=at,
@@ -2238,13 +2329,21 @@ def _poke_tree(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None
         pass
 
 
+def _tree_id(c: Book, typ: str, raw: Any, ref: Any, verb: str) -> int:
+    """A tree verb's id, or its todo named ROSTER/NEED resolved to the id (#706, as #274)."""
+    nid = int(raw or 0)
+    if not nid and ref:
+        nid = _card_ref_id(c._cn, {"ref": ref, "type": typ}, verb)
+    return nid
+
+
 def _h_attach(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import tree as rec_tree
 
     parent_t = str(body.get("type_a") or body.get("parent_type") or "")
-    parent_id = int(body.get("id_a") or body.get("parent_id") or 0)
+    parent_id = _tree_id(c, parent_t, body.get("id_a") or body.get("parent_id"), body.get("ref_a"), "attach")
     child_t = str(body.get("type_b") or body.get("type") or "")
-    child_id = int(body.get("id_b") or body.get("id") or 0)
+    child_id = _tree_id(c, child_t, body.get("id_b") or body.get("id"), body.get("ref_b"), "attach")
     tree = str(body.get("tree") or "")
     rows = rec_tree.add(c._cn, parent_t, parent_id, child_t, child_id, tree=tree)
     _poke_tree(c, child_t, child_id, owner=owner)
@@ -2282,9 +2381,9 @@ def _h_move(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     from agent_coord.server.records import tree as rec_tree
 
     child_t = str(body.get("type") or body.get("type_b") or "")
-    child_id = int(body.get("id") or body.get("id_b") or 0)
+    child_id = _tree_id(c, child_t, body.get("id") or body.get("id_b"), body.get("ref"), "move")
     parent_t = str(body.get("parent_type") or body.get("type_a") or "")
-    parent_id = int(body.get("parent_id") or body.get("id_a") or 0)
+    parent_id = _tree_id(c, parent_t, body.get("parent_id") or body.get("id_a"), body.get("parent_ref"), "move")
     tree = str(body.get("tree") or "").strip()
     if not tree:
         plans = rec_tree.plan_names(c._cn, child_t, child_id)
@@ -2307,7 +2406,7 @@ def _h_prune(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     from agent_coord.server.records import tree as rec_tree
 
     typ = str(body.get("type") or body.get("type_b") or "")
-    nid = int(body.get("id") or body.get("id_b") or 0)
+    nid = _tree_id(c, typ, body.get("id") or body.get("id_b"), body.get("ref"), "prune")
     tree = str(body.get("tree") or "")
     rows = rec_tree.prune(c._cn, typ, nid, tree=tree)
     _poke_tree(c, typ, nid, owner=owner)
@@ -2318,7 +2417,7 @@ def _h_detach(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     from agent_coord.server.records import tree as rec_tree
 
     typ = str(body.get("type") or body.get("type_b") or "")
-    nid = int(body.get("id") or body.get("id_b") or 0)
+    nid = _tree_id(c, typ, body.get("id") or body.get("id_b"), body.get("ref"), "detach")
     tree = str(body.get("tree") or "")
     rows = rec_tree.remove(c._cn, typ, nid, tree=tree)
     _poke_tree(c, typ, nid, owner=owner)
@@ -2579,33 +2678,16 @@ def _h_invite(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     return door_mod.board_packet()
 
 
-# These verbs do not otherwise write activity. Each pushes its name onto join.doing.
-_DOING_STACK = frozenset(
-    {
-        "todo",
-        "session",
-        "mail-thread",
-        "trail",
-        "member",
-        "trust",
-        "invite",
-        "move",
-        "prune",
-        "detach",
-        "label-remove",
-        "add",
-        "remove",
-    }
-)
-
-
 def _note_doing(c: Book, project: str, owner: str | None, verb: str) -> None:
-    if verb not in _DOING_STACK or not owner:
+    """A verb that writes nothing else bumps the seat; doing stays the desk's (#635)."""
+    from agent_coord.server.records.doing_stack import BUMP_VERBS
+
+    if verb not in BUMP_VERBS or not owner:
         return
     try:
         from agent_coord.server.records import join as rec_join
 
-        rec_join.push_doing(c._cn, project, owner, verb)
+        rec_join.touch(c._cn, project, owner)
     except Exception:
         try:
             c._cn.rollback()
@@ -2843,7 +2925,7 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
                     if root_mail and _mail_open_room(c, int(i)):
                         raise CoordError(
                             "trail: not a participant in this room; "
-                            f"run mill reply {root_mail} <body> to join, "
+                            f"run mill reply {root_mail} --body-file PATH to join, "
                             "or ask a participant to mill add you at a letter of it"
                         )
                     # Private letter or a room opened from one: no open-join (#sec S-3).
@@ -2988,7 +3070,9 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
         body.pop(_k, None)
 
     project_raw = str(body.get("project") or "").strip() or "the-mill"
-    project = _stored(project_raw)
+    project = _project_alias(getattr(c, "_cn", None), _stored(project_raw))
+    if body.get("project") and project != _stored(project_raw):
+        body["project"] = project  # handlers that read the body see id 1's name too
     owner_raw = str(body.get("owner") or "").strip()
     owner = _stored(owner_raw) if owner_raw else None
     if verb not in WALL:
@@ -3165,7 +3249,9 @@ def dispatch_ws(
         mark_host(body, peer)
     body["verb"] = v
     project_raw = str(body.get("project") or "").strip() or "the-mill"
-    project = _stored(project_raw)
+    project = _project_alias(getattr(c, "_cn", None), _stored(project_raw))
+    if body.get("project") and project != _stored(project_raw):
+        body["project"] = project  # handlers that read the body see id 1's name too
     fn = HANDLERS.get(v)
     if fn is None:
         raise CoordError(f"unknown mill verb {v}")

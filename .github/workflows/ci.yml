@@ -48,26 +48,12 @@ jobs:
           python -m pip install "pip @ https://files.pythonhosted.org/packages/3f/06/3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/pip-26.2.2-py3-none-any.whl#sha256=fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70"
           python -m pip install --require-hashes -r tools/ci-lock/build.txt
       # The backend comes from build.txt, not a fresh unhashed download; the
-      # commit time dates the archive members. setuptools ignores it for the
-      # sdist, so repro_sdist.py rewrites the sdist with fixed times and owner.
-      - run: |
-          set -eu
-          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
-          python -m build --no-isolation
-          python tools/repro_sdist.py dist
-      # #673: build a second time from a fresh worktree (new path, new
-      # mtimes); the sdist and the wheel sha256 must match the first build.
-      - name: Build again and compare sha256
-        run: |
-          set -eu
-          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
-          git worktree add --detach "$RUNNER_TEMP/src2" HEAD
-          (cd "$RUNNER_TEMP/src2" && python -m build --no-isolation --outdir "$RUNNER_TEMP/dist2" && python tools/repro_sdist.py "$RUNNER_TEMP/dist2")
-          git worktree remove --force "$RUNNER_TEMP/src2"
-          (cd dist && sha256sum -- *) > "$RUNNER_TEMP/a.sha"
-          (cd "$RUNNER_TEMP/dist2" && sha256sum -- *) > "$RUNNER_TEMP/b.sha"
-          cat "$RUNNER_TEMP/a.sha"
-          diff "$RUNNER_TEMP/a.sha" "$RUNNER_TEMP/b.sha"
+      # commit time dates the archive members, and the in-tree backend
+      # (build_backend/mill_build.py) fixes times, owner and modes in both.
+      - run: SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)" python -m build --no-isolation
+      # F78: two more builds of this commit (fresh clones, umask 022 and 002,
+      # later times) must match dist/ byte for byte.
+      - run: python tools/check_repro.py dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dist
@@ -142,6 +128,8 @@ jobs:
       - run: test "$(uname -m)" = "x86_64"
       - run: python -m agent_coord.server.records.driver --require-c
       - run: python tools/check_skill_copy.py --installed
+      # F90: every mill verb and flag the docs teach is one the parser takes.
+      - run: python tools/check_doc_commands.py
 
   pytest_no_sql:
     needs: build_pack

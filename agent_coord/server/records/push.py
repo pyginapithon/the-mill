@@ -193,6 +193,46 @@ def take(cn, desk: str) -> list[dict]:
         item["outcome"] = row.get("outcome")
         item["time"] = row.get("created")
         out.append(item)
+    return fold_hints(out)
+
+
+def _hint_object(item: dict) -> tuple | None:
+    """(type, id, outcome) for a hint poke about one object; None for anything else
+    (a letter, a receipt, an expired line, a route exit or drop line)."""
+    if item.get("kind") != "hint" or "exit" in item or "dropped" in item:
+        return None
+    typ = str(item.get("type") or "").strip()
+    num = _frame_id(item)
+    if not typ or not num:
+        return None
+    return (typ, num, str(item.get("outcome") or ""))
+
+
+def fold_hints(items: list[dict]) -> list[dict]:
+    """#671: one sync item per hinted object. A hint is a poke about an object, with
+    the same poke key on every change, so a desk away for days would get one row per
+    change (61 HOLD hints for one hold). The rows for one (type, id, outcome) become
+    the latest of them, at its place, with n (how many) and first (the oldest time).
+    A sent row and a missed row never merge: one was walked live, one was not."""
+    counts: dict[tuple, int] = {}
+    first: dict[tuple, Any] = {}
+    last: dict[tuple, int] = {}
+    for pos, item in enumerate(items):
+        key = _hint_object(item)
+        if key is None:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        first.setdefault(key, item.get("time"))
+        last[key] = pos
+    if all(n == 1 for n in counts.values()):
+        return items
+    out: list[dict] = []
+    for pos, item in enumerate(items):
+        key = _hint_object(item)
+        if key is None or counts[key] == 1:
+            out.append(item)
+        elif last[key] == pos:
+            out.append({**item, "n": counts[key], "first": first[key]})
     return out
 
 

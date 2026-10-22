@@ -54,6 +54,8 @@ DROP PROCEDURE IF EXISTS mill_name_reclaim;
 DROP PROCEDURE IF EXISTS mill_member_put;
 DROP PROCEDURE IF EXISTS mill_member_delete;
 DROP PROCEDURE IF EXISTS mill_member_select;
+DROP PROCEDURE IF EXISTS mill_member_admin_put;
+DROP PROCEDURE IF EXISTS mill_member_admin_delete;
 DROP PROCEDURE IF EXISTS mill_label_put;
 DROP PROCEDURE IF EXISTS mill_label_delete;
 DROP PROCEDURE IF EXISTS mill_label_select;

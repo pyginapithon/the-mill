@@ -7,19 +7,23 @@ that is not in a t-<8 hex> fixture project or was not made by the calling
 desk, so real cards and other desks' rows cannot be touched.
 
   probe_deleted_rows.py run [--project t-<8 hex>]
-      open one card and write one score in a fixture project (a fresh
-      random one by default), probe-delete both, then read the card back
-      with trail and print what to check on the Wall.
+      open one card and write one score in a fixture roster, probe-delete
+      both, then read the card back with trail and print what to check on
+      the Wall. By default the tool makes a fresh t-<8 hex> roster first
+      (0.7 rosters must exist before a card or score can use them) and
+      retires it at the end, also after a refusal; --project names a
+      roster you made, which the tool leaves alone.
   probe_deleted_rows.py delete --type todo|score --id N
       probe-delete one of your own fixture rows.
 
 Run it as a child of the shell that started mill connect, with the python
 that has the mill pack installed:
 
-  bash -c 'mill --office ALIAS connect PROJECT DESK >/tmp/c.log 2>&1 & CP=$!; sleep 8;
+  bash -c 'mill --office ALIAS connect DESK >/tmp/c.log 2>&1 & CP=$!; sleep 8;
            python tools/probe_deleted_rows.py run; kill $CP'
 
 Needs an office at 0.6.30 or later (older offices answer unknown mill verb).
+Making and retiring the roster needs an Admin desk on a limited-trust office.
 Prints one JSON object. Exit 0 ok, 1 refused or a check failed, 2 usage.
 """
 from __future__ import annotations
@@ -59,6 +63,25 @@ def fresh_project() -> str:
 
 def delete(call: Callable[[dict], Any], typ: str, rid: int) -> dict[str, Any]:
     return _first(_result(call({"verb": VERB, "type": typ, "id": int(rid)})))
+
+
+def make_roster(call: Callable[[dict], Any], project: str) -> None:
+    call({"verb": "roster", "slug": project, "confirm": project, "yes": True})
+
+
+def retire_roster(call: Callable[[dict], Any], project: str) -> None:
+    call({"verb": "retire", "slug": project, "confirm": project, "yes": True, "name_type": "roster"})
+
+
+def run_own_roster(call: Callable[[dict], Any], project: str) -> dict[str, Any]:
+    """#644: make the fixture roster, run, then retire it even after a refusal."""
+    make_roster(call, project)
+    try:
+        out = run(call, project)
+    finally:
+        retire_roster(call, project)
+    out["roster"] = {"made": True, "retired": True}
+    return out
 
 
 def run(call: Callable[[dict], Any], project: str) -> dict[str, Any]:
@@ -102,10 +125,9 @@ def run(call: Callable[[dict], Any], project: str) -> dict[str, Any]:
         "score": {"id": sid, "kpi": kpi, "state": gone_s.get("state"), "deleted": gone_s.get("deleted")},
         "trail_state": trail_state,
         "check": [
-            f"/api/v1/events: rows type todo id {tid} and type score id {sid} carry state deleted",
-            "activity between: mill_between for a project this desk is a member of"
-            f" (not {project}) lists both rows with state deleted",
-            "Wall Wire and History: both rows show the deleted pill",
+            f"trail_state above: mill trail todo:{tid} reads the card as deleted",
+            f"Wall Wire (signed in): rows todo {tid} and score {sid} show the deleted pill",
+            "Wall History: both rows show the deleted pill",
         ],
     }
 
@@ -114,7 +136,7 @@ def main(argv: list[str] | None = None, call: Callable[[dict], Any] | None = Non
     ap = argparse.ArgumentParser(prog="probe_deleted_rows.py", description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run", help="make and delete one fixture card and one fixture score")
-    r.add_argument("--project", default="", help="fixture project t-<8 hex> (default: a fresh one)")
+    r.add_argument("--project", default="", help="your fixture roster t-<8 hex> (default: a fresh one the tool makes and retires)")
     d = sub.add_parser("delete", help="probe-delete one of your own fixture rows")
     d.add_argument("--type", required=True, choices=("todo", "score"))
     d.add_argument("--id", required=True, type=int)
@@ -129,7 +151,7 @@ def main(argv: list[str] | None = None, call: Callable[[dict], Any] | None = Non
             if not FIXTURE.match(project):
                 print(json.dumps({"ok": False, "error": f"project must be t-<8 hex>, got {project!r}"}))
                 return 2
-            out = run(call, project)
+            out = run(call, project) if args.project else run_own_roster(call, project)
         else:
             out = delete(call, args.type, args.id)
             out["ok"] = out.get("state") == "deleted"
