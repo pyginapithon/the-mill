@@ -40,12 +40,13 @@ _check_spec.loader.exec_module(_check_mod)
 check_css_braces = _check_mod.check_css_braces
 BOARD = ROOT / "default" / "board.html"
 BOOT = ROOT / "default" / "boot.js"
+MAIL_PAINT = ROOT / "default" / "mail" / "mail-paint.js"
 
 # Immutable for a year once the browser has them. Change a file, change its pin here.
 HTML_PINS = {
-    "boot.js": "wow286",
+    "boot.js": "wow292",
     "board.css": "wow283",
-    "lazy.js": "wow285",
+    "lazy.js": "wow292",
     "shell.css": "wow269",
     "shell-early.js": "wow281",
     "theme.css": "wow165",
@@ -54,6 +55,7 @@ LAZY_PINS = (
     "/glossary/glossary.js?v=wow285",
     "/floor/map-paint.js?v=wow280",
     "/admin/invite.js?v=wow280",
+    "/mail/mail-paint.js?v=wow292",
     "/mail/mail.js?v=wow285",
     "/score/score.js?v=wow182",
     "/todo/todo.js?v=wow182",
@@ -193,7 +195,7 @@ def test_welcome_is_the_human_page():
 
 
 def test_boot_opens_first_subtab_and_live_mail_views():
-    src = BOOT.read_text(encoding="utf-8")
+    src = BOOT.read_text(encoding="utf-8") + MAIL_PAINT.read_text(encoding="utf-8")
     assert 'localStorage.setItem("factory-todo-view"' not in src
     assert "factory-session-mode" not in src
     assert "factory-mail-view" not in src
@@ -209,7 +211,7 @@ def test_boot_opens_first_subtab_and_live_mail_views():
     assert 'mv === "graph"' not in prefs
     assert 'mv === "rooms"' in prefs
     assert 'mv === "letters"' in prefs
-    mail = src.split("function mail(", 1)[1].split("function ", 1)[0]
+    mail = MAIL_PAINT.read_text(encoding="utf-8").split("function mail(", 1)[1].split("function ", 1)[0]
     assert 'mailView !== "rooms"' in mail
     assert "paintMailLetters" in mail
 
