@@ -80,6 +80,7 @@ def test_sweep_reads_titles_bodies_and_both_comment_kinds(monkeypatch: pytest.Mo
                      {"number": 4, "title": "t", "body": None}],
         "/issues/comments?": [{"id": 11, "issue_url": "https://h/repos/o/r/issues/4", "body": HOME_PATH}],
         "/pulls/comments?": [{"id": 12, "pull_request_url": "https://h/repos/o/r/pulls/3", "body": "fine"}],
+        "/reviews?": [],
     }
 
     def fake_all(url: str, token: str) -> list:
