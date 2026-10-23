@@ -19,7 +19,6 @@ _GIT_SHA = re.compile(r"\bgit\s+([0-9a-f]{7,40})\b", re.I)
 
 def unpack(body: str, fallback_id: Any) -> dict[str, Any]:
     slug_s = str(fallback_id)
-    doing = ""
     detail = body or ""
     progress = ""
     payload = None
@@ -41,8 +40,6 @@ def unpack(body: str, fallback_id: Any) -> dict[str, Any]:
             progress = str(got.get("progress") or "")
     return {
         "need_id": slug_s,
-        # #818: always "" now (no card title); kept so Wall readers do not break (PR C).
-        "doing": doing,
         "detail": detail,
         "progress": progress,
         "payload": payload,

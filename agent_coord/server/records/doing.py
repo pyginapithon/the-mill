@@ -45,11 +45,21 @@ def now(cn, desk: str = "", roster: str = "", all_desks: bool = False) -> list[d
     ) or []
 
 
-def history(cn, desk: str = "", since: str | None = None, page: int = 1, size: int = 50) -> list[dict[str, Any]]:
+def history(
+    cn,
+    desk: str = "",
+    since: str | None = None,
+    page: int = 1,
+    size: int = 50,
+    on_type: str = "",
+    on_id: int | None = None,
+) -> list[dict[str, Any]]:
+    """Past entries, newest first; on_type/on_id keep one item's entries (desk may be empty)."""
     from agent_coord.server.records.name import bare
 
     return call(
         cn,
         "mill_doing_history",
-        [bare(desk, CONST_DESK) if desk else "", since, int(page), int(size)],
+        [bare(desk, CONST_DESK) if desk else "", since, int(page), int(size),
+         on_type or "", int(on_id) if on_type and on_id is not None else None],
     ) or []

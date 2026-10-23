@@ -708,7 +708,7 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
         last_text = str(r.get("last_text") or "")
         if last_text:
             out["last"] = {"doing": last_text, "on": _item(r.get("last_on_type"), r.get("last_on_id")),
-                           "age": _age(r.get("last_age_s"))}
+                           "age": _age(r.get("last_age_s")), "ended_by": r.get("ended_by")}
         head = f"{who}: idle" + (f" {out['idle']}" if out.get("idle") else "")
         if last_text:
             head += f' (last: "{last_text}"' + (f" on {out['last']['on']}" if out["last"]["on"] else "") + ")"
@@ -738,8 +738,9 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
     return out
 
 
-def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
-    """`mill connected --history`: past doing entries, newest first, 50 a page."""
+def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int] | None = None) -> dict[str, Any]:
+    """`mill connected --history`: past doing entries, newest first, 50 a page.
+    on keeps one item's entries (the Wall's card trail, GET /api/v1/doing/history?on=)."""
     from datetime import datetime
 
     from agent_coord.server.records import doing as rec_doing
@@ -757,7 +758,8 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
     if page < 1:
         raise CoordError("connected --page: N is 1 or more")
     size = DOING_PAGE
-    rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size)
+    rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size,
+                             on[0] if on else "", on[1] if on else None)
     total = int(rows[0].get("total") or 0) if rows else 0
     if not rows and page > 1:
         raise CoordError(f"connected --history --page {page}: past the last page")

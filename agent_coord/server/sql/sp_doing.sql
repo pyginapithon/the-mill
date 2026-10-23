@@ -192,6 +192,10 @@ BEGIN
          -- the first of its own event and a clear
          CASE WHEN en.fin IS NULL THEN en.clr WHEN en.clr IS NULL THEN en.fin
               ELSE LEAST(en.fin, en.clr) END AS ended_at,
+         -- how it ended, the same first-event rule as the history (no newer: it is the newest)
+         CASE WHEN en.fin IS NULL AND en.clr IS NULL THEN NULL
+              WHEN en.clr IS NULL OR (en.fin IS NOT NULL AND en.fin <= en.clr) THEN 'finished'
+              ELSE 'cleared' END AS ended_by,
          lst.id AS last_id, lst.text AS last_text, lst.on_type AS last_on_type, lst.on_id AS last_on_id,
          TIMESTAMPDIFF(SECOND, lst.created, v_now) AS last_age_s,
          st.updated AS heartbeat, v_now AS now
@@ -266,12 +270,15 @@ END //
 -- Past --doing entries (text and on), newest first, one page (p_page from 1).
 -- Each row says when its event finished it, when it was cleared and when a
 -- newer entry replaced it; the first of the three is how it ended.
--- total counts every matching entry (adoption count).
+-- total counts every matching entry (adoption count). p_on_type and p_on_id,
+-- when set, keep the entries on that one item (a card trail); p_desk may be empty.
 CREATE PROCEDURE mill_doing_history(
-  IN p_desk  VARCHAR(64),
-  IN p_since DATETIME(6),
-  IN p_page  INT,
-  IN p_size  INT
+  IN p_desk    VARCHAR(64),
+  IN p_since   DATETIME(6),
+  IN p_page    INT,
+  IN p_size    INT,
+  IN p_on_type VARCHAR(16),
+  IN p_on_id   BIGINT UNSIGNED
 )
 BEGIN
   DECLARE v_one BIGINT UNSIGNED;
@@ -295,6 +302,7 @@ BEGIN
    WHERE g.text <> '' AND g.on_type IS NOT NULL
      AND (v_one IS NULL OR g.desk_id = v_one)
      AND (p_since IS NULL OR g.created >= p_since)
+     AND (IFNULL(p_on_type, '') = '' OR (g.on_type = p_on_type AND g.on_id = p_on_id))
    ORDER BY g.created DESC, g.id DESC
    LIMIT v_off, p_size;
 END //
