@@ -166,6 +166,22 @@ def test_blocked_on_a_card_hold_or_letter_reads_back_to_its_desk(w):
     assert not [x for x in _blocked(w, ME) if x["desk"] == ME]
 
 
+def test_a_wait_on_a_letter_counts_only_its_asked_recipients(w):
+    # PEER asks ME and THIRD; THIRD's reply-all asks PEER (the parent's sender)
+    # and copies ME (#820). THIRD then waits on that reply for an answer.
+    root = int(w.ok(["send", "--to-desk", ME, "--to-desk", THIRD, "--body-file", str(w.body)], desk=PEER)["id"])
+    mid = int(w.ok(["reply", str(root), "--body-file", str(w.body)], desk=THIRD)["id"])
+    asked = {str(r["name"]): int(r["asked"]) for r in rows_done(
+        w.cn, "SELECT n.name, mt.asked FROM mail_to mt JOIN name n ON n.id = mt.desk_id"
+              " WHERE mt.type = 'mail' AND mt.id = %s", (mid,))}
+    assert asked == {PEER: 1, ME: 0}
+    need, _ = w.card(desk=ME)
+    w.ok(["claim", R, need, "--doing", "after the answer", "--waiting-on", f"mail-{mid} an answer"], desk=THIRD)
+    # The asked desk sees THIRD blocked on it; the copied desk does not.
+    assert [x for x in _blocked(w, PEER) if x["desk"] == THIRD and x["on"] == f"mail-{mid}"]
+    assert not [x for x in _blocked(w, ME) if x["desk"] == THIRD and x["on"] == f"mail-{mid}"]
+
+
 # (d) it ends with its entry --------------------------------------------------------
 
 def test_blocked_on_ends_with_its_entry(w):
