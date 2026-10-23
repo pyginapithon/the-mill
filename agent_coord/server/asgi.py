@@ -350,21 +350,24 @@ def make_asgi_app(
         try:
             return await _dispatch_inner(request, t0)
         except Exception as e:
+            from agent_coord.server.middleware import SECURITY_HEADERS, error_id
+
+            eid = error_id(e, f"{request.method} {path} dispatch")
             try:
-                from agent_coord.server.push import api_log, mill_admin_alert
+                from agent_coord.server.push import mill_admin_alert
                 from agent_coord.server.middleware import _office
 
-                api_log(f"{request.method} {path} 500 dispatch err={e}")
                 with _office() as c:
-                    mill_admin_alert(c._cn, f"asgi {request.method} {path}: {e}", command="asgi")
+                    mill_admin_alert(c._cn, f"asgi {request.method} {path} error_id={eid}: {e}", command="asgi")
             except Exception:
                 pass
             from agent_coord.server.mill_json import dumps_mill_bytes
 
             return Response(
-                content=dumps_mill_bytes({"error": err_text(e)}),
+                content=dumps_mill_bytes({"error": "mill API error", "error_id": eid}),
                 status_code=500,
                 media_type="application/json; charset=utf-8",
+                headers={"Cache-Control": "no-store", **dict(SECURITY_HEADERS)},
             )
 
     def _body_refusal(code: int, text: str) -> Response:

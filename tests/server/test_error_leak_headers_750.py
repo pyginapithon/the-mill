@@ -162,3 +162,20 @@ def test_wall_loads_under_its_csp(client):
         if url.split("?")[0].endswith(".css"):
             for ref in re.findall(r"url\(\s*['\"]?([^'\")]+)", got.text):
                 assert _allows(img_src, ref) or _allows(csp.get("font-src", csp["default-src"]), ref), ref
+
+
+def test_asgi_dispatch_500_sends_no_exception_text(client, logged, monkeypatch):
+    """The adapter's own catch-all (outside the handler) answers the same way."""
+
+    def boom(*_a, **_kw):
+        raise RuntimeError(LEAK)
+
+    monkeypatch.setattr("agent_coord.server.asgi.record_access", boom)
+    r = client.get("/health")
+    assert r.status_code == 500
+    assert "db.example" not in r.text and "/home/" not in r.text
+    body = r.json()
+    assert body["error"] == "mill API error"
+    assert re.fullmatch(r"[0-9a-f]{12}", body["error_id"])
+    assert r.headers["x-frame-options"] == "DENY"
+    assert any(body["error_id"] in line and "db.example" in line for line in logged)
