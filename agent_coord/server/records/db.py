@@ -431,8 +431,119 @@ def _run_proc(cur, name: str, args: list) -> list[dict[str, Any]]:
     return rows
 
 
+# #818: one transaction for a command and its doing row. While request_tx runs
+# on a connection, call() and the read helpers do not commit, and the stored
+# procedures skip their own START TRANSACTION / COMMIT (@mill_req_tx).
+_REQ_TX: dict[int, dict[str, Any]] = {}
+
+
+class RequestRolledBack(Exception):
+    """A statement failed inside request_tx; everything it wrote was rolled back."""
+
+    def __init__(self, cause: BaseException):
+        super().__init__(str(cause))
+        self.cause = cause
+
+
+def in_request_tx(cn) -> bool:
+    return id(cn) in _REQ_TX
+
+
+def commit(cn) -> None:
+    """Commit now, unless a request transaction is open (it commits at its end)."""
+    if id(cn) in _REQ_TX:
+        return
+    cn.commit()
+
+
+def after_commit(cn, fn) -> None:
+    """Run fn after the request transaction commits (dropped on a rollback); now if none is open."""
+    st = _REQ_TX.get(id(cn))
+    if st is None:
+        fn()
+        return
+    st["after"].append(fn)
+
+
+def _req_flag(cn, on: bool) -> None:
+    cur = cn.cursor()
+    try:
+        cur.execute("SET @mill_req_tx = 1" if on else "SET @mill_req_tx = NULL")
+        if on:
+            cur.execute("START TRANSACTION")
+    finally:
+        cur.close()
+
+
+def request_tx(cn, run):
+    """run() as one transaction on cn: it commits only when run() returns and no
+    statement failed on the way (a handler that catches a failed call does not
+    hide it); otherwise everything rolls back and RequestRolledBack (or the
+    error) is raised. after_commit work runs after the commit. A deadlock or
+    lock wait retries the whole run once."""
+    for attempt in (1, 2):
+        try:
+            cn.rollback()  # no read snapshot carried in
+        except Exception:
+            pass
+        st: dict[str, Any] = {"after": [], "failed": None}
+        _req_flag(cn, True)
+        _REQ_TX[id(cn)] = st
+        try:
+            out = run()
+            if st["failed"] is not None:
+                raise RequestRolledBack(st["failed"])
+            cn.commit()
+        except BaseException as e:
+            try:
+                cn.rollback()
+            except Exception:
+                pass
+            _REQ_TX.pop(id(cn), None)
+            try:
+                _req_flag(cn, False)
+            except Exception:
+                pass
+            cause = e.cause if isinstance(e, RequestRolledBack) else e
+            if attempt == 1 and isinstance(cause, Exception) and retryable_db(cause):
+                continue
+            raise
+        _REQ_TX.pop(id(cn), None)
+        try:
+            _req_flag(cn, False)
+        except Exception:
+            pass
+        for fn in st["after"]:
+            try:
+                fn()
+            except Exception:
+                pass
+        return out
+    raise RuntimeError("request_tx: no attempt ran")
+
+
 def call(cn, name: str, args: list | tuple = ()) -> list[dict[str, Any]]:
     t0 = time.perf_counter()
+    st = _REQ_TX.get(id(cn))
+    if st is not None:
+        # Inside request_tx: no commit, no retry, no rollback here; the request decides.
+        cur = _cursor(cn)
+        try:
+            rows = _run_proc(cur, name, list(args))
+            _bump_write(name)
+            _perf(f"sql.{name}", (time.perf_counter() - t0) * 1000.0, n=len(rows), ok=1)
+            return rows
+        except Exception as e:
+            if st["failed"] is None:
+                st["failed"] = e
+            _perf(f"sql.{name}", (time.perf_counter() - t0) * 1000.0, ok=0, err=str(e)[:160])
+            raise
+        finally:
+            finish_cursor(cur)
+            try:
+                cur.close()
+            except Exception:
+                pass
     last: BaseException | None = None
     for attempt in (1, 2):
         cur = _cursor(cn)
@@ -481,7 +592,7 @@ def scalar_done(cn, sql: str, args: tuple = ()):
         return scalar(cn, sql, args)
     finally:
         try:
-            cn.commit()
+            commit(cn)
         except Exception:
             pass
 
@@ -496,7 +607,7 @@ def rows_done(cn, sql: str, args: tuple = ()) -> list[dict[str, Any]]:
     finally:
         cur.close()
         try:
-            cn.commit()
+            commit(cn)
         except Exception:
             pass
 

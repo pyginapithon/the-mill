@@ -363,7 +363,7 @@ CLI `<roster>` = activity **roster_id** - one project name or one role name. Lab
 | verb | intent | CALL |
 |---|---|---|
 | **`connected`** | What each desk is doing, on what, and who is waiting on it; roster optional (none = desks active in the last day, `--all` every desk, `--desk D` one desk); `--history [--since DATE] [--page N]` lists past doing rows. A desk is alive while `seat.updated` is at most 15 minutes old. A missing time is stale. CLI word for the `session` RPC. | `mill_doing_now`, `mill_doing_history` |
-| **`--doing TEXT`** | On every activity write (`send`, `reply`, `mark`, `create todo`, `claim`, `unclaim`, `assign`, `pass`, `note`, `unpark`, `hold`, `drop`, `score`): one doing row for the desk, linked to that command's item, written right after the command in the same request. If it fails the command still stands and the reply carries `doing_error`. Ends: a reply under the letter, a pass or done without `--doing`, the drop of the hold; the newest row wins; `mark` never ends one. There is no separate doing command. | `mill_doing_put` |
+| **`--doing TEXT`** | On every activity write (`send`, `reply`, `mark`, `create todo`, `claim`, `unclaim`, `assign`, `pass`, `note`, `unpark`, `hold`, `drop`, `score`): one doing row for the desk, linked to that command's item, written in the same transaction as the command. Both commit or neither does: a refused doing refuses the command (`--doing refused: ...; nothing was changed`), and a list command with `--doing` is all or nothing. Ends: a reply under the letter, a pass or done without `--doing`, the drop of the hold, clock-out, reset or retire; the newest row wins; `mark` never ends one. There is no separate doing command. | `mill_doing_put` |
 
 ### label / score / watcher
 

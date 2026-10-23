@@ -216,6 +216,13 @@ def _poke(
     """
     if not nid:
         return
+    from agent_coord.server.records.db import after_commit
+
+    # #818: inside a --doing request the pokes wait for its commit.
+    after_commit(c._cn, lambda: _poke_now(c, typ, nid, command, owner=owner, fresh=fresh))
+
+
+def _poke_now(c: Book, typ: str, nid: Any, command: str, *, owner: str | None, fresh: bool) -> None:
     try:
         from agent_coord.server.push import fanout
 
@@ -867,10 +874,11 @@ def _doing_finish(c: Book, command: str, body: dict[str, Any], out: Any, owner: 
 
 
 def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project: str, owner: str | None, text: str) -> Any:
-    """Write the doing entry right after the command, in the same request.
+    """The doing side of a command, inside the request that ran it.
 
-    The command already stands. A doing that cannot be written is said in the
-    reply (doing_error) and never undoes the command.
+    Without --doing, a pass or drop may write its finish row (_doing_finish).
+    With --doing this runs inside _run_command's transaction: any refusal raises,
+    and the command rolls back with its doing row (#818).
     """
     if not owner:
         return out
@@ -880,27 +888,53 @@ def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project:
         return out
     from agent_coord.server.records import doing as rec_doing
 
-    note: dict[str, Any]
+    res = out if isinstance(out, dict) else {}
+    rows = res.get("results") if isinstance(res.get("results"), list) else []
+    bad = [r for r in rows if isinstance(r, dict) and r.get("ok") is False]
+    if bad:
+        # A list command with --doing is all or nothing.
+        b = bad[0]
+        raise CoordError(f"{b.get('need') or 'an item'}: {str(b.get('error') or 'refused')[:160]}")
+    item = _doing_item(c, command, body, out, project)
+    if item is None:
+        raise CoordError("no item was written, so no doing can be recorded")
     try:
-        item = _doing_item(c, command, body, out, project)
-        if item is None:
-            note = {"doing_error": f"{command} --doing: no item was written, so no doing was recorded"}
-        else:
-            got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1])
-            note = {"doing_entry": {"id": int(got.get("id") or 0), "on": f"{item[0]}-{item[1]}"}}
-            if got.get("id"):
-                _poke(c, "doing", got.get("id"), "doing", owner=owner)
+        got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1])
+    except CoordError:
+        raise
     except Exception as e:
-        try:
-            c._cn.rollback()
-        except Exception:
-            pass
-        msg = str(e).split(":", 1)[-1].strip() if "doing:" in str(e) else "the doing could not be stored"
-        note = {"doing_error": f"{command} --doing: not recorded ({msg[:120]}); the {command} itself stands"}
+        raise CoordError(_sql_refusal(e) or "the doing could not be stored") from e
     if isinstance(out, dict):
         out = dict(out)
-        out.update(note)
+        out["doing_entry"] = {"id": int(got.get("id") or 0), "on": f"{item[0]}-{item[1]}"}
+    if got.get("id"):
+        _poke(c, "doing", got.get("id"), "doing", owner=owner)  # waits for the commit
     return out
+
+
+def _run_command(c: Book, fn: Any, command: str, body: dict[str, Any], project: str, owner: str | None, text: str) -> Any:
+    """Run a handler and its doing side.
+
+    With --doing (#818) the command and its doing row are one transaction: both
+    commit, or a refusal of either rolls both back and nothing is written; its
+    pokes, letters and webhooks go out only after the commit.
+    """
+    if not (owner and text):
+        out = fn(c, body, project, owner)
+        return _doing_after(c, command, body, out, project, owner, text)
+    from agent_coord.server.records.db import RequestRolledBack, request_tx
+
+    def run() -> Any:
+        out = fn(c, body, project, owner)
+        return _doing_after(c, command, body, out, project, owner, text)
+
+    try:
+        return request_tx(c._cn, run)
+    except RequestRolledBack as e:
+        msg = _sql_refusal(e.cause) or str(e.cause).split(":", 1)[-1].strip() or type(e.cause).__name__
+        raise CoordError(f"{command} --doing refused: {msg[:160]}; nothing was changed") from e
+    except CoordError as e:
+        raise CoordError(f"{command} --doing refused: {e}; nothing was changed", sync=getattr(e, "sync", None)) from e
 
 
 def _h_project(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
@@ -1521,7 +1555,9 @@ def _ends_read(fn):
             return fn(c, *a, **k)
         finally:
             try:
-                c._cn.commit()
+                from agent_coord.server.records.db import commit as _db_commit
+
+                _db_commit(c._cn)  # #818: not inside a request transaction
             except Exception:
                 pass
 
@@ -2612,6 +2648,12 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
 
 def _poke_tree(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None:
     _poke(c, typ, nid, typ.upper(), owner=owner)
+    from agent_coord.server.records.db import after_commit
+
+    after_commit(c._cn, lambda: _poke_tree_rooms(c, typ, nid, owner=owner))
+
+
+def _poke_tree_rooms(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None:
     try:
         from agent_coord.server.records import tree as rec_tree
         from agent_coord.server.records.name import by_id
@@ -3380,8 +3422,7 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
         scrub_request_body(body)
     doing_text = _doing_text(command, body)
     try:
-        out = fn(c, body, project, owner)
-        out = _doing_after(c, command, body, out, project, owner, doing_text)
+        out = _run_command(c, fn, command, body, project, owner, doing_text)
         try:
             from agent_coord.server import wake_first
 
@@ -3552,8 +3593,7 @@ def dispatch_ws(
             owns_id = True
     try:
         doing_text = _doing_text(v, body)
-        out = fn(c, body, project, owner)
-        out = _doing_after(c, v, body, out, project, owner, doing_text)
+        out = _run_command(c, fn, v, body, project, owner, doing_text)
         try:
             from agent_coord.server import wake_first
 

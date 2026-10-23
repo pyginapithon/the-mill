@@ -26,7 +26,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_proj = MILL_NAME_GET('roster', p_project);
   SET v_desk = MILL_NAME_GET('desk', p_desk);
@@ -43,7 +43,7 @@ BEGIN
   SET v_id = LAST_INSERT_ID();
   CALL mill_activity_put('todo', v_id, v_ts, v_desk, v_proj, MILL_WEIGHT('todo'), LENGTH(IFNULL(p_body, '')));
   CALL mill_watcher_roster('todo', v_id, v_proj, v_desk);
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, p_status AS status;
 END //
 
@@ -72,7 +72,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_proj = MILL_NAME_GET('roster', p_project);
   SET v_desk = MILL_NAME_GET('desk', p_desk);
@@ -129,7 +129,7 @@ BEGIN
   UPDATE tree SET lft = lft + 2 WHERE name_id = v_name AND lft > v_r ORDER BY lft DESC;
   INSERT INTO tree (name_id, type, id, lft, rgt)
   VALUES (v_name, 'todo', v_id, v_r, v_r + 1);
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, p_status AS status, v_name AS name_id, v_r AS lft;
 END //
 
@@ -150,7 +150,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_vol = CASE
@@ -175,7 +175,7 @@ BEGIN
   IF v_vol IS NOT NULL THEN
     CALL mill_watcher_put('todo', p_id, v_vol);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_id AS id, v_ts AS updated;
 END //
 
@@ -203,7 +203,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   IF EXISTS (SELECT 1 FROM todo WHERE id = p_id) THEN
     SET v_desk = NULL;
@@ -237,7 +237,7 @@ BEGIN
         updated = v_ts;
     END IF;
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_id AS id, 'deleted' AS op;
 END //
 
@@ -258,7 +258,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_proj = NULL;
@@ -276,7 +276,7 @@ BEGIN
   VALUES ('todo', p_id, v_ts, v_ts, v_ts, v_desk, v_proj, MILL_WEIGHT('todo'), 1, NULL)
   ON DUPLICATE KEY UPDATE deleted = v_ts, updated = v_ts;
   UPDATE todo SET updated = v_ts, updated_id = v_desk WHERE id = p_id;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_id AS id, 'retired' AS op;
 END //
 
@@ -292,7 +292,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   IF v_desk IS NULL THEN
@@ -305,7 +305,7 @@ BEGIN
   END IF;
   UPDATE activity SET deleted = NULL, updated = v_ts WHERE type = 'todo' AND id = p_id;
   UPDATE todo SET updated = v_ts, updated_id = v_desk WHERE id = p_id;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_id AS id, 'reclaimed' AS op;
 END //
 

@@ -16,6 +16,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from agent_coord.helpers.errors import CoordError
 from agent_coord.server.api.mill import rpc
 from agent_coord.server.book import Book
 from agent_coord.server.redact import PH, TEXT_KEYS, WRITE_COMMANDS, err_text
@@ -59,7 +60,12 @@ def test_ws_write_is_redacted_before_the_handler(monkeypatch, command, args, key
     store: dict = {}
     monkeypatch.setitem(rpc.HANDLERS, command, _capture(store))
     body = {k: (v.format(t=tok) if isinstance(v, str) else v) for k, v in args.items()}
-    rpc.dispatch_ws(MagicMock(spec=Book), "desk-a", command, body, req_id=None)
+    c = MagicMock(spec=Book)
+    c._cn = MagicMock()  # a --doing command runs in a request transaction on it (#818)
+    try:
+        rpc.dispatch_ws(c, "desk-a", command, body, req_id=None)
+    except CoordError:
+        pass  # the fake handler wrote no item, so a --doing command is refused after it ran
     assert tok not in store["body"][key]
     assert PH["token"] in store["body"][key]
 

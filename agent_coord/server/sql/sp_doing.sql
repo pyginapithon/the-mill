@@ -98,14 +98,14 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: the item is gone';
   END IF;
   SET v_roster = IFNULL((SELECT roster_id FROM activity WHERE type = p_on_type AND id = p_on_id), 1);
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   UPDATE seat SET updated = v_ts WHERE desk_id = v_desk;
   CALL mill_doing_insert(v_desk, v_roster, p_text, v_ts, v_id);
   -- The row was inserted by this call; nothing older is touched.
   UPDATE doing SET on_type = p_on_type, on_id = p_on_id WHERE id = v_id;
   CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS created, v_desk AS desk_id, v_roster AS roster_id;
 END //
 
@@ -133,7 +133,7 @@ BEGIN
     RESIGNAL;
   END;
   SET v_desk = MILL_NAME_GET('desk', p_desk);
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_cur = NULL;
   SELECT id, text, on_type, on_id, roster_id INTO v_cur, v_text, v_type, v_on, v_roster
     FROM doing WHERE desk_id = v_desk ORDER BY created DESC, id DESC LIMIT 1 FOR UPDATE;
@@ -143,7 +143,7 @@ BEGIN
     UPDATE doing SET on_type = p_on_type, on_id = p_on_id WHERE id = v_id;
     CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
 END //
 
 -- What desks are doing now. Three row kinds, told apart by part:
