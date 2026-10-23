@@ -4356,7 +4356,7 @@
       return `<span class="doing-trail" data-doing-trail="${esc(key)}">${inner}</span>`;
     }
     function wallClaimedSlot(r) {
-      /* #818 slot: claimed_at on cards is a coming server field. Blank until it lands. */
+      /* #818 slot: the card's claimed_at from the server. Blank when the card has none. */
       const at = String((r && r.claimed_at) || "").trim();
       return `<span class="card-claimed" data-slot="claimed_at">${at ? esc("claimed " + dt(at).slice(5, 16)) : ""}</span>`;
     }

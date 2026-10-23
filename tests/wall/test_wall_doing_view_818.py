@@ -77,9 +77,10 @@ const out = {};
       const q = new URLSearchParams(url.split('?')[1] || '');
       const rows = fx.history.filter(e => (!q.get('on') || e.on === q.get('on')) && (!q.get('desk') || e.desk === q.get('desk')))
         .sort((a, b) => b.at.localeCompare(a.at));
-      return res(200, { history: rows, page: { n: 1, of: 1, size: 50, entries: rows.length } });
+      return res(200, { history: rows, page: { n: 1, of: 1, size: 50, entries: rows.length }, mill: 'test' });
     }
-    return res(200, fx.doing);
+    /* The server wraps a bare list as {result, mill} (mill_json.stamp_mill). */
+    return res(200, { result: fx.doing, mill: 'test' });
   };
   await wallDoingSync();
   out.urls = calls.slice();
