@@ -17,7 +17,9 @@ only the /ws hop is replaced by dispatch_ws, as in the #238 matrix.
     a refused or over-long --doing stores nothing; a failed doing write never
     undoes the command;
 (f) an entry ends on a real event only: clock-out or reset ends it (ended_by
-    cleared, the empty row is never a doing).
+    cleared, the empty row is never a doing); a pass or done by the desk ends
+    its card entry; a later note, another desk's done or a pass --back never
+    ends one or brings an ended one back.
 """
 from __future__ import annotations
 
@@ -401,3 +403,39 @@ def test_clock_out_or_reset_ends_the_doing(w, how):
     rows = _hist(w, desk)
     assert [r["doing"] for r in rows] == ["mid task"]  # the empty row is never a doing
     assert rows[0]["ended"] is True and rows[0]["ended_by"] == "cleared"
+
+
+def test_a_later_note_or_someone_elses_done_never_ends_a_card_doing(w):
+    need, tid = w.card()
+    w.ok(["claim", R, need])
+    w.ok(["pass", R, need, "--doing", "waiting on review"])
+    assert w.me()["doing"] == "waiting on review"
+    w.ok(["note", R, need, "--note", "one more thing"])
+    assert w.me()["doing"] == "waiting on review"
+    w.ok(["pass", R, need, "--done"], desk=PEER)
+    view = w.me()
+    assert view["doing"] == "waiting on review" and view["on"] == f"todo-{tid}"
+    assert _hist(w, ME)[0]["ended"] is False
+
+
+def test_pass_back_never_brings_back_an_ended_card_doing(w):
+    need, tid = w.card()
+    w.ok(["claim", R, need, "--doing", "fixing it"])
+    w.ok(["pass", R, need])
+    assert w.me()["doing"] == ""
+    w.ok(["pass", R, need, "--back"])
+    view = w.me()
+    assert view["doing"] == "" and view["last"]["on"] == f"todo-{tid}"
+    row = _hist(w, ME)[0]
+    assert row["doing"] == "fixing it" and row["ended_by"] == "finished"
+
+
+def test_done_by_the_desk_itself_ends_its_card_doing(w):
+    need, tid = w.card(desk=ME)
+    w.ok(["claim", R, need], desk=PEER)
+    w.ok(["pass", R, need], desk=PEER)
+    w.ok(["note", R, need, "--note", "reviewing", "--doing", "reviewing the ship"])
+    assert w.me()["doing"] == "reviewing the ship"
+    w.ok(["pass", R, need, "--done"])
+    assert w.me()["doing"] == ""
+    assert _hist(w, ME)[0]["ended_by"] == "finished"
