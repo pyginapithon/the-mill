@@ -171,6 +171,9 @@ CREATE TABLE IF NOT EXISTS todo (
   creator_id      BIGINT UNSIGNED        NOT NULL,
   status          ENUM('parked','open','claimed','shipped','done') NOT NULL DEFAULT 'open',
   assigned_id     BIGINT UNSIGNED        NULL,
+  -- #818 D2: when the card became claimed or its volunteer changed (claim,
+  -- --take-over, assign, pass --back to claimed). NULL when not claimed.
+  claimed_at      DATETIME(6)   NULL,
   body            VARCHAR(4096) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
   PRIMARY KEY (type, id),
   UNIQUE KEY idx_id (id),

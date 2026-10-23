@@ -159,8 +159,18 @@ BEGIN
     ELSE MILL_NAME_GET('desk', p_volunteer)
   END;
   SELECT roster_id INTO v_proj FROM todo WHERE id = p_id;
+  -- #818 D2: claimed_at is first, so it reads the old status and volunteer
+  -- (MySQL assigns left to right). A claim, a new volunteer or a step back to
+  -- claimed stamps it; leaving claimed clears it; anything else keeps it.
   UPDATE todo
-     SET updated = v_ts,
+     SET claimed_at = CASE
+           WHEN IFNULL(NULLIF(p_status, ''), status) <> 'claimed' THEN NULL
+           WHEN status <> 'claimed' OR claimed_at IS NULL THEN v_ts
+           WHEN p_volunteer IS NOT NULL AND p_volunteer NOT IN ('', '-')
+                AND NOT (v_vol <=> assigned_id) THEN v_ts
+           ELSE claimed_at
+         END,
+         updated = v_ts,
          updated_id = v_desk,
          status = IFNULL(NULLIF(p_status, ''), status),
          assigned_id = CASE

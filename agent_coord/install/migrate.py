@@ -770,6 +770,47 @@ def _ensure_mail_to_asked(cn) -> list[str]:
     return applied
 
 
+def _ensure_todo_claimed_at(cn) -> list[str]:
+    """#818 D2: todo.claimed_at. Add the column, then backfill every claimed
+    card that has none, so a run killed after the ALTER converges (after this
+    PR a claimed card always has one, so the backfill finds nothing to do).
+
+    Best row the book keeps: the volunteer's watcher row on the card. The
+    volunteer's first write on a card puts it on the card's watchers
+    (mill_watcher_roster, INSERT IGNORE), so for a card it did not file that
+    is the claim, or a note just before it; for a card it filed it is the
+    create, the earliest time it can have claimed it. Capped at todo.updated.
+    No watcher row: todo.updated (what the age read before). A card that left
+    and came back to the same volunteer keeps its first time.
+    """
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if not _table_exists(cur, "todo"):
+            return applied
+        if not _column_exists(cur, "todo", "claimed_at"):
+            cur.execute("ALTER TABLE todo ADD COLUMN claimed_at DATETIME(6) NULL AFTER assigned_id")
+            applied.append("todo.claimed_at")
+        cur.execute("SELECT COUNT(*) FROM todo WHERE status = 'claimed' AND claimed_at IS NULL")
+        if int((cur.fetchone() or (0,))[0] or 0) > 0:
+            # updated has ON UPDATE CURRENT_TIMESTAMP: keep it as it is.
+            cur.execute(
+                "UPDATE todo t"
+                " LEFT JOIN watcher w ON w.type = 'todo' AND w.id = t.id AND w.desk_id = t.assigned_id"
+                " SET t.claimed_at = IF(w.updated IS NULL, t.updated, LEAST(w.updated, t.updated)),"
+                " t.updated = t.updated"
+                " WHERE t.status = 'claimed' AND t.claimed_at IS NULL"
+            )
+            applied.append("todo.claimed_at_backfill")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 def _ensure_score_series(cn) -> list[str]:
     """#288 step 1: score.better, score.unit and the score_point table. Additive; no wipe."""
     applied: list[str] = []
@@ -1211,6 +1252,8 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(_ensure_join_wake_on(cn))
             # #818 D1: before the routine reload (mill_mail_to_copied, mill_doing_now read it).
             applied.extend(_ensure_mail_to_asked(cn))
+            # #818 D2: before the routine reload (mill_todo_update, mill_doing_now read it).
+            applied.extend(_ensure_todo_claimed_at(cn))
             # #818 after the join column steps (the seat copy reads them).
             did_818 = apply_doing_818(cn)
             applied.extend(did_818)
