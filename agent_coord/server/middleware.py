@@ -442,10 +442,11 @@ def _doing_read(path: str, qs: dict[str, list[str]]) -> tuple[int, Any]:
             on = (hit.group(1), int(hit.group(2)))
         if not desk and not on:
             return 400, {"error": "GET /api/v1/doing/history requires ?desk= or ?on= (or both)"}
-        page = one("page") or "1"
-        if not page.isdigit() or int(page) < 1:
-            return 400, {"error": "GET /api/v1/doing/history: page= is 1 or more"}
-        body = {"desk": desk, "history": True, "since": one("since"), "page": int(page)}
+        try:
+            page = rpc._doing_page(one("page")) or 1
+        except CoordError:
+            return 400, {"error": f"GET /api/v1/doing/history: page= is 1 to {rpc.DOING_PAGE_MAX}"}
+        body = {"desk": desk, "history": True, "since": one("since"), "page": page}
         with _office() as c:
             who = rpc._stored(desk) if desk else ""
             if who:

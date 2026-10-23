@@ -186,3 +186,77 @@ def test_cards_carry_no_doing_key(w):
     card = [c for c in board.get("needs", []) + board.get("issues", []) if int(c["id"]) == tid][0]
     assert "doing" not in card and "doing_trunc" not in card
     assert scalar_done(w.cn, "SELECT COUNT(*) FROM todo WHERE id = %s", (tid,)) == 1
+
+
+# Validator 2595: a bad page= was a 500. Every query parameter on both routes,
+# whatever it holds, is a 200 or a 400, never a 500.
+
+@pytest.mark.parametrize("page", [
+    "%C2%B2",        # superscript two: str.isdigit() says yes, int() says no
+    "%EF%BC%91",     # full-width one: int() reads it as 1
+    "99999999999",   # over the book's INT
+    "2147483647",    # (page - 1) * 50 overflows the offset
+    "100001",        # over the page bound
+    "1.5", "%2B2", "0x2", "-1", "0", "",  # (a space, + in a query, is stripped like on every parameter)
+])
+def test_a_bad_history_page_is_a_400(wall, page):
+    code, got = _get(wall, f"/api/v1/doing/history?desk={ME}&page={page}")
+    if page == "":
+        assert code == 200  # an empty page= is page 1, like no page=
+        return
+    assert code == 400 and "page=" in got["error"] and "1 to 100000" in got["error"], (page, code, got)
+
+
+LONG = "x" * 300
+
+
+@pytest.mark.parametrize("query,want", [
+    (f"/api/v1/doing/history?desk={ME}&since=junk", 400),
+    (f"/api/v1/doing/history?desk={ME}&since=2026-10-23+25:00", 400),
+    (f"/api/v1/doing/history?desk={ME}&since=%EF%BC%92026-10-23", 400),
+    (f"/api/v1/doing/history?desk={ME}&since=" + "2" * 5000, 400),
+    (f"/api/v1/doing/history?desk={ME}&since=0001-01-01", 200),
+    (f"/api/v1/doing/history?desk={ME}&since=9999-12-31T23:59:59.999999", 200),
+    ("/api/v1/doing/history?desk=" + LONG, 400),
+    ("/api/v1/doing/history?desk=%00", 400),
+    ("/api/v1/doing/history?desk=%F0%9F%98%80", 400),
+    ("/api/v1/doing/history?desk=%FF%FE", 400),
+    ("/api/v1/doing?desk=" + LONG, 400),
+    ("/api/v1/doing?desk=%F0%9F%98%80", 400),
+    ("/api/v1/doing?project=" + LONG, 400),
+    ("/api/v1/doing?project=%00", 400),
+    ("/api/v1/doing?project=%F0%9F%98%80", 400),
+    ("/api/v1/doing?all=2", 400),
+    ("/api/v1/doing?all=%C2%B2", 400),
+    ("/api/v1/doing?all=" + LONG, 400),
+    ("/api/v1/doing/history?on=todo-9999999999999999999", 200),
+    ("/api/v1/doing/history?on=todo-99999999999999999999", 400),
+    ("/api/v1/doing/history?on=todo-%C2%B2", 400),
+    ("/api/v1/doing/history?on=TODO-1", 400),
+    ("/api/v1/doing/history?on=" + LONG, 400),
+    ("/api/v1/doing/history?on=todo-1&desk=" + LONG, 400),
+])
+def test_no_query_parameter_is_a_500(wall, query, want):
+    code, got = _get(wall, query)
+    assert code == want, (query[:80], code, got)
+    if code == 400:
+        assert isinstance(got, dict) and got.get("error") and "mill API error" not in got["error"]
+
+
+def test_the_cli_page_bound_matches_the_route(w):
+    """The same overflow on `mill connected --history --page` (older than the routes)."""
+    code, out, err = w.run(["connected", "--history", "--desk", ME, "--page", "99999999999"])
+    txt = err + out
+    assert code != 0 and "--page" in txt and "1 to 100000" in txt, txt
+
+
+@pytest.mark.parametrize("page", ["x", "²", "１", "-3", 2.5, True, 10**12])
+def test_a_crafted_rpc_page_is_refused_not_crashed(w, page):
+    """A client that sends page as anything but a small int gets a refusal."""
+    from agent_coord.helpers.errors import CoordError
+    from agent_coord.server.api.mill import rpc
+
+    for body in ({"history": True, "desk": ME, "page": page}, {"desk": ME, "page": page}):
+        with pytest.raises(CoordError) as got:
+            rpc._h_session(w.book, dict(body), "", ME)
+        assert "--page" in str(got.value) and "1 to 100000" in str(got.value), (page, body, str(got.value))

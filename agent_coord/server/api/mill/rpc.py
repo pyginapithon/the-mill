@@ -644,9 +644,10 @@ def _h_session(c: Book, body: dict[str, Any], project: str, owner: str | None) -
             raise CoordError(f"connected: no desk {desk[:64]}")
     elif roster:
         _require_live_project(c._cn, roster, "connected")
+    page = _doing_page(body.get("page"))
     if body.get("history"):
         return _doing_history(c, body, desk)
-    if body.get("since") or int(body.get("page") or 0):
+    if body.get("since") or page:
         raise CoordError("connected: --since and --page go with --history")
     return [_desk_view(r, roster, by) for r, by in _doing_rows(
         rec_doing.now(c._cn, desk, roster, bool(body.get("all")))
@@ -754,9 +755,7 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int]
             raise CoordError(
                 f"connected --since: {since_raw[:40]} is not a date; say 2026-10-22 or '2026-10-22 18:00' (office clock)"
             ) from None
-    page = int(body.get("page") or 1)
-    if page < 1:
-        raise CoordError("connected --page: N is 1 or more")
+    page = _doing_page(body.get("page")) or 1
     size = DOING_PAGE
     rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size,
                              on[0] if on else "", on[1] if on else None)
@@ -788,6 +787,25 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int]
 
 
 DOING_PAGE = 50
+# 50 a page: five million entries. The book's offset, (page - 1) * 50, is an INT.
+DOING_PAGE_MAX = 100000
+
+
+def _doing_page(raw: Any) -> int:
+    """The --history page: 0 when not given (None, "", or the CLI's 0), else an
+    int or a string of ASCII digits from 1 to DOING_PAGE_MAX. Anything else
+    (a bool, a float, "²" or "１" that str.isdigit() takes, a sign, an
+    overflow) is refused, so no page ever reaches the book out of range."""
+    if raw is None or raw == "" or (type(raw) is int and raw == 0):
+        return 0
+    n = -1
+    if type(raw) is int:
+        n = raw
+    elif isinstance(raw, str) and raw.isascii() and raw.isdigit() and len(raw) <= 6:
+        n = int(raw)
+    if not 1 <= n <= DOING_PAGE_MAX:
+        raise CoordError(f"connected --page: N is 1 to {DOING_PAGE_MAX}")
+    return n
 # #818 PR B: commands whose --doing writes a doing entry on the item they wrote.
 DOING_COMMANDS = frozenset(
     {"send", "reply", "mark", "open", "claim", "unclaim", "assign", "pass", "note", "unpark", "hold", "drop", "score"}
