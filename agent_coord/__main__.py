@@ -1300,7 +1300,7 @@ def _build_parser() -> MillArgumentParser:
     se = sub.add_parser(
         "connected",
         help="mill connected [ROSTER] [--desk X]: what each desk is doing, on which letter or card, "
-        "and who is waiting on it; --history lists past entries",
+        "what it waits on and who is blocked on it; --history lists past entries",
     )
     se.add_argument(
         "project", nargs="?", default="", metavar="ROSTER",
