@@ -705,8 +705,9 @@
       padding: .08rem .35rem; border-radius: 999px; font-size: 10px; letter-spacing: .06em;
       border: 1px solid var(--edge); color: var(--dim);
     }
-    .hist-row.kind-here { border-left-color: var(--green); }
-    .hist-row.kind-here .k { color: var(--green); border-color: var(--green); }
+    .hist-row.kind-doing { border-left-color: var(--green); }
+    .hist-row.kind-doing .k { color: var(--green); border-color: var(--green); }
+    .hist-row.kind-doing.muted { opacity: .62; }
     .hist-row.kind-mail { border-left-color: var(--cyan); }
     .hist-row.kind-mail .k { color: var(--cyan); border-color: var(--cyan); }
     .hist-row.kind-todo { border-left-color: var(--amber); }
@@ -1878,6 +1879,10 @@ html.wall-human-readonly .admin-actions.admin-full-only {
   min-width: 14rem; overflow: auto;
   padding: .55rem .75rem .8rem;
 }
+/* #818: a CONNECTED line is the row button, then the doing meta under it (links can't sit
+   in a button). The meta line is empty until the doing view is read. */
+.here-line { border-bottom: 1px solid var(--edge); }
+.here-line > .here-row { border-bottom: 0; }
 .here-row {
   display: grid;
   grid-template-columns: .7rem minmax(7rem, 12rem) 4.6rem minmax(0, 1fr);
@@ -1896,6 +1901,8 @@ html.wall-human-readonly .admin-actions.admin-full-only {
 .here-dot.working { background: var(--green); }
 .here-dot.waiting, .here-dot.blocked { background: var(--amber); }
 .here-dot.idle, .here-dot.here { background: var(--cyan); }
+/* #818: an idle desk is a real state now; the empty-pane .idle padding must not stretch its dot. */
+.here-dot.idle { padding: 0; }
 .here-dot.gone { background: var(--red); }
 .here-name {
   font-weight: 650; color: var(--ink);
@@ -1937,6 +1944,11 @@ div.here-doing { overflow: visible; white-space: normal; text-overflow: clip; }
 /* #715: COLLAB stays compact, but once its count is read it is a real number and must
    not look like the faded not-loaded state (contrast was 2.2). */
 .strip .kpi.strip-nav.strip-later:not(.kpi-loading) { opacity: 1; }
+@media (max-width: 520px) {
+  /* #818: on a phone the doing text gets its own line under the name, not a 3-letter column. */
+  .here-row { grid-template-columns: .7rem minmax(0, 1fr) auto; }
+  .here-row > .here-doing { grid-column: 2 / -1; }
+}
 @media (max-width: 800px) {
   .here-split { flex-direction: column; }
   #sec-here > .here-split > #here { border-right: 0; border-bottom: 1px solid var(--edge); max-height: 50vh; }

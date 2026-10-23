@@ -140,7 +140,7 @@
           target: wo,
           age: age,
           progress: prog,
-          job: wallDoingFace(a.doing).now.slice(0, 48),
+          job: wallDoingText(a.owner, a.doing).slice(0, 48),
         });
       });
       scoreStalledNeeds(d).forEach(n => {
@@ -154,7 +154,7 @@
           target: String(n.need_id || ""),
           age: age,
           progress: prog,
-          job: String(n.doing || n.need_id || "").slice(0, 48),
+          job: String(n.detail || n.need_id || "").slice(0, 48),
         });
       });
       return out;

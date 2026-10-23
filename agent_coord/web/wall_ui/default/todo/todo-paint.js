@@ -335,9 +335,9 @@
         const open = !!_todoDetailId && !!path[detailKey] && !!path[key];
         const shrunk = todoStatusCollapsed(st) && !open;
         const rowFace = todoTreeCardRow(d, n);
-        const doingFull = rowFace ? String(rowFace.doing || "").trim() : "";
+        /* #818: cards have no title; the body line is the card's detail. */
         const detailFull = rowFace ? String(rowFace.detail || "").trim() : "";
-        const bodyLine = doingFull || detailFull || p.title;
+        const bodyLine = detailFull || p.title;
         const note = detailFull && detailFull !== bodyLine ? detailFull : "";
         const asker = rowFace ? todoTreeDesk(rowFace.creator || rowFace.asker || rowFace.src || "") : "";
         const holder = rowFace
@@ -355,7 +355,9 @@
               (note ? `<span class="todo-card-note">${esc(note)}</span>` : "") +
               (nid ? `<span class="todo-tree-id"><code>${esc(nid)}</code></span>` : "") +
               (asker ? `<span class="todo-tree-field"><span>asker</span> <b>${esc(asker)}</b></span>` : "") +
-              (holder ? `<span class="todo-tree-field"><span>holder</span> <b>${esc(holder)}</b></span>` : "")
+              (holder ? `<span class="todo-tree-field"><span>holder</span> <b>${esc(holder)}</b></span>` : "") +
+              (rowFace ? wallClaimedSlot(rowFace) : "") +
+              (n.id ? wallDoingTrailSlot("todo-" + String(n.id)) : "")
             : `<span class="st">${esc(st)}</span><b>${esc(p.title)}</b>`);
         const html = `<button type="button" class="todo-tree-card st-${esc(st)}${on}${shrunk ? " is-collapsed" : ""}${open ? " is-open" : ""}" data-plan="${esc(forest.planId)}" data-type="todo" data-id="${esc(String(n.id || ""))}" data-has-children="${todoTreeHasKidsHint(n) ? "1" : "0"}" title="${esc(open ? bodyLine : p.title)}">` +
           face + `</button>`;
@@ -630,6 +632,7 @@
         _todoTreeChainOpen = true;
         const has = card.getAttribute("data-has-children") === "1";
         if (window._floor) paintPlan(window._floor);
+        try { wallDoingTrail(); } catch (eTrail) {}
         const found = todoTreeFindNode(window._floor, planId, id);
         let cur = found && found.node;
         const seenOpen = {};
