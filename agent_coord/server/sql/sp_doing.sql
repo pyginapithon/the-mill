@@ -185,8 +185,9 @@ END //
 --           newest claim first; age is since the claim (todo.claimed_at, #818 D2).
 --   blocked: up to 3 per desk, newest first: other desks whose current entry
 --           (not ended) is blocked on it (#822): on the desk, a card it holds
---           as volunteer, a hold it holds, or a letter it received. A read of
---           the waiting_* fields on doing rows; there is no edge or link table.
+--           as volunteer, a hold it holds, or a letter it was asked on (not
+--           copied, #818 D1). A read of the waiting_* fields on doing rows;
+--           there is no edge or link table.
 -- Listed: p_desk alone when named; else every desk on p_roster when named;
 -- else every joined desk when p_all; else desks active in the last day.
 CREATE PROCEDURE mill_doing_now(
@@ -326,7 +327,7 @@ BEGIN
           OR (w.waiting_type = 'hold' AND EXISTS (SELECT 1 FROM hold h WHERE h.id = w.waiting_id
                 AND h.desk_id = t.desk_id))
           OR (w.waiting_type = 'mail' AND EXISTS (SELECT 1 FROM mail_to mt WHERE mt.type = 'mail'
-                AND mt.id = w.waiting_id AND mt.desk_id = t.desk_id)))
+                AND mt.id = w.waiting_id AND mt.desk_id = t.desk_id AND mt.asked = 1)))
         JOIN name d ON d.id = t.desk_id
         JOIN name wn ON wn.id = w.waiter_id
     ) x

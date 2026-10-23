@@ -8,7 +8,8 @@
     refused and nothing is written (the command rolls back with its doing);
 (c) `mill connected` shows the desk's own blocked-on, and the reverse view, the
     desks blocked on it, is a read: their current entry waits on the desk, a
-    card it holds as volunteer, a hold it holds, or a letter it received;
+    card it holds as volunteer, a hold it holds, or a letter it was asked on
+    (mail_to.asked, F119; a copied desk is not blocked by it);
 (d) it ends with its entry (pass, reply, drop, clear or a newer --doing);
 (e) on an existing book `migrate.ensure()` widens waiting_type and adds
     waiting_why; a second ensure changes nothing; a run killed between them converges.
