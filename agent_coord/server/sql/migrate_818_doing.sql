@@ -186,10 +186,12 @@ BEGIN
     IF (SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'join' AND INDEX_NAME = 'idx_token_hash') > 0 THEN
       ALTER TABLE `join` DROP INDEX idx_token_hash;
     END IF;
+    -- guarded: a run killed after this one ALTER resumes at the roster copy.
+    IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'join' AND COLUMN_NAME = 'doing') > 0 THEN
     ALTER TABLE `join`
       RENAME COLUMN doing TO text,
       ADD COLUMN roster_id BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER desk_id,
-      ADD COLUMN on_type ENUM('mail','todo') NULL AFTER text,
+      ADD COLUMN on_type ENUM('mail','todo','hold','score') NULL AFTER text,
       ADD COLUMN on_id BIGINT UNSIGNED NULL AFTER on_type,
       ADD COLUMN waiting_type ENUM('mail','todo') NULL AFTER on_id,
       ADD COLUMN waiting_id BIGINT UNSIGNED NULL AFTER waiting_type,
@@ -206,11 +208,18 @@ BEGIN
       ADD KEY idx_on (on_type, on_id),
       ADD CONSTRAINT fk_doing_desk FOREIGN KEY (desk_id) REFERENCES name (id) ON DELETE RESTRICT,
       ADD CONSTRAINT fk_doing_roster FOREIGN KEY (roster_id) REFERENCES name (id) ON DELETE RESTRICT;
+    END IF;
     -- The entry's roster is the one its activity row already carries.
     UPDATE `join` j
       JOIN activity a ON a.type = 'doing' AND a.id = j.id
        SET j.roster_id = a.roster_id;
     RENAME TABLE `join` TO doing;
+  END IF;
+
+  -- 4. on_type points at any activity but doing (a book migrated by an earlier
+  -- build of this file has mail/todo only). Widening keeps every value.
+  IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doing' AND COLUMN_NAME = 'on_type' AND COLUMN_TYPE <> 'enum(''mail'',''todo'',''hold'',''score'')') > 0 THEN
+    ALTER TABLE doing MODIFY on_type ENUM('mail','todo','hold','score') NULL;
   END IF;
 END //
 

@@ -3072,6 +3072,22 @@ HANDLERS = {
 }
 
 
+JOIN_TYPE_GONE = (
+    "{command}: type join is gone; the activity is doing now (mill 0.7.16)."
+    " This mill client is older than the office: pip install -U the-mill, then use doing."
+)
+
+
+def _refuse_join_type(command: str, body: dict[str, Any]) -> None:
+    """#818: a TYPE of join comes only from a client older than the office.
+    Refuse it plainly, before any handler or SQL, and name the upgrade."""
+    if command == "join":
+        return
+    for key in ("type", "type_b", "kind"):
+        if str(body.get(key) or "").strip().lower() == "join":
+            raise CoordError(JOIN_TYPE_GONE.format(command=command or "mill"))
+
+
 def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
     from agent_coord.client.outbound import WALL, canonical_command
 
@@ -3091,6 +3107,7 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
     owner = _stored(owner_raw) if owner_raw else None
     if command not in WALL:
         raise CoordError(f"unknown mill command {command}")
+    _refuse_join_type(command, body)
     if command not in OPEN_COMMANDS:
         from agent_coord.client.session_errors import (
             SESSION_INVALID_REJOIN,
@@ -3257,6 +3274,7 @@ def dispatch_ws(
     # client. `host` (the Admin office-host marker) is re-set below only from a
     # verified loopback transport peer, never from the /ws args.
     _strip_server_only(body)
+    _refuse_join_type(v, body)
     from agent_coord.server.admin.guard import mark_host
 
     if peer and not forwarded:

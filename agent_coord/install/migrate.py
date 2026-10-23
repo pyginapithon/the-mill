@@ -628,7 +628,8 @@ def _ensure_join_endpoint_key(cn) -> list[str]:
     applied: list[str] = []
     cur = cn.cursor()
     try:
-        if _table_exists(cur, "join") and not _column_exists(cur, "join", "endpoint_key"):
+        # #818: only a seat-shaped join (a run cut after the reshape has no endpoint_url).
+        if _table_exists(cur, "join") and _column_exists(cur, "join", "endpoint_url") and not _column_exists(cur, "join", "endpoint_key"):
             cur.execute(
                 "ALTER TABLE `join` ADD COLUMN endpoint_key "
                 "VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER endpoint_url"
@@ -648,7 +649,8 @@ def _ensure_join_wake_on(cn) -> list[str]:
     applied: list[str] = []
     cur = cn.cursor()
     try:
-        if _table_exists(cur, "join") and not _column_exists(cur, "join", "wake_on"):
+        # #818: only a seat-shaped join (a run cut after the reshape has no endpoint_key).
+        if _table_exists(cur, "join") and _column_exists(cur, "join", "endpoint_key") and not _column_exists(cur, "join", "wake_on"):
             cur.execute(
                 "ALTER TABLE `join` ADD COLUMN wake_on "
                 "ENUM('all','addressed') NOT NULL DEFAULT 'all' AFTER endpoint_key"
@@ -940,6 +942,14 @@ def doing_818_needed(cn) -> bool:
     cur = cn.cursor()
     try:
         if _table_exists(cur, "join"):
+            return True
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doing' AND COLUMN_NAME = 'on_type'"
+            " AND COLUMN_TYPE <> %s",
+            ("enum('mail','todo','hold','score')",),
+        )
+        if int(cur.fetchone()[0] or 0) > 0:
             return True
         cur.execute(
             "SELECT COUNT(*) FROM information_schema.COLUMNS"

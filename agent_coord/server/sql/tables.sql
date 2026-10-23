@@ -205,8 +205,8 @@ CREATE TABLE IF NOT EXISTS seat (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 -- #818: what a desk is doing. Append-only: one row per entry, never overwritten.
--- The desk's current doing is its newest row. on_* is the letter or card the
--- entry is about; waiting_* is what it waits on. Both optional (PR B writes them).
+-- The desk's current doing is its newest row. on_* is the activity the entry
+-- is about (any type but doing); waiting_* is what it waits on. Both optional (PR B writes them).
 CREATE TABLE IF NOT EXISTS doing (
   type          ENUM('mail','todo','doing','hold','score') NOT NULL DEFAULT 'doing',
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS doing (
   desk_id       BIGINT UNSIGNED NOT NULL,
   roster_id     BIGINT UNSIGNED NOT NULL DEFAULT 1,
   text          VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
-  on_type       ENUM('mail','todo') NULL,
+  on_type       ENUM('mail','todo','hold','score') NULL,
   on_id         BIGINT UNSIGNED NULL,
   waiting_type  ENUM('mail','todo') NULL,
   waiting_id    BIGINT UNSIGNED NULL,

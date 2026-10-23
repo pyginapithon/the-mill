@@ -141,3 +141,16 @@ def test_empty_signal_text_is_not_swallowed_270(live, monkeypatch):
     monkeypatch.setattr("agent_coord.server.records.mail.to_node_delete", boom)
     with pytest.raises(_SqlRefusal):
         _go({"verb": "remove", "type": "mail", "id": 7, "who": "peer"})
+
+
+@pytest.mark.parametrize("command,args", [
+    ("add", {"type": "join", "id": 3}),
+    ("remove", {"type": "join", "id": 3}),
+    ("label-add", {"type": "join", "id": 3, "label": "x"}),
+    ("move", {"type": "join", "id": 3, "type_b": "join"}),
+])
+def test_old_client_join_type_over_ws_names_the_upgrade(live, command, args):
+    """#818: a 0.7.15 client still sends TYPE join; the refusal names the upgrade, nothing runs."""
+    with pytest.raises(CoordError, match="pip install -U the-mill"):
+        rpc.dispatch_ws(_Book(), "builder", command, dict(args))
+    assert live["hint"] == [] and live["del"] == [] and live["put"] == [] and live["drop"] == []

@@ -5,7 +5,9 @@
 (b) the seat holds the per-desk state and connect, socket, wake and reset
     behave as before;
 (c) mill doing appends a new entry, it never overwrites;
-(d) the migration is idempotent (a second ensure changes nothing).
+(d) the migration is idempotent (a second ensure changes nothing);
+(e) on_type points at any activity but doing, and a narrower list converges;
+(f) a run killed between any two statements converges on the next ensure.
 
 The pre-818 book is built on a wiped tip book: drop seat and doing, put the
 old type lists back, create the old `join` table and fill it.
@@ -249,3 +251,155 @@ def test_d_migration_is_idempotent(cn, migrated):
         cur.close()
     assert snap() == was
     assert {t: _ctype(cn, t) for t in TYPE_TABLES + ("doing", "watcher")} == types
+
+
+def _col(cn, table: str, col: str) -> str:
+    return str(scalar_done(
+        cn,
+        "SELECT COLUMN_TYPE FROM information_schema.COLUMNS"
+        " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+        (table, col),
+    ) or "")
+
+
+def test_e_on_points_at_any_activity_but_doing(cn, migrated):
+    """on_type is any activity type except doing itself; a narrower list converges."""
+    want = "enum('mail','todo','hold','score')"
+    assert _col(cn, "doing", "on_type") == want
+    did = _desk_id(cn, "fx818-a")
+    _x(cn, "INSERT INTO doing (desk_id, text, on_type, on_id) VALUES (%s, 'on a hold', 'hold', 1)", (did,))
+    _x(cn, "INSERT INTO doing (desk_id, text, on_type, on_id) VALUES (%s, 'on a score', 'score', 1)", (did,))
+    with pytest.raises(Exception):
+        _x(cn, "INSERT INTO doing (desk_id, text, on_type, on_id) VALUES (%s, 'on itself', 'doing', 1)", (did,))
+    cn.rollback()
+    # A book migrated by an earlier build (mail/todo only) widens on the next ensure.
+    _x(cn, "DELETE FROM doing WHERE on_type IN ('hold', 'score')")
+    _x(cn, "INSERT INTO doing (desk_id, text, on_type, on_id) VALUES (%s, 'on a card', 'todo', 9)", (did,))
+    _x(cn, "ALTER TABLE doing MODIFY on_type ENUM('mail','todo') NULL")
+    cn.commit()
+    assert migrate.doing_818_needed(cn)
+    migrate.ensure(cn)
+    assert _col(cn, "doing", "on_type") == want
+    assert not migrate.doing_818_needed(cn)
+    assert scalar_done(cn, "SELECT COUNT(*) FROM doing WHERE on_type = 'todo' AND on_id = 9") == 1
+
+
+# ---- resumable: a run killed between any two statements converges on ensure ----
+
+FKS_818 = ("fk_label_activity", "fk_tree_activity", "fk_mail_to_mail", "fk_seat_desk", "fk_doing_desk", "fk_doing_roster")
+
+
+def _shape(cn) -> dict:
+    """Everything the migration decides: lists, columns, keys, rows."""
+    out: dict = {t: _ctype(cn, t) for t in TYPE_TABLES + ("doing", "watcher")}
+    out["tables"] = (_has_table(cn, "join"), _has_table(cn, "seat"), _has_table(cn, "doing"))
+    out["doing_cols"] = [tuple(r.values()) for r in rows_done(
+        cn,
+        "SELECT COLUMN_NAME, COLUMN_TYPE FROM information_schema.COLUMNS"
+        " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doing' ORDER BY ORDINAL_POSITION")]
+    out["keys"] = sorted(tuple(r.values()) for r in rows_done(
+        cn,
+        "SELECT TABLE_NAME, INDEX_NAME FROM information_schema.STATISTICS"
+        " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('seat', 'doing') GROUP BY TABLE_NAME, INDEX_NAME"))
+    out["fks"] = sorted(tuple(r.values()) for r in rows_done(
+        cn,
+        "SELECT TABLE_NAME, CONSTRAINT_NAME, DELETE_RULE FROM information_schema.REFERENTIAL_CONSTRAINTS"
+        " WHERE CONSTRAINT_SCHEMA = DATABASE() AND CONSTRAINT_NAME IN (" + ",".join(["%s"] * len(FKS_818)) + ")",
+        FKS_818))
+    out["doing_rows"] = [tuple(r.values()) for r in rows_done(
+        cn, "SELECT id, desk_id, roster_id, text, on_type, waiting_type FROM doing ORDER BY id")]
+    out["seat_rows"] = [tuple(r.values()) for r in rows_done(
+        cn, "SELECT id, desk_id, token_hash, delivery_mode, endpoint_url, endpoint_key, wake_on, lan_ip FROM seat ORDER BY id")]
+    for t in ("activity", "watcher", "label"):
+        out[t + "_rows"] = [tuple(r.values()) for r in rows_done(
+            cn, f"SELECT type, id FROM `{t}` WHERE id IN (1, 7, 11, 12) ORDER BY type, id")]
+    out["triggers"] = sorted(r["TRIGGER_NAME"] for r in rows_done(
+        cn, "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()"))
+    return out
+
+
+def _helpers(cn) -> None:
+    """Create the file's retype helper, as a killed run would have left it."""
+    stmts = migrate.split_script((migrate.sql_dir() / migrate.DOING_818).read_text(encoding="utf-8"))
+    body = [s for s in stmts if s.lstrip().upper().startswith("CREATE PROCEDURE MILL_MIGRATE_818_RETYPE")]
+    assert len(body) == 1
+    _x(cn, "DROP PROCEDURE IF EXISTS mill_migrate_818_retype")
+    _x(cn, body[0])
+
+
+ALL10 = ("activity", "label", "tree", "mail", "mail_to", "todo", "join", "hold", "score", "watcher")
+SEAT_CREATE = next(
+    s for s in migrate.split_script((migrate.sql_dir() / "tables.sql").read_text(encoding="utf-8"))
+    if s.lstrip().startswith("CREATE TABLE IF NOT EXISTS seat")
+)
+SEAT_COPY = (
+    "INSERT IGNORE INTO seat (id, desk_id, created, updated, token_hash, delivery_mode, endpoint_url,"
+    " endpoint_key, wake_on, lan_ip, time_connect, time_disconnect)"
+    " SELECT id, desk_id, created, updated, token_hash, delivery_mode, endpoint_url, endpoint_key,"
+    " wake_on, lan_ip, time_connect, time_disconnect FROM `join`"
+)
+DROP_FKS = [
+    "ALTER TABLE label DROP FOREIGN KEY fk_label_activity",
+    "ALTER TABLE tree DROP FOREIGN KEY fk_tree_activity",
+    "ALTER TABLE mail_to DROP FOREIGN KEY fk_mail_to_mail",
+]
+WIDEN = [f"CALL mill_migrate_818_retype('{t}', 'widen')" for t in ALL10]
+MOVE = [f"UPDATE `{t}` SET type = 'doing' WHERE type = 'join'" for t in ALL10]
+FINAL = [f"CALL mill_migrate_818_retype('{t}', 'final')" for t in ALL10]
+ADD_FKS = [
+    "ALTER TABLE label ADD CONSTRAINT fk_label_activity FOREIGN KEY (type, id) REFERENCES activity (type, id) ON DELETE CASCADE",
+    "ALTER TABLE tree ADD CONSTRAINT fk_tree_activity FOREIGN KEY (type, id) REFERENCES activity (type, id) ON DELETE RESTRICT",
+    "ALTER TABLE mail_to ADD CONSTRAINT fk_mail_to_mail FOREIGN KEY (type, id) REFERENCES mail (type, id) ON DELETE CASCADE",
+]
+RESHAPE_PREP = [
+    "ALTER TABLE `join` DROP FOREIGN KEY fk_join_desk",
+    "ALTER TABLE `join` DROP INDEX idx_desk",
+    "ALTER TABLE `join` DROP INDEX idx_lan_updated",
+    "ALTER TABLE `join` DROP INDEX idx_token_hash",
+]
+RESHAPE = (
+    "ALTER TABLE `join` RENAME COLUMN doing TO text,"
+    " ADD COLUMN roster_id BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER desk_id,"
+    " ADD COLUMN on_type ENUM('mail','todo','hold','score') NULL AFTER text,"
+    " ADD COLUMN on_id BIGINT UNSIGNED NULL AFTER on_type,"
+    " ADD COLUMN waiting_type ENUM('mail','todo') NULL AFTER on_id,"
+    " ADD COLUMN waiting_id BIGINT UNSIGNED NULL AFTER waiting_type,"
+    " DROP COLUMN updated, DROP COLUMN token_hash, DROP COLUMN delivery_mode, DROP COLUMN endpoint_url,"
+    " DROP COLUMN endpoint_key, DROP COLUMN wake_on, DROP COLUMN lan_ip, DROP COLUMN time_connect,"
+    " DROP COLUMN time_disconnect,"
+    " ADD KEY idx_desk_created (desk_id, created), ADD KEY idx_on (on_type, on_id),"
+    " ADD CONSTRAINT fk_doing_desk FOREIGN KEY (desk_id) REFERENCES name (id) ON DELETE RESTRICT,"
+    " ADD CONSTRAINT fk_doing_roster FOREIGN KEY (roster_id) REFERENCES name (id) ON DELETE RESTRICT"
+)
+# The file's statements in order. A cut at k means the run died after the first k.
+STEPS = [SEAT_CREATE, SEAT_COPY, *DROP_FKS, *WIDEN, *MOVE, *FINAL, *ADD_FKS, *RESHAPE_PREP, RESHAPE]
+# Every boundary inside each phase, plus mid-phase cuts.
+CUTS = sorted({0, 1, 2, 3, 5, 6, 8, 15, 16, 20, 25, 26, 30, 35, 36, 38, 39, 40, 41, 43, 44, len(STEPS)})
+
+
+def _fresh_old_book(cn) -> None:
+    from agent_coord.server.records import apply
+
+    apply(cn, wipe=True)
+    migrate.ensure(cn)
+    _old_book(cn)
+
+
+def test_f_a_killed_run_converges_from_every_cut(cn):
+    """Validator stage 1: kill between alters, run ensure again, same end state."""
+    _fresh_old_book(cn)
+    migrate.ensure(cn)
+    want = _shape(cn)
+    assert want["tables"] == (False, True, True)
+    for cut in CUTS:
+        _fresh_old_book(cn)
+        _helpers(cn)
+        _x(cn, "DROP TRIGGER IF EXISTS join_no_delete_in_tree")
+        for stmt in STEPS[:cut]:
+            _x(cn, stmt)
+        cn.commit()
+        assert migrate.doing_818_needed(cn), cut
+        migrate.ensure(cn)
+        assert not migrate.doing_818_needed(cn), cut
+        got = _shape(cn)
+        assert got == want, (cut, {k: (got[k], want[k]) for k in want if got[k] != want[k]})
