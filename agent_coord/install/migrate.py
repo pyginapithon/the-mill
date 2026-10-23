@@ -1086,7 +1086,10 @@ def _read_stamp(cur, fn: str) -> str:
         row = cur.fetchone()
         return str((row or [""])[0] or "")
     except Exception as e:
-        if getattr(e, "errno", None) != 1305:  # FUNCTION does not exist: a book from before the stamp
+        # 1305: no such function, a book from before the stamp. 1449: its definer
+        # is not a user here (a dump restored on another server). Either way the
+        # routines are not known to be this pack's: unstamped, so ensure reloads them.
+        if getattr(e, "errno", None) not in (1305, 1449):
             raise
         return ""
 

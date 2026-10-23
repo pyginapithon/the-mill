@@ -521,3 +521,36 @@ def test_h_sql_state_flags_a_missing_or_changed_routine(cn):
     assert migrate.sql_state(cn)["ok"] is False
     migrate.ensure(cn)
     assert migrate.sql_state(cn)["ok"] is True
+
+
+def test_i_a_book_whose_routines_name_a_missing_definer_converges(cn):
+    """A dump restored on another server keeps DEFINER = a user that is not
+    there; calling the stamp then fails with 1449. ensure must read that as
+    unstamped and reload, not crash before the reload."""
+    from agent_coord.server.records import apply
+
+    apply(cn, wipe=True)
+    migrate.ensure(cn)
+    gone = "`gone_818`@`localhost`"
+    redefined = 0
+    for r in rows_done(cn, "SELECT ROUTINE_TYPE AS t, ROUTINE_NAME AS n FROM information_schema.ROUTINES"
+                           " WHERE ROUTINE_SCHEMA = DATABASE()"):
+        rtype, name = r["t"], r["n"]
+        ddl = rows_done(cn, f"SHOW CREATE {rtype} `{name}`")[0][f"Create {rtype.title()}"]
+        rest = ddl.partition(f" {rtype} ")[2]
+        try:
+            _x(cn, f"DROP {rtype} `{name}`")
+            _x(cn, f"CREATE DEFINER={gone} {rtype} {rest}")
+        except Exception as e:  # no SET_USER_ID here: the case cannot be built
+            if getattr(e, "errno", None) in (1227, 1044):
+                pytest.skip("this server user cannot create routines for another definer")
+            raise
+        redefined += 1
+    cn.commit()
+    assert redefined > 2
+    st = migrate.sql_state(cn)
+    assert st["ok"] is False
+    migrate.ensure(cn)
+    assert migrate.sql_state(cn)["ok"] is True
+    assert scalar_done(cn, "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE()"
+                           " AND DEFINER = 'gone_818@localhost'") == 0
