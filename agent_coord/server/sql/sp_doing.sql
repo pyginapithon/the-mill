@@ -219,9 +219,9 @@ BEGIN
     ) lst ON TRUE
    ORDER BY IFNULL(cur.created, '1970-01-01') DESC, d.name;
 
-  SELECT 'letter' AS part, x.desk, x.id, x.sender, x.age_s, x.n
+  SELECT 'letter' AS part, x.desk, x.id, x.sender, x.age_s, x.n, x.asked
     FROM (
-      SELECT d.name AS desk, m.id, sd.name AS sender,
+      SELECT d.name AS desk, m.id, sd.name AS sender, mt.asked,
              TIMESTAMPDIFF(SECOND, m.created, v_now) AS age_s,
              COUNT(*) OVER (PARTITION BY mt.desk_id) AS n,
              ROW_NUMBER() OVER (PARTITION BY mt.desk_id ORDER BY m.created DESC, m.id DESC) AS rn

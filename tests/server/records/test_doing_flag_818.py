@@ -469,7 +469,7 @@ def test_connected_shows_who_is_waiting_on_the_desk(w):
     w.ok(["watch", "todo", str(tid)], desk=PEER)
     view = w.me()
     letters = view["waiting_on_it"]["letters"]
-    assert letters["n"] >= 1 and letters["newest"][0] == {"id": f"mail-{mid}", "from": PEER, "age": letters["newest"][0]["age"]}
+    assert letters["n"] >= 1 and letters["newest"][0] == {"id": f"mail-{mid}", "from": PEER, "age": letters["newest"][0]["age"], "asked": True}
     assert len(letters["newest"]) <= 3
     cards = view["waiting_on_it"]["cards"]
     assert cards["n"] >= 1 and any(c["id"] == f"todo-{tid}" and PEER in c["watchers"] for c in cards["newest"])

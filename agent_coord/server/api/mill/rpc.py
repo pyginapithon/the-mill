@@ -714,7 +714,8 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
         if last_text:
             head += f' (last: "{last_text}"' + (f" on {out['last']['on']}" if out["last"]["on"] else "") + ")"
     letters = [
-        {"id": f"mail-{int(x['id'])}", "from": _stored(x.get("sender") or ""), "age": _age(x.get("age_s"))}
+        {"id": f"mail-{int(x['id'])}", "from": _stored(x.get("sender") or ""), "age": _age(x.get("age_s")),
+         "asked": bool(x.get("asked"))}  # #820: always true here, a copy never waits
         for x in by["letter"]
     ]
     cards = [
