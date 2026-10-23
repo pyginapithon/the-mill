@@ -13,7 +13,7 @@ Tables in `agent_coord/server/sql/tables.sql`. Python: `agent_coord/server/recor
 | `mail` | letter (sender `desk_id`, body, `roster_id`). No dest. |
 | `mail_to` | dest `desk_id`, `opened`, `receipt`, `asked` (1 named on the letter, 0 copied: reached only as a room member on reply-all; waiting on a desk counts asked rows). No roster column. JOIN `name` for the desk name. Survives mill member-remove. |
 | `member` | N-N `(name_id, desk_id)`. `name_id` is a project or a role. Not a label. `name.n` = desk count. |
-| `todo` | One JSON `body`. The floor prints `need_id`: the need string the creator passed, kept in that JSON body (`todo.py` reads it back from the `slug` key). **`need_id` is not a name tuple** (not `(type, name)` / not `ROLE_` / `PROJ_` speech). There is no need column. `updated_id` last desk that wrote; `creator_id` mill create todo; `assigned_id` claimer; `roster_id` project or role. |
+| `todo` | One JSON `body`. The floor prints `need_id`: the need string the creator passed, kept in that JSON body (`todo.py` reads it back from the `slug` key). **`need_id` is not a name tuple** (not `(type, name)` / not `ROLE_` / `PROJ_` speech). There is no need column. `updated_id` last desk that wrote; `creator_id` mill create todo; `assigned_id` claimer; `claimed_at` when the card became claimed or its volunteer changed (NULL when not claimed; a claimed card's age in `mill connected`); `roster_id` project or role. |
 | `` `join` `` | live seat; unique `desk_id`. Groups and roles are `member`. `doing` VARCHAR(512). Desk bearer is `token_hash`. |
 | `human` | one person. They hold the bearer. The book stores `bearer_hash`. `directory_sub` is the directory or IAM subject. |
 | `human_desk` | one human, many desks. One desk, one human. |
