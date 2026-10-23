@@ -6,7 +6,7 @@ from typing import Any
 
 from agent_coord.const import (
     CONST_HOLD,
-    CONST_JOIN,
+    CONST_DOING,
     CONST_MAIL,
     CONST_OFFICE,
     CONST_SCORE,
@@ -640,7 +640,7 @@ def _tree_face(typ: str, raw: dict, meta: dict) -> tuple[str, str, str]:
     status = str(meta.get("status") or "")
     who = str(meta.get("who") or "")
     iid = raw.get("id")
-    if typ == CONST_JOIN:
+    if typ == CONST_DOING:
         desk = _nm(str(raw.get("join_desk") or ""))
         doing = _clip(str(raw.get("join_doing") or ""))
         label = desk or title or f"join {iid}"

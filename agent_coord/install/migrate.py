@@ -270,7 +270,7 @@ def _ensure_watcher_hint(cn) -> list[str]:
 # Whole-file procedure refresh. Every DROP/CREATE PROCEDURE in these files is
 # re-applied on each ensure. mill_join_upsert and mill_member_put/delete once
 # called mill_watcher_put/delete('name', ...). Tip mill_watcher_* take
-# ENUM('todo','join','hold','score'), so a stale caller fails the seat mint.
+# ENUM('todo','doing','hold','score') (#818; 'join' before), so a stale caller fails the seat mint.
 # sp_name.sql rides along (name_type shape: mill_name_host/delete/rename/reclaim).
 # Order: after _ensure_watcher_hint so the callees are tip first.
 # sp_hold.sql: an existing book must pick up the #194 re-hold refresh in mill_hold_upsert.
@@ -296,7 +296,7 @@ _SP_FULL_REFRESH: tuple[str, ...] = (
 _PAYLOAD_ACTIVITY_FKS: tuple[tuple[str, str], ...] = (
     ("mail", "fk_mail_activity"),
     ("todo", "fk_todo_activity"),
-    ("join", "fk_join_activity"),
+    ("join", "fk_join_activity"),  # pre-#818 books; the 818 migration renames join to doing
     ("hold", "fk_hold_activity"),
     ("score", "fk_score_activity"),
 )
@@ -409,7 +409,8 @@ def _ensure_activity_soft_delete(cn) -> list[str]:
                 "mail_no_delete_in_tree",
                 "hold_no_delete_in_tree",
                 "hold_no_delete",
-                "join_no_delete_in_tree",
+                "join_no_delete_in_tree",  # DROP only: pre-#818 books (#818 renames join to doing)
+                "doing_no_delete_in_tree",
                 "score_no_delete_in_tree",
                 "name_no_delete",
             )
@@ -476,7 +477,9 @@ def _ensure_activity_soft_delete(cn) -> list[str]:
 # _PAYLOAD_ACTIVITY_FKS); do not list one here or ensure would add it back.
 # Kept as they are: fk_label_activity (CASCADE), fk_mail_to_mail (CASCADE), human_* FKs.
 _FK_RULES: tuple[tuple[str, str, str, str, str, str], ...] = (
-    ("join", "fk_join_desk", "desk_id", "name", "id", "RESTRICT"),  # #96
+    ("seat", "fk_seat_desk", "desk_id", "name", "id", "RESTRICT"),  # #96 (#818: was join)
+    ("doing", "fk_doing_desk", "desk_id", "name", "id", "RESTRICT"),  # #818
+    ("doing", "fk_doing_roster", "roster_id", "name", "id", "RESTRICT"),  # #818
     ("score_evidence", "fk_score_evidence_score", "score_id", "score", "id", "RESTRICT"),  # #95
     ("score_point", "fk_score_point_score", "score_id", "score", "id", "RESTRICT"),  # #288
     ("score_point", "fk_score_point_desk", "desk_id", "name", "id", "RESTRICT"),  # #288
@@ -600,7 +603,7 @@ def _ensure_push_expired(cn) -> list[str]:
 
 
 def _ensure_join_token_hash(cn) -> list[str]:
-    """Index join.token_hash so bearer lookup is not a full seat scan."""
+    """Index join.token_hash so bearer lookup is not a full seat scan (pre-#818 books)."""
     applied: list[str] = []
     cur = cn.cursor()
     try:
@@ -857,6 +860,7 @@ def _ensure_label_ord(cn) -> list[str]:
 
 
 ROSTER_070 = "migrate_070_roster.sql"
+DOING_818 = "migrate_818_doing.sql"
 
 
 def roster_070_needed(cn) -> bool:
@@ -929,6 +933,44 @@ def apply_roster_070(cn) -> list[str]:
     finally:
         cur.close()
     return [ROSTER_070] + reload_routines(cn)
+
+
+def doing_818_needed(cn) -> bool:
+    """#818: True while the book has a `join` table or a type column that lists 'join'."""
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "join"):
+            return True
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'type'"
+            " AND TABLE_NAME IN ('activity','label','tree','mail','mail_to','todo','doing','hold','score','watcher')"
+            " AND COLUMN_TYPE LIKE %s",
+            ("%'join'%",),
+        )
+        return int(cur.fetchone()[0] or 0) > 0
+    finally:
+        cur.close()
+
+
+def apply_doing_818(cn) -> list[str]:
+    """#818: seat split off, activity type join renamed to doing, the `join`
+    table becomes the append-only doing table (same ids). Then reload every
+    routine. Each step in the file checks the book first, so a second run (or
+    a run after a partial one) does only what is left."""
+    if not doing_818_needed(cn):
+        return []
+    cur = cn.cursor()
+    try:
+        for stmt in split_script((sql_dir() / DOING_818).read_text(encoding="utf-8-sig")):
+            cur.execute(stmt)
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return [DOING_818] + reload_routines(cn)
 
 
 SQL_FIX = "mill install sql --apply"
@@ -1016,6 +1058,8 @@ def _ensure_steps(cn) -> dict[str, Any]:
             # Column before the procedure refresh: mill_join_wake_* name it (#618).
             applied.extend(_ensure_join_endpoint_key(cn))
             applied.extend(_ensure_join_wake_on(cn))
+            # #818 after the join column steps (the seat copy reads them).
+            applied.extend(apply_doing_818(cn))
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))

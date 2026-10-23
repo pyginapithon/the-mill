@@ -87,7 +87,8 @@ def _frames(cn, typ: str, nid: int) -> dict[str, dict]:
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(push.HUB, "rooms", rooms)
         mp.setattr(push.HUB, "notify", capture)
-        fanout(cn, typ, int(nid), typ.upper())
+        # #818: doing keeps the hint word JOIN on the wire.
+        fanout(cn, typ, int(nid), "JOIN" if typ == "doing" else typ.upper())
     return {room: payload for room, payload in notified}
 
 
@@ -240,22 +241,25 @@ def test_join_doing_pushes_default_then_custom_and_dispatch_ignores(cn) -> None:
     # #280: alice's own doing does not hint alice; another watcher (bob) gets it.
     bob = "bob"
     here.upsert(cn, project, bob, "builder", token_hash="b" * 64, doing="present")
-    watchers.put(cn, "join", jid, _desk_id(cn, bob))
+    watchers.put(cn, "doing", jid, _desk_id(cn, bob))
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(push.HUB, "rooms", {desk(alice): {object()}, desk(bob): {object()}})
         mp.setattr(push.HUB, "notify", capture)
-        rpc._h_doing(Book(cn), {"doing": "chart"}, project, "alice")
+        got = rpc._h_doing(Book(cn), {"doing": "chart"}, project, "alice")
     assert notified, "doing did not push JOIN"
     assert [room for room, _ in notified] == [desk(bob)]
     payload = notified[0][1]
-    assert payload["type"] == "join"
+    # #818: a new doing entry; bob's watch followed alice's current entry to it.
+    # The hint word stays JOIN so an older desk still skips it.
+    assert payload["type"] == "doing"
+    jid = int(got["id"])
     assert int(payload["id"]) == jid
     assert payload["hint"] == "JOIN"
     check_frame(payload)
     assert dispatch_hint(alice, payload) == "skip"
 
-    watchers.set_hint(cn, "join", jid, _desk_id(cn, alice), "session")
-    frames = _frames(cn, "join", jid)
+    watchers.set_hint(cn, "doing", jid, _desk_id(cn, alice), "session")
+    frames = _frames(cn, "doing", jid)
     assert frames[desk(alice)]["detail"] == "session"
     assert frames[desk(alice)]["hint"] == "JOIN"
     check_frame(frames[desk(alice)], "session")
@@ -268,7 +272,7 @@ def test_note_connect_pushes_join(cn) -> None:
     jid = int(rec[0]["id"])
     bob = "bob"
     here.upsert(cn, "unit", bob, "builder", token_hash="b" * 64, doing="present")
-    watchers.put(cn, "join", jid, _desk_id(cn, bob))
+    watchers.put(cn, "doing", jid, _desk_id(cn, bob))
     notified: list[tuple[str, dict]] = []
 
     def capture(room, payload):

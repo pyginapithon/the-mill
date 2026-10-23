@@ -71,7 +71,7 @@ def _joins(items: list[dict], jid: int) -> list[dict]:
     return [
         it
         for it in items
-        if str(it.get("type") or "") == "join" and int(it.get("id") or 0) == jid and it.get("hint") == "JOIN"
+        if str(it.get("type") or "") == "doing" and int(it.get("id") or 0) == jid and it.get("hint") == "JOIN"
     ]
 
 
@@ -79,7 +79,7 @@ def test_connect_does_not_echo_own_join_as_missed(cn, monkeypatch) -> None:
     monkeypatch.setattr(HUB, "rooms", {})
     rec = here.upsert(cn, "unit", "alice", "builder", token_hash=token_hash(TOKEN), doing="present")
     jid = int(rec[0]["id"])
-    assert watchers.select(cn, "join", jid), "alice should watch her own join row"
+    assert watchers.select(cn, "doing", jid), "alice should watch her own doing entry"
     take_sync(cn, "alice")
 
     client = _client(monkeypatch)
@@ -94,7 +94,7 @@ def test_connect_join_still_queued_for_other_watcher(cn, monkeypatch) -> None:
     rec = here.upsert(cn, "unit", "alice", "builder", token_hash=token_hash(TOKEN), doing="present")
     jid = int(rec[0]["id"])
     here.upsert(cn, "unit", "bob", "builder", token_hash="b" * 64, doing="present")
-    watchers.put(cn, "join", jid, int(name.get(cn, "bob", "desk")))
+    watchers.put(cn, "doing", jid, int(name.get(cn, "bob", "desk")))
     take_sync(cn, "alice")
     take_sync(cn, "bob")
 

@@ -41,7 +41,7 @@ BEGIN
   END IF;
   SET v_type = NULLIF(TRIM(p_type), '');
   SET v_id = IFNULL(p_id, 0);
-  IF v_type IS NULL OR v_id = 0 OR v_type NOT IN ('mail','todo','join','hold','score') THEN
+  IF v_type IS NULL OR v_id = 0 OR v_type NOT IN ('mail','todo','doing','hold','score') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'tree node requires a payload';
   END IF;
   CALL mill_activity_put(v_type, v_id, v_ts, 1, 1, MILL_WEIGHT(v_type), NULL);

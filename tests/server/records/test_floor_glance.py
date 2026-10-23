@@ -119,7 +119,7 @@ def test_tree_face_labels_every_activity_type() -> None:
         {"title": "board", "status": "open", "who": "builder"},
     ) == ("nest", "claimed", "builder")
     assert _tree_face("mail", {"id": 9}, {"title": "note", "status": "mail", "who": "presence"})[0] == "note"
-    assert _tree_face("join", {"id": 3, "join_desk": "builder", "join_doing": "present"}, {}) == (
+    assert _tree_face("doing", {"id": 3, "join_desk": "builder", "join_doing": "present"}, {}) == (
         "builder | present",
         "join",
         "",

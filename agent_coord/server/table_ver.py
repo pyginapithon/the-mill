@@ -34,7 +34,7 @@ PANE_TABLES: dict[str, tuple[str, ...]] = {
     "tree-mail": ("tree", "mail", "name"),
     "tree-todo": ("tree", "todo", "name"),
     "todos": ("todo", "name"),
-    "agents": ("join", "name"),
+    "agents": ("seat", "doing", "name"),
     "scores": ("score", "name"),
     "holds": ("hold", "name"),
     "watchers": ("watcher", "name"),
@@ -65,7 +65,7 @@ def tables_for_proc(name: str) -> tuple[str, ...]:
     if n.startswith("mill_hold_"):
         return ("hold",)
     if n.startswith("mill_join_"):
-        return ("join",)
+        return ("seat", "doing")
     if n.startswith("mill_score_"):
         return ("score",)
     if n.startswith("mill_name_"):

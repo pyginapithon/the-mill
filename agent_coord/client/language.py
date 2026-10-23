@@ -51,10 +51,10 @@ def retype(name: str, what: str, *, yes: bool, ask: Callable[[str], str] | None 
 
 
 def _type_id(raw: str, command: str) -> tuple[str, int | str]:
-    from agent_coord.const import ACTIVITY_TYPES
+    from agent_coord.const import ACTIVITY_TYPES, activity_type
 
     kind, _, num = str(raw or "").strip().partition(":")
-    kind = kind.strip().lower()
+    kind = activity_type(kind)
     hint = (
         f"{command}: TARGET is type:id (for example todo:256, todo:cold-test/fix-login or mail:1866), type one of "
         + "|".join(sorted(ACTIVITY_TYPES))

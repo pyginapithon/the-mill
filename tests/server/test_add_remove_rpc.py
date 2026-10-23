@@ -45,11 +45,12 @@ def test_add_watch_defaults_to_self_with_hint(live):
     assert live["hint"] == [("todo", 9, 42, "need:detail")]
 
 
-@pytest.mark.parametrize("typ", ["todo", "join", "hold", "score"])
-def test_every_non_mail_kind_is_a_watcher(live, typ):
+@pytest.mark.parametrize("typ,stored", [("todo", "todo"), ("doing", "doing"), ("join", "doing"), ("hold", "hold"), ("score", "score")])
+def test_every_non_mail_kind_is_a_watcher(live, typ, stored):
+    # #818: join is read as doing for one release.
     _go({"verb": "add", "type": typ, "id": 3})
     _go({"verb": "remove", "type": typ, "id": 3})
-    assert live["hint"][-1][:3] == (typ, 3, 42) and live["del"] == [(typ, 3, 42)]
+    assert live["hint"][-1][:3] == (stored, 3, 42) and live["del"] == [(stored, 3, 42)]
     assert live["put"] == [] and live["drop"] == []
 
 

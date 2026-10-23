@@ -34,7 +34,7 @@ def _exit2(argv):
 
 @pytest.mark.parametrize("raw,want", [
     ("todo:256", ("todo", 256)), ("mail:1866", ("mail", 1866)), ("HOLD:3", ("hold", 3)),
-    ("join:7", ("join", 7)), ("score:40", ("score", 40)),
+    ("join:7", ("doing", 7)), ("doing:8", ("doing", 8)), ("score:40", ("score", 40)),
 ])
 def test_target_parses(body, raw, want):
     b = body(["add", raw])

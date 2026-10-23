@@ -3492,7 +3492,7 @@
     }
     function paintGlanceBook(b) {
       b = b || {};
-      const order = ["mail", "todo", "join", "hold", "score", "name"];
+      const order = ["mail", "todo", "doing", "hold", "score", "name"];
       const types = b.types || {};
       let html = '<h3 class="svc-h">Book</h3>';
       if (b.open === false) html += '<p class="svc-note">Activity counts could not be read.</p>';
@@ -4881,7 +4881,7 @@
           if (!unread && typeof mailMsgHumanRequiredOpen === "function" && mailMsgHumanRequiredOpen(m)) unread = true;
         }
       }
-      if (!title && (type === "name" || type === "join")) {
+      if (!title && (type === "name" || type === "doing" || type === "join")) {
         title = millNameBare(type, (node && (node.name || node.owner)) || "") || ("#" + String(id || ""));
       }
       if (!title) title = type ? (type + " #" + String(id || "")) : "(untitled)";

@@ -12,6 +12,7 @@ from typing import Any
 ROUTES: dict[str, dict[str, Any]] = {
     "heartbeat:PING": {"ignore": True},
     "join:JOIN": {"ignore": True},
+    "doing:JOIN": {"ignore": True},  # #818: join type renamed doing; hint word unchanged
     "mail:MAIL": {"verb": "inbox", "unread": True},
     "todo:TODO": {"verb": "todo"},
     "hold:HOLD": {"verb": "hold"},

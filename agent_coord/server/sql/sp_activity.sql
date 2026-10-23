@@ -20,7 +20,7 @@ DROP PROCEDURE IF EXISTS mill_activity_bucket;
 DELIMITER //
 
 CREATE PROCEDURE mill_activity_put(
-  IN p_type    ENUM('mail','todo','join','hold','score'),
+  IN p_type    ENUM('mail','todo','doing','hold','score'),
   IN p_id      BIGINT UNSIGNED,
   IN p_ts      DATETIME(6),
   IN p_desk    BIGINT UNSIGNED,
@@ -44,7 +44,7 @@ BEGIN
 END //
 
 CREATE PROCEDURE mill_watcher_put(
-  IN p_type ENUM('todo','join','hold','score'),
+  IN p_type ENUM('todo','doing','hold','score'),
   IN p_id   BIGINT UNSIGNED,
   IN p_desk BIGINT UNSIGNED
 )
@@ -53,7 +53,7 @@ BEGIN
 END //
 
 CREATE PROCEDURE mill_watcher_roster(
-  IN p_type ENUM('todo','join','hold','score'),
+  IN p_type ENUM('todo','doing','hold','score'),
   IN p_id   BIGINT UNSIGNED,
   IN p_aff  BIGINT UNSIGNED,
   IN p_desk BIGINT UNSIGNED
@@ -64,7 +64,7 @@ BEGIN
 END //
 
 CREATE PROCEDURE mill_watcher_delete(
-  IN p_type ENUM('todo','join','hold','score'),
+  IN p_type ENUM('todo','doing','hold','score'),
   IN p_id   BIGINT UNSIGNED,
   IN p_desk BIGINT UNSIGNED
 )
@@ -73,7 +73,7 @@ BEGIN
 END //
 
 CREATE PROCEDURE mill_watcher_select(
-  IN p_type ENUM('todo','join','hold','score'),
+  IN p_type ENUM('todo','doing','hold','score'),
   IN p_id   BIGINT UNSIGNED
 )
 BEGIN
@@ -83,7 +83,7 @@ BEGIN
   SELECT w.desk_id, n.name AS desk, n.type AS desk_type, w.hint, h.delivery_mode, h.endpoint_url
     FROM watcher w
     JOIN name n ON n.id = w.desk_id AND n.type = 'desk'
-    LEFT JOIN `join` h ON h.desk_id = w.desk_id
+    LEFT JOIN seat h ON h.desk_id = w.desk_id
    WHERE w.type = p_type AND w.id = p_id
   UNION ALL
   SELECT d.id, d.name, d.type, MIN(w.hint), h.delivery_mode, h.endpoint_url
@@ -91,7 +91,7 @@ BEGIN
     JOIN name r ON r.id = w.desk_id AND r.type = 'roster'
     JOIN member mb ON mb.name_id = r.id
     JOIN name d ON d.id = mb.desk_id AND d.type = 'desk' AND d.deleted IS NULL
-    LEFT JOIN `join` h ON h.desk_id = d.id
+    LEFT JOIN seat h ON h.desk_id = d.id
    WHERE w.type = p_type AND w.id = p_id
      AND NOT EXISTS (
        SELECT 1 FROM watcher x WHERE x.type = p_type AND x.id = p_id AND x.desk_id = d.id)
@@ -99,7 +99,7 @@ BEGIN
 END //
 
 CREATE PROCEDURE mill_watcher_set_hint(
-  IN p_type ENUM('todo','join','hold','score'),
+  IN p_type ENUM('todo','doing','hold','score'),
   IN p_id   BIGINT UNSIGNED,
   IN p_desk BIGINT UNSIGNED,
   IN p_hint VARCHAR(4096)
@@ -250,7 +250,7 @@ BEGIN
       CAST(DATE_FORMAT(a.updated, '%Y-%m-%d %H:%i:00') AS DATETIME(6)) AS updated,
       a.type, a.desk_id, a.roster_id, SUM(a.n) AS n,
       ANY_VALUE(dn.name) AS desk, ANY_VALUE(dn.type) AS desk_type, ANY_VALUE(an.name) AS roster, ANY_VALUE(an.type) AS roster_type
-    FROM `join` j
+    FROM seat j
     JOIN activity a
       ON a.desk_id = j.desk_id
      AND a.updated >= DATE_SUB(MILL_NOW(), INTERVAL 15 MINUTE)
@@ -275,7 +275,7 @@ BEGIN
     ORDER BY s.desk_id, e.`timestamp`;
   ELSEIF v_grain = 'hour' AND v_kind = 'lan' THEN
     SELECT s.desk_id, dn.name AS desk, dn.type AS desk_type, e.`timestamp` AS `timestamp`, e.taken, e.value
-    FROM `join` j
+    FROM seat j
     JOIN score s
       ON s.roster_id = v_office
      AND s.desk_id = j.desk_id
@@ -303,7 +303,7 @@ BEGIN
     ORDER BY s.desk_id, e.`timestamp`;
   ELSE
     SELECT s.desk_id, dn.name AS desk, dn.type AS desk_type, e.`timestamp` AS `timestamp`, e.taken, e.value
-    FROM `join` j
+    FROM seat j
     JOIN score s
       ON s.roster_id = v_office
      AND s.desk_id = j.desk_id
@@ -384,7 +384,7 @@ BEGIN
        AND m.name_id = v_name
     UNION ALL
     SELECT j.desk_id
-      FROM `join` j
+      FROM seat j
      WHERE v_kind = 'lan'
        AND j.lan_ip = p_id
   ) d
