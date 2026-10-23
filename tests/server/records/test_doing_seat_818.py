@@ -7,7 +7,9 @@
 (c) mill doing appends a new entry, it never overwrites;
 (d) the migration is idempotent (a second ensure changes nothing);
 (e) on_type points at any activity but doing, and a narrower list converges;
-(f) a run killed between any two statements converges on the next ensure.
+(f) a run killed between any two statements converges on the next ensure;
+(g) so does a run killed inside the routine reload, after the rename;
+(h) sql_state flags a missing or changed routine.
 
 The pre-818 book is built on a wiped tip book: drop seat and doing, put the
 old type lists back, create the old `join` table and fill it.
@@ -115,6 +117,11 @@ def _old_book(cn) -> dict:
            (jid, did, token_hash(tok) if tok else None, doing, mode, url, key, wake_on, lan, up, up))
         _x(cn, "INSERT INTO activity (type, id, desk_id, roster_id) VALUES ('join', %s, %s, 1)", (jid, did))
         _x(cn, "INSERT INTO watcher (type, id, desk_id) VALUES ('join', %s, %s)", (jid, did))
+    # Distinct, fixed times: the migration must keep them (2557 warnings 1 and 2).
+    _x(cn, "UPDATE `join` SET created = '2025-12-01 00:00:00' + INTERVAL id SECOND,"
+           " updated = '2026-01-05 06:07:08.123456' + INTERVAL id SECOND")
+    _x(cn, "UPDATE activity SET updated = '2026-01-02 03:04:05.5' + INTERVAL id SECOND WHERE type = 'join'")
+    _x(cn, "UPDATE watcher SET updated = '2026-01-03 03:04:05.5' + INTERVAL id SECOND")
     lbl = int(scalar_done(cn, "SELECT id FROM name WHERE type = 'label' AND name = 'fx818-lbl'"))
     _x(cn, "INSERT INTO label (type, id, name_id) VALUES ('join', 7, %s)", (lbl,))
     _x(cn, "INSERT INTO watcher (type, id, desk_id) VALUES ('name', 1, %s)", (_desk_id(cn, "fx818-b"),))
@@ -125,9 +132,18 @@ def _old_book(cn) -> dict:
 @pytest.fixture(scope="module")
 def migrated(cn):
     before = _old_book(cn)
+    stamps = lambda: {
+        t: {(r["type"], int(r["id"]), int(r["desk_id"])): r["updated"] for r in rows_done(
+            cn, f"SELECT type, id, desk_id, updated FROM `{t}`")}
+        for t in ("activity", "watcher")
+    }
+    was = stamps()
     assert migrate.doing_818_needed(cn)
     first = migrate.ensure(cn)
-    return {"before": before, "first": first}
+    doing = {int(r["id"]): r["created"] for r in rows_done(cn, "SELECT id, created FROM doing")}
+    seat = {int(r["id"]): r["created"] for r in rows_done(cn, "SELECT id, created FROM seat")}
+    return {"before": before, "first": first, "updated_before": was, "updated_after": stamps(),
+            "doing_created": doing, "seat_created": seat}
 
 
 def test_a_ids_and_pointers_resolve_as_doing(cn, migrated):
@@ -164,6 +180,21 @@ def test_a_ids_and_pointers_resolve_as_doing(cn, migrated):
         " WHERE TABLE_SCHEMA = DATABASE() AND CONSTRAINT_TYPE = 'FOREIGN KEY'")}
     assert {"fk_label_activity", "fk_tree_activity", "fk_mail_to_mail",
             "fk_seat_desk", "fk_doing_desk", "fk_doing_roster"} <= fks
+
+
+def test_a2_the_move_keeps_times(cn, migrated):
+    """2557 warn 1: the type move is not an edit, activity/watcher.updated stay.
+    Warn 2: a migrated doing entry dates from when its text was set (join.updated);
+    the seat keeps when it was made (join.created)."""
+    was, now = migrated["updated_before"], migrated["updated_after"]
+    for t in ("activity", "watcher"):
+        moved = {(("doing" if typ == "join" else typ), i, d): v for (typ, i, d), v in was[t].items()}
+        assert now[t] == moved, t
+    for desk, jid, *_ in OLD_ROWS:
+        old = migrated["before"][desk]
+        assert migrated["doing_created"][jid] == old["updated"], desk
+        assert migrated["doing_created"][jid] != old["created"], desk
+        assert migrated["seat_created"][jid] == old["created"], desk
 
 
 def test_b_seat_holds_state_and_behaves(cn, migrated):
@@ -313,6 +344,11 @@ def _shape(cn) -> dict:
     for t in ("activity", "watcher", "label"):
         out[t + "_rows"] = [tuple(r.values()) for r in rows_done(
             cn, f"SELECT type, id FROM `{t}` WHERE id IN (1, 7, 11, 12) ORDER BY type, id")]
+    cur = cn.cursor()
+    try:
+        out["routines"] = migrate._routine_rows(cur)
+    finally:
+        cur.close()
     out["triggers"] = sorted(r["TRIGGER_NAME"] for r in rows_done(
         cn, "SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()"))
     return out
@@ -403,3 +439,81 @@ def test_f_a_killed_run_converges_from_every_cut(cn):
         assert not migrate.doing_818_needed(cn), cut
         got = _shape(cn)
         assert got == want, (cut, {k: (got[k], want[k]) for k in want if got[k] != want[k]})
+
+
+def _run_file(cn) -> None:
+    cur = cn.cursor()
+    try:
+        for stmt in migrate.split_script((migrate.sql_dir() / migrate.DOING_818).read_text(encoding="utf-8")):
+            cur.execute(stmt)
+        cn.commit()
+    finally:
+        cur.close()
+
+
+def _reload_stmts() -> list[str]:
+    out: list[str] = []
+    for path in migrate.sql_apply_order():
+        if path.stem.startswith("fn_") or path.stem.startswith("sp_"):
+            out.extend(migrate.split_script(path.read_text(encoding="utf-8-sig")))
+    return out
+
+
+def test_g_a_run_killed_in_the_routine_reload_converges(cn):
+    """2557 claim 6: killed after RENAME TABLE join TO doing, inside the routine
+    reload. The book is flagged (sql_state not ok) and the next ensure reloads,
+    so routine bodies equal a clean run's, with none missing."""
+    _fresh_old_book(cn)
+    migrate.ensure(cn)
+    want = _shape(cn)
+    assert migrate.sql_state(cn)["ok"] is True
+    stmts = _reload_stmts()
+    n = len(stmts)
+    # None: the file finished, the reload never started. 0: functions dropped only.
+    for cut in (None, 0, 1, n // 4, n // 2, n - 1):
+        _fresh_old_book(cn)
+        # The old pack's routine, as on the cloud book: names the old table.
+        _x(cn, "DROP PROCEDURE IF EXISTS mill_floor_fp")
+        _x(cn, "CREATE PROCEDURE mill_floor_fp() SELECT COUNT(*) FROM `join`")
+        cn.commit()
+        _run_file(cn)
+        assert not _has_table(cn, "join") and not migrate.doing_818_needed(cn), cut
+        if cut is not None:
+            cur = cn.cursor()
+            try:
+                migrate._drop_functions(cur)
+                for stmt in stmts[:cut]:
+                    migrate._apply_stmt(cur, stmt)
+                cn.commit()
+            finally:
+                cur.close()
+        st = migrate.sql_state(cn)
+        assert st["ok"] is False and st.get("routines"), (cut, st)
+        migrate.ensure(cn)
+        assert migrate.sql_state(cn)["ok"] is True, cut
+        migrate.ensure(cn)  # and a further run changes nothing
+        got = _shape(cn)
+        assert got == want, (cut, {k: "differs" for k in want if got[k] != want[k]})
+        assert scalar_done(cn, "SELECT COUNT(*) FROM information_schema.ROUTINES"
+                               " WHERE ROUTINE_SCHEMA = DATABASE() AND ROUTINE_DEFINITION LIKE %s", ("%`join`%",)) == 0
+
+
+def test_h_sql_state_flags_a_missing_or_changed_routine(cn):
+    """A routine dropped or changed by hand after ensure is not this pack's SQL."""
+    from agent_coord.server.records import apply
+
+    apply(cn, wipe=True)
+    migrate.ensure(cn)
+    assert migrate.sql_state(cn)["ok"] is True
+    _x(cn, "DROP FUNCTION IF EXISTS MILL_SCORE_DOC_ADD")
+    cn.commit()
+    st = migrate.sql_state(cn)
+    assert st["ok"] is False and "mill_score_doc_add" in st["routines"].lower()
+    migrate.ensure(cn)
+    assert migrate.sql_state(cn)["ok"] is True
+    _x(cn, "DROP PROCEDURE IF EXISTS mill_floor_scope_load")
+    _x(cn, "CREATE PROCEDURE mill_floor_scope_load() SELECT 1")
+    cn.commit()
+    assert migrate.sql_state(cn)["ok"] is False
+    migrate.ensure(cn)
+    assert migrate.sql_state(cn)["ok"] is True

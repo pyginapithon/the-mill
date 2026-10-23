@@ -112,9 +112,10 @@ BEGIN
   CALL mill_migrate_818_retype('score', 'widen');
   CALL mill_migrate_818_retype('watcher', 'widen');
 
-  -- 2b. Move the rows.
+  -- 2b. Move the rows. updated = updated: the type move is not an edit, so
+  -- ON UPDATE CURRENT_TIMESTAMP must not stamp every moved row as new.
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'activity' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE activity SET type = 'doing' WHERE type = 'join';
+    UPDATE activity SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'label' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
     UPDATE label SET type = 'doing' WHERE type = 'join';
@@ -129,19 +130,19 @@ BEGIN
     UPDATE mail_to SET type = 'doing' WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'todo' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE todo SET type = 'doing' WHERE type = 'join';
+    UPDATE todo SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'join' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE `join` SET type = 'doing' WHERE type = 'join';
+    UPDATE `join` SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'hold' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE hold SET type = 'doing' WHERE type = 'join';
+    UPDATE hold SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'score' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE score SET type = 'doing' WHERE type = 'join';
+    UPDATE score SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
   IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'watcher' AND COLUMN_NAME = 'type' AND COLUMN_TYPE LIKE '%''join''%') > 0 THEN
-    UPDATE watcher SET type = 'doing' WHERE type = 'join';
+    UPDATE watcher SET type = 'doing', updated = updated WHERE type = 'join';
   END IF;
 
   -- 2c. Drop 'join'; 'doing' takes its place in the list.
@@ -188,6 +189,9 @@ BEGIN
     END IF;
     -- guarded: a run killed after this one ALTER resumes at the roster copy.
     IF (SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'join' AND COLUMN_NAME = 'doing') > 0 THEN
+    -- A doing entry's time is when its text was last set: join.updated, not
+    -- join.created (when the seat was made; seat keeps that). Same values on a re-run.
+    UPDATE `join` SET created = updated, updated = updated;
     ALTER TABLE `join`
       RENAME COLUMN doing TO text,
       ADD COLUMN roster_id BIGINT UNSIGNED NOT NULL DEFAULT 1 AFTER desk_id,

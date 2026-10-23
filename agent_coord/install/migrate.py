@@ -980,7 +980,10 @@ def apply_doing_818(cn) -> list[str]:
         raise
     finally:
         cur.close()
-    return [DOING_818] + reload_routines(cn)
+    # The routine reload is not here: _ensure_steps reloads after this step
+    # whenever the routines are not this pack's, so a run killed after the
+    # RENAME (when this check is already false) still gets its reload.
+    return [DOING_818]
 
 
 SQL_FIX = "mill install sql --apply"
@@ -1015,21 +1018,101 @@ def _stamp_sql(cn, digest: str) -> None:
         cur.close()
 
 
-def sql_state(cn) -> dict[str, Any]:
-    """Does the book hold this pack's SQL? Read only. ok, pack and book (12 hex each), fix."""
-    pack = sql_digest()
+_ROUTINES_FN = "MILL_ROUTINES_STAMP"
+_ROUTINE_RE = re.compile(r"^\s*CREATE\s+(?:DEFINER\s*=\s*\S+\s+)?(PROCEDURE|FUNCTION)\s+`?([A-Za-z0-9_]+)`?", re.I)
+
+
+@functools.lru_cache(maxsize=1)
+def shipped_routines() -> frozenset[tuple[str, str]]:
+    """(PROCEDURE|FUNCTION, lower name) for every routine the fn_/sp_ files create."""
+    out: set[tuple[str, str]] = set()
+    for path in sql_apply_order():
+        if not (path.stem.startswith("fn_") or path.stem.startswith("sp_")):
+            continue
+        for stmt in split_script(path.read_text(encoding="utf-8-sig")):
+            m = _ROUTINE_RE.match(stmt)
+            if m:
+                out.add((m.group(1).upper(), m.group(2).lower()))
+    return frozenset(out)
+
+
+def _routine_rows(cur) -> list[tuple[str, str, str]]:
+    cur.execute(
+        "SELECT ROUTINE_TYPE, ROUTINE_NAME, SHA2(IFNULL(ROUTINE_DEFINITION, ''), 256)"
+        " FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE()"
+        " AND ROUTINE_NAME NOT IN (%s, %s) AND ROUTINE_NAME NOT LIKE 'mill\\_migrate\\_%%'",
+        (_STAMP_FN, _ROUTINES_FN),
+    )
+    rows = []
+    for r in cur.fetchall():
+        rows.append(tuple(x.decode("utf-8") if isinstance(x, (bytes, bytearray)) else str(x) for x in r))
+    return sorted(rows, key=lambda r: (r[0], r[1].lower()))
+
+
+def routines_fingerprint(cn) -> str:
+    """sha256 over (type, name, body hash) of every routine in the book but the stamps (#818)."""
     cur = cn.cursor()
     try:
-        cur.execute(f"SELECT {_STAMP_FN}()")
+        rows = _routine_rows(cur)
+    finally:
+        cur.close()
+    h = hashlib.sha256()
+    for t, n, d in rows:
+        h.update(f"{t}:{n.lower()}:{d}\n".encode("ascii"))
+    return h.hexdigest()
+
+
+def _stamp_routines(cn) -> None:
+    """Record the routines' fingerprint after a run that finished (#818)."""
+    digest = routines_fingerprint(cn)
+    cur = cn.cursor()
+    try:
+        cur.execute(f"DROP FUNCTION IF EXISTS {_ROUTINES_FN}")
+        cur.execute(
+            f"CREATE FUNCTION {_ROUTINES_FN}() RETURNS CHAR(64) CHARSET ascii"
+            f" DETERMINISTIC NO SQL RETURN '{digest}'"
+        )
+        cn.commit()
+    finally:
+        cur.close()
+
+
+def _read_stamp(cur, fn: str) -> str:
+    try:
+        cur.execute(f"SELECT {fn}()")
         row = cur.fetchone()
-        book = str((row or [""])[0] or "")
+        return str((row or [""])[0] or "")
     except Exception as e:
         if getattr(e, "errno", None) != 1305:  # FUNCTION does not exist: a book from before the stamp
             raise
-        book = ""
+        return ""
+
+
+def sql_state(cn) -> dict[str, Any]:
+    """Does the book hold this pack's SQL? Read only. ok, pack and book (12 hex each), fix.
+
+    #818: also the routines. Every routine the pack ships must be there, and
+    the routines must be the ones the last finished ensure left (their
+    fingerprint equals the stamp it wrote). A run killed mid-reload, or a
+    routine changed or dropped by hand, is not ok."""
+    pack = sql_digest()
+    cur = cn.cursor()
+    try:
+        book = _read_stamp(cur, _STAMP_FN)
+        stamped = _read_stamp(cur, _ROUTINES_FN)
+        rows = _routine_rows(cur)
     finally:
         cur.close()
-    return {"ok": book == pack, "pack": pack[:12], "book": book[:12], "fix": SQL_FIX}
+    have = {(t.upper(), n.lower()) for t, n, _ in rows}
+    missing = sorted(n for _, n in shipped_routines() - have)
+    h = hashlib.sha256()
+    for t, n, d in rows:
+        h.update(f"{t}:{n.lower()}:{d}\n".encode("ascii"))
+    routines_ok = not missing and bool(stamped) and stamped == h.hexdigest()
+    out = {"ok": book == pack and routines_ok, "pack": pack[:12], "book": book[:12], "fix": SQL_FIX}
+    if not routines_ok:
+        out["routines"] = "missing " + ",".join(missing[:5]) if missing else "changed since the last ensure"
+    return out
 
 
 def install_sql(cn, *, apply: bool) -> dict[str, Any]:
@@ -1048,6 +1131,7 @@ def ensure(cn) -> dict[str, Any]:
     pack's SQL digest (#614). mill install and mill install sql --apply call it."""
     res = _ensure_steps(cn)
     _stamp_sql(cn, sql_digest())
+    _stamp_routines(cn)
     return res
 
 
@@ -1061,6 +1145,9 @@ def _ensure_steps(cn) -> dict[str, Any]:
         wipe = (os.environ.get("MILL_RECORDS_WIPE") or "").strip() == "1"
         if _table_exists(cur, "activity") and not wipe:
             cur.close()
+            # #818: read before any step. A book whose routines are not this
+            # pack's (another pack, or a run killed mid-reload) gets the full reload.
+            current = bool(sql_state(cn).get("ok"))
             # 0.7.0 roster first: later steps name roster_id and the roster type.
             applied.extend(apply_roster_070(cn))
             # Column before the procedure refresh, so mill_label_select can read l.ord.
@@ -1069,7 +1156,10 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(_ensure_join_endpoint_key(cn))
             applied.extend(_ensure_join_wake_on(cn))
             # #818 after the join column steps (the seat copy reads them).
-            applied.extend(apply_doing_818(cn))
+            did_818 = apply_doing_818(cn)
+            applied.extend(did_818)
+            if did_818 or not current:
+                applied.extend(reload_routines(cn))
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))
