@@ -522,6 +522,100 @@ def error_id(exc: BaseException, where: str) -> str:
     return eid
 
 
+_SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
+_CRED_HEADERS = ("Authorization", "PRIVATE-TOKEN", "X-Mill-Invite")
+
+
+def _has_session_cookie(headers) -> bool:
+    from agent_coord.server.glance import GLANCE_COOKIE
+
+    for part in (headers.get("Cookie") or "").split(";"):
+        name = part.strip().partition("=")[0].strip()
+        if name == GLANCE_COOKIE or name.startswith("factory-door"):
+            return True
+    return False
+
+
+def _host_port(host: str, scheme: str) -> tuple[str, int] | None:
+    from urllib.parse import urlsplit
+
+    try:
+        parts = urlsplit("//" + (host or "").strip())
+        name = (parts.hostname or "").lower()
+        port = parts.port or (443 if scheme == "https" else 80)
+    except ValueError:
+        return None
+    return (name, port) if name else None
+
+
+def origin_matches(origin: str, headers, peer: str) -> bool:
+    """True when Origin names this wall: the Host header, or X-Forwarded-Host and
+    X-Forwarded-Proto when the TCP peer is a trusted proxy (allow.trusted_proxies).
+    The installed edge keeps Host and sends no proto, so the port defaults from
+    the Origin's own scheme."""
+    from urllib.parse import urlsplit
+
+    from agent_coord.server.allow import _in_rules, trusted_proxies
+
+    try:
+        want = urlsplit((origin or "").strip())
+        o_scheme = (want.scheme or "").lower()
+        o_host = (want.hostname or "").lower()
+        o_port = want.port or (443 if o_scheme == "https" else 80)
+    except ValueError:
+        return False
+    if o_scheme not in ("http", "https") or not o_host:
+        return False
+    host = (headers.get("Host") or "").strip()
+    proto = ""
+    if _in_rules(peer, trusted_proxies()):
+        host = (headers.get("X-Forwarded-Host") or "").split(",")[0].strip() or host
+        proto = (headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+    if proto and proto != o_scheme:
+        return False
+    got = _host_port(host, proto or o_scheme)
+    return got == (o_host, o_port)
+
+
+def cookie_write_refusal(command: str, headers, peer: str) -> tuple[int, str]:
+    """(status, reason) when a cookie-authenticated write is refused, else (0, "").
+
+    Only a write (any method but GET, HEAD, OPTIONS) that carries a door or
+    glance session cookie and no credential header is checked. It must be
+    application/json (a cross-origin page cannot send that without a CORS
+    preflight, which the wall never grants) and same-origin: Sec-Fetch-Site
+    same-origin, an Origin that matches the wall, or the X-Mill-Wall header.
+    """
+    if (command or "").upper() in _SAFE_METHODS or not _has_session_cookie(headers):
+        return 0, ""
+    if any((headers.get(h) or "").strip() for h in _CRED_HEADERS):
+        return 0, ""
+    ctype = (headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    if ctype != "application/json":
+        return 415, "a write with the session cookie must be Content-Type application/json"
+    site = (headers.get("Sec-Fetch-Site") or "").strip().lower()
+    if site in ("cross-site", "same-site"):
+        return 403, "cross-origin write refused"
+    if site == "same-origin":
+        return 0, ""
+    origin = (headers.get("Origin") or "").strip()
+    if origin:
+        return (0, "") if origin_matches(origin, headers, peer) else (403, "cross-origin write refused")
+    if (headers.get("X-Mill-Wall") or "").strip():
+        return 0, ""
+    return 403, "a write with the session cookie needs a same-origin Origin or X-Mill-Wall"
+
+
+def _refuse_cookie_write(handler: BaseHTTPRequestHandler) -> bool:
+    """Answer a refused cookie-authenticated write (card 749); True when refused."""
+    peer = str((getattr(handler, "client_address", None) or ("", 0))[0] or "")
+    code, why = cookie_write_refusal(getattr(handler, "command", "") or "", handler.headers, peer)
+    if not code:
+        return False
+    handler._send(code, _json({"error": why}), "application/json; charset=utf-8")
+    return True
+
+
 def _fail_closed(handler: BaseHTTPRequestHandler, exc: BaseException) -> None:
     """One bad route must fail that request closed - never kill the 18765 listener.
 
@@ -1069,6 +1163,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
         def do_GET(self) -> None:  # noqa: N802
             t0 = time.perf_counter()
             try:
+                if _refuse_cookie_write(self):
+                    return
                 self._do_GET_inner()
             except Exception as _route_exc:
                 _fail_closed(self, _route_exc)
@@ -2033,6 +2129,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
         def do_POST(self) -> None:  # noqa: N802
             t0 = time.perf_counter()
             try:
+                if _refuse_cookie_write(self):
+                    return
                 self._do_POST_inner()
             except Exception as _route_exc:
                 _fail_closed(self, _route_exc)
