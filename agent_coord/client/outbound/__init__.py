@@ -60,7 +60,6 @@ WALL = COMMANDS | SIT | PROBE | frozenset(
         "retire",
         "label",
         "member",
-        "doing",
         "roster",
         "reclaim",
         "reset",
@@ -113,6 +112,7 @@ _STR = (
     "better",
     "unit",
     "at",
+    "since",
 )
 _INT = ("id", "id_a", "id_b", "rm_id", "after", "limit", "parent_id")
 
@@ -233,7 +233,8 @@ def _note_fields(args: Any, body: dict[str, Any]) -> None:
 
 # Commands whose project and --doing are checked before the call (#243-#245).
 _PROJECT_GUARD = {"open", "todo", "label-add", "label-remove", "unpark"}
-_DOING_GUARD = {"open", "hold"}
+# #818 PR B: every command that takes --doing (the doing entry links to its item).
+_DOING_GUARD = {"send", "reply", "mark", "open", "claim", "unclaim", "assign", "pass", "note", "unpark", "hold", "drop", "score"}
 DOING_MAX = 512
 
 
@@ -339,6 +340,14 @@ def body_from_args(args: Any) -> dict[str, Any]:
                     "send: src must be the mill connect desk "
                     f"(got {src!r}; connect is {body.get('owner')!r})"
                 )
+    # #818 PR B: mill connected reads every roster when none is named.
+    if command == "session":
+        if not str(getattr(args, "project", "") or "").strip():
+            body.pop("project", None)
+        if bool(getattr(args, "history", False)):
+            body["history"] = True
+        if int(getattr(args, "page", 0) or 0):
+            body["page"] = int(args.page)
     if command in ("hold", "drop"):
         from agent_coord.helpers.bounds import resource_name
 

@@ -245,13 +245,17 @@ def test_b_seat_holds_state_and_behaves(cn, migrated):
 def test_c_doing_appends(cn, migrated):
     did = _desk_id(cn, "fx818-a")
     before = rows_done(cn, "SELECT id, text FROM doing WHERE desk_id = %s ORDER BY id", (did,))
-    one = rec_join.push_doing(cn, "fx818", "fx818-a", "pr open, waiting on ci")
-    two = rec_join.push_doing(cn, "fx818", "fx818-a", "done")
+    # #818 PR B: a doing is written by --doing on a command, linked to its item.
+    from agent_coord.server.records import doing as rec_doing
+    from agent_coord.server.records import todo as rec_todo
+
+    tid = int(rec_todo.insert(cn, "fx818", "fx818-a", "open", '{"slug":"c818"}')[0]["id"])
+    one = [rec_doing.put(cn, "fx818-a", "pr open, waiting on ci", "todo", tid)]
+    two = [rec_doing.put(cn, "fx818-a", "done", "todo", tid)]
     after = rows_done(cn, "SELECT id, text FROM doing WHERE desk_id = %s ORDER BY id", (did,))
     assert after[: len(before)] == before  # nothing overwritten
     assert [r["text"] for r in after[len(before):]] == ["pr open, waiting on ci", "done"]
     assert int(one[0]["id"]) < int(two[0]["id"])
-    assert two[0]["doing"] == "done"
     for r in after[len(before):]:
         assert scalar_done(cn, "SELECT COUNT(*) FROM activity WHERE type = 'doing' AND id = %s", (r["id"],)) == 1
     sel = {r["desk"]: r for r in rec_join.select(cn, "")}

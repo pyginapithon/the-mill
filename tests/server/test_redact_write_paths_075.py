@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """0.7.5: every write path runs the store redactor before the row is stored.
 
-Covers reply, doing, join, claim, unclaim, pass, hold, assign and the score
+Covers reply, --doing (mark, drop, unpark, hold), join, claim, unclaim, pass, hold, assign and the score
 value, target and note, plus Wall desk posts, Admin error mail and the error
 text a 500 returns. Fake values are built at runtime. Regression row S-7
 (redact-write-paths).
@@ -38,7 +38,9 @@ def _capture(store):
 
 CASES = [
     ("reply", {"mail_id": 5, "body": "see {t}"}, "body"),
-    ("doing", {"doing": "using {t}"}, "doing"),
+    ("mark", {"ids": [5], "doing": "using {t}"}, "doing"),
+    ("drop", {"resource": "r1", "doing": "after {t}"}, "doing"),
+    ("unpark", {"need": "n1", "doing": "on {t}"}, "doing"),
     ("claim", {"need": "n1", "msg": "key {t}"}, "msg"),
     ("unclaim", {"need": "n1", "msg": "key {t}"}, "msg"),
     ("pass", {"need": "n1", "note": "key {t}"}, "note"),
@@ -82,7 +84,7 @@ def test_read_commands_are_left_alone(monkeypatch):
 
 
 def test_every_text_command_is_listed():
-    for command in ("send", "reply", "note", "open", "score", "doing", "join", "claim", "unclaim", "pass", "hold", "assign"):
+    for command in ("send", "reply", "note", "open", "score", "join", "claim", "unclaim", "pass", "hold", "assign", "mark", "drop", "unpark"):
         assert command in WRITE_COMMANDS
     for key in ("body", "doing", "msg", "note", "detail", "value", "target"):
         assert key in TEXT_KEYS

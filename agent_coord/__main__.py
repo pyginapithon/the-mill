@@ -443,6 +443,15 @@ def _link_flags(sp) -> None:
     )
 
 
+DOING_HELP = (
+    "what you are doing now, in a few words; mill connected shows it on this command's item. "
+    "No end step: a reply or pass without --doing ends it"
+)
+DOING_FLAG_COMMANDS = (
+    "send", "reply", "mark", "create", "claim", "unclaim", "assign", "pass", "note", "unpark", "hold", "drop", "score",
+)
+
+
 def _build_parser() -> MillArgumentParser:
     p = MillArgumentParser(
         prog="mill",
@@ -513,7 +522,6 @@ def _build_parser() -> MillArgumentParser:
         action="store_true",
         help="show who holds the resource, or every lock when no resource; never takes or refreshes",
     )
-    a.add_argument("--doing", default="")
     a.add_argument(
         "--group-by",
         dest="group_by",
@@ -1052,17 +1060,9 @@ def _build_parser() -> MillArgumentParser:
     lrm.add_argument("id", metavar="ID|ROSTER/NEED", help="activity id; a todo also by ROSTER/NEED")
     lrm.add_argument("label")
 
-    do = sub.add_parser(
-        "doing",
-        help=argparse.SUPPRESS,
-    )
-    do.add_argument("project")
-    do.add_argument("--doing", required=True)
-
     def _todo_create_args(p: argparse.ArgumentParser) -> None:
         p.add_argument("project")
         p.add_argument("need")
-        p.add_argument("--doing", default="")
         dg = p.add_mutually_exclusive_group()
         dg.add_argument("--detail", default="", help="card text, 1..4096 characters")
         dg.add_argument(
@@ -1295,9 +1295,18 @@ def _build_parser() -> MillArgumentParser:
 
     se = sub.add_parser(
         "connected",
-        help="mill connected ROSTER: desks connected on that roster (who, doing, last seen)",
+        help="mill connected [ROSTER] [--desk X]: what each desk is doing, on which letter or card, "
+        "and who is waiting on it; --history lists past entries",
     )
-    se.add_argument("project")
+    se.add_argument(
+        "project", nargs="?", default="", metavar="ROSTER",
+        help="only desks on this roster (default: desks active in the last day)",
+    )
+    se.add_argument("--desk", default="", help="only this desk")
+    se.add_argument("--all", action="store_true", help="every desk, not only those active in the last day")
+    se.add_argument("--history", action="store_true", help="past doing entries, newest first, 50 a page")
+    se.add_argument("--since", default="", metavar="DATE", help="with --history: entries from DATE on (office clock)")
+    se.add_argument("--page", type=int, default=0, help="with --history: page N")
     se.add_argument("--limit", type=int, default=10)
 
     att = sub.add_parser(
@@ -1412,6 +1421,11 @@ def _build_parser() -> MillArgumentParser:
     _attach_office_help(p)
     _no_abbrev(p)
     _yes_everywhere(p)
+    # #818 PR B: every activity write takes --doing; the doing entry links to the
+    # item that command wrote (no separate doing command).
+    for _name in DOING_FLAG_COMMANDS:
+        _dp = _ct if _name == "create" else sub.choices[_name]
+        _dp.add_argument("--doing", default="", metavar="TEXT", help=DOING_HELP)
     return p
 
 

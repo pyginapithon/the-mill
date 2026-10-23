@@ -1,0 +1,232 @@
+-- #818 PR B: --doing on an activity command writes one doing entry linked to
+-- that command's item; `mill connected` reads what every desk is doing.
+-- Rows live in table doing (append-only, see sp_join.sql mill_doing_insert).
+-- No end step: an entry on a letter ends when its desk replies under that
+-- letter; on a card when its desk passes it (ships it as the volunteer) or the
+-- card is done; on a hold when the desk drops it. Marking a letter never ends
+-- it. A score entry does not end on its own (score semantics are open).
+
+DROP FUNCTION IF EXISTS mill_doing_end;
+DROP PROCEDURE IF EXISTS mill_doing_put;
+DROP PROCEDURE IF EXISTS mill_doing_now;
+DROP PROCEDURE IF EXISTS mill_doing_history;
+
+DELIMITER //
+
+-- When the entry ended, or NULL while it is current. Derived, never stored.
+CREATE FUNCTION mill_doing_end(
+  p_desk    BIGINT UNSIGNED,
+  p_on_type VARCHAR(8),
+  p_on_id   BIGINT UNSIGNED,
+  p_created DATETIME(6)
+) RETURNS DATETIME(6)
+  NOT DETERMINISTIC
+  READS SQL DATA
+BEGIN
+  DECLARE v_at DATETIME(6);
+  SET v_at = NULL;
+  IF p_on_type = 'mail' THEN
+    SELECT MIN(r.created) INTO v_at
+      FROM tree t
+      JOIN tree c ON c.name_id = t.name_id AND c.type = 'mail'
+                 AND c.lft > t.lft AND c.rgt < t.rgt
+      JOIN mail r ON r.id = c.id
+     WHERE t.type = 'mail' AND t.id = p_on_id
+       AND r.desk_id = p_desk AND r.created >= p_created;
+  ELSEIF p_on_type = 'todo' THEN
+    SELECT td.updated INTO v_at
+      FROM todo td
+     WHERE td.id = p_on_id
+       AND td.updated >= p_created
+       AND (td.status = 'done' OR (td.status = 'shipped' AND td.assigned_id = p_desk))
+     LIMIT 1;
+  ELSEIF p_on_type = 'hold' THEN
+    SELECT h.updated INTO v_at
+      FROM hold h
+     WHERE h.id = p_on_id
+       AND h.updated >= p_created
+       AND (h.desk_id IS NULL OR h.desk_id <> p_desk)
+     LIMIT 1;
+  END IF;
+  RETURN v_at;
+END //
+
+-- One new entry for the desk, on the item the command just wrote. The roster
+-- is that item's (its activity row). Watchers follow (mill_doing_insert).
+-- waiting_type/waiting_id stay NULL: no command sets them yet.
+CREATE PROCEDURE mill_doing_put(
+  IN p_desk      VARCHAR(64),
+  IN p_text      VARCHAR(512),
+  IN p_on_type   VARCHAR(8),
+  IN p_on_id     BIGINT UNSIGNED
+)
+BEGIN
+  DECLARE v_ts DATETIME(6);
+  DECLARE v_id BIGINT UNSIGNED;
+  DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE v_roster BIGINT UNSIGNED;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: desk has not joined';
+  END IF;
+  IF IFNULL(p_on_type, '') NOT IN ('mail', 'todo', 'hold', 'score') OR p_on_id IS NULL
+     OR NOT EXISTS (SELECT 1 FROM activity WHERE type = p_on_type AND id = p_on_id AND deleted IS NULL) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: the item is gone';
+  END IF;
+  SET v_roster = IFNULL((SELECT roster_id FROM activity WHERE type = p_on_type AND id = p_on_id), 1);
+  START TRANSACTION;
+  SET v_ts = MILL_NOW();
+  UPDATE seat SET updated = v_ts WHERE desk_id = v_desk;
+  CALL mill_doing_insert(v_desk, v_roster, p_text, v_ts, v_id);
+  -- The row was inserted by this call; nothing older is touched.
+  UPDATE doing SET on_type = p_on_type, on_id = p_on_id WHERE id = v_id;
+  CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
+  COMMIT;
+  SELECT v_id AS id, v_ts AS created, v_desk AS desk_id, v_roster AS roster_id;
+END //
+
+-- What desks are doing now. Three row kinds, told apart by part:
+--   desk:   one per listed desk: its newest entry, whether that has ended,
+--           and its newest entry with text (the last thing it said).
+--   letter: up to 3 per desk, newest first: letters to the desk it has not
+--           handled and has not replied under (n = how many in all).
+--   card:   up to 3 per desk: cards it has claimed that another desk watches.
+-- Listed: p_desk alone when named; else every desk on p_roster when named;
+-- else every joined desk when p_all; else desks active in the last day.
+CREATE PROCEDURE mill_doing_now(
+  IN p_desk   VARCHAR(64),
+  IN p_roster VARCHAR(64),
+  IN p_all    TINYINT
+)
+BEGIN
+  DECLARE v_now DATETIME(6);
+  DECLARE v_one BIGINT UNSIGNED;
+  DECLARE v_ros BIGINT UNSIGNED;
+  SET v_now = MILL_NOW();
+  SET v_one = NULL;
+  SET v_ros = NULL;
+  IF IFNULL(p_desk, '') <> '' THEN
+    SET v_one = IFNULL(MILL_NAME_GET('desk', p_desk), 0);
+  ELSEIF IFNULL(p_roster, '') <> '' THEN
+    SET v_ros = IFNULL(MILL_NAME_GET('roster', p_roster), 0);
+  END IF;
+  DROP TEMPORARY TABLE IF EXISTS tmp_doing_desk;
+  CREATE TEMPORARY TABLE tmp_doing_desk (desk_id BIGINT UNSIGNED NOT NULL PRIMARY KEY) ENGINE=MEMORY;
+  INSERT INTO tmp_doing_desk (desk_id)
+  SELECT s.desk_id
+    FROM seat s
+    JOIN name d ON d.id = s.desk_id AND d.type = 'desk' AND d.deleted IS NULL
+   WHERE (v_one IS NOT NULL AND s.desk_id = v_one)
+      OR (v_ros IS NOT NULL AND EXISTS (SELECT 1 FROM member m WHERE m.desk_id = s.desk_id AND m.name_id = v_ros))
+      OR (v_one IS NULL AND v_ros IS NULL AND (IFNULL(p_all, 0) = 1
+          OR s.updated > v_now - INTERVAL 1 DAY
+          OR EXISTS (SELECT 1 FROM activity a
+                      WHERE a.desk_id = s.desk_id AND a.updated > v_now - INTERVAL 1 DAY)));
+
+  SELECT 'desk' AS part, d.name AS desk,
+         cur.id, cur.text, cur.on_type, cur.on_id, cur.waiting_type, cur.waiting_id,
+         TIMESTAMPDIFF(SECOND, cur.created, v_now) AS age_s,
+         IF(cur.id IS NULL, NULL, mill_doing_end(t.desk_id, cur.on_type, cur.on_id, cur.created)) AS ended_at,
+         lst.id AS last_id, lst.text AS last_text, lst.on_type AS last_on_type, lst.on_id AS last_on_id,
+         TIMESTAMPDIFF(SECOND, lst.created, v_now) AS last_age_s,
+         st.updated AS heartbeat, v_now AS now
+    FROM tmp_doing_desk t
+    JOIN name d ON d.id = t.desk_id
+    JOIN seat st ON st.desk_id = t.desk_id
+    LEFT JOIN LATERAL (
+      SELECT g.id, g.created, g.text, g.on_type, g.on_id, g.waiting_type, g.waiting_id
+        FROM doing g WHERE g.desk_id = t.desk_id
+       ORDER BY g.created DESC, g.id DESC LIMIT 1
+    ) cur ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT g.id, g.created, g.text, g.on_type, g.on_id
+        FROM doing g WHERE g.desk_id = t.desk_id AND g.text <> ''
+       ORDER BY g.created DESC, g.id DESC LIMIT 1
+    ) lst ON TRUE
+   ORDER BY IFNULL(cur.created, '1970-01-01') DESC, d.name;
+
+  SELECT 'letter' AS part, x.desk, x.id, x.sender, x.age_s, x.n
+    FROM (
+      SELECT d.name AS desk, m.id, sd.name AS sender,
+             TIMESTAMPDIFF(SECOND, m.created, v_now) AS age_s,
+             COUNT(*) OVER (PARTITION BY mt.desk_id) AS n,
+             ROW_NUMBER() OVER (PARTITION BY mt.desk_id ORDER BY m.created DESC, m.id DESC) AS rn
+        FROM tmp_doing_desk t
+        JOIN mail_to mt ON mt.desk_id = t.desk_id AND mt.type = 'mail' AND mt.opened IS NULL
+        JOIN mail m ON m.id = mt.id AND m.desk_id <> mt.desk_id
+        JOIN name d ON d.id = mt.desk_id
+        JOIN name sd ON sd.id = m.desk_id
+        LEFT JOIN activity am ON am.type = 'mail' AND am.id = m.id
+       WHERE am.deleted IS NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM tree tl
+             JOIN tree c ON c.name_id = tl.name_id AND c.type = 'mail'
+                        AND c.lft > tl.lft AND c.rgt < tl.rgt
+             JOIN mail r ON r.id = c.id AND r.desk_id = mt.desk_id
+            WHERE tl.type = 'mail' AND tl.id = m.id)
+    ) x
+   WHERE x.rn <= 3
+   ORDER BY x.desk, x.rn;
+
+  SELECT 'card' AS part, x.desk, x.id, x.need, x.roster, x.watchers, x.age_s, x.n
+    FROM (
+      SELECT d.name AS desk, td.id,
+             JSON_UNQUOTE(JSON_EXTRACT(td.body, '$.slug')) AS need,
+             ro.name AS roster,
+             (SELECT GROUP_CONCAT(wn.name ORDER BY wn.name SEPARATOR ',')
+                FROM watcher w JOIN name wn ON wn.id = w.desk_id
+               WHERE w.type = 'todo' AND w.id = td.id AND w.desk_id <> td.assigned_id) AS watchers,
+             TIMESTAMPDIFF(SECOND, td.updated, v_now) AS age_s,
+             COUNT(*) OVER (PARTITION BY td.assigned_id) AS n,
+             ROW_NUMBER() OVER (PARTITION BY td.assigned_id ORDER BY td.updated DESC, td.id DESC) AS rn
+        FROM tmp_doing_desk t
+        JOIN todo td ON td.assigned_id = t.desk_id AND td.status = 'claimed'
+        JOIN name d ON d.id = td.assigned_id
+        JOIN name ro ON ro.id = td.roster_id
+        LEFT JOIN activity at ON at.type = 'todo' AND at.id = td.id
+       WHERE at.deleted IS NULL
+         AND EXISTS (SELECT 1 FROM watcher w
+                      WHERE w.type = 'todo' AND w.id = td.id AND w.desk_id <> td.assigned_id)
+    ) x
+   WHERE x.rn <= 3
+   ORDER BY x.desk, x.rn;
+
+  DROP TEMPORARY TABLE IF EXISTS tmp_doing_desk;
+END //
+
+-- Past entries with text, newest first, one page (p_page from 1). Each row says
+-- whether it has ended. total counts every matching entry (adoption count).
+CREATE PROCEDURE mill_doing_history(
+  IN p_desk  VARCHAR(64),
+  IN p_since DATETIME(6),
+  IN p_page  INT,
+  IN p_size  INT
+)
+BEGIN
+  DECLARE v_one BIGINT UNSIGNED;
+  DECLARE v_off INT;
+  SET v_one = NULL;
+  IF IFNULL(p_desk, '') <> '' THEN
+    SET v_one = IFNULL(MILL_NAME_GET('desk', p_desk), 0);
+  END IF;
+  SET v_off = (GREATEST(IFNULL(p_page, 1), 1) - 1) * GREATEST(IFNULL(p_size, 50), 1);
+  SELECT g.id, d.name AS desk, g.created, g.text, g.on_type, g.on_id,
+         g.waiting_type, g.waiting_id, ro.name AS roster,
+         mill_doing_end(g.desk_id, g.on_type, g.on_id, g.created) AS ended_at,
+         COUNT(*) OVER () AS total
+    FROM doing g
+    JOIN name d ON d.id = g.desk_id
+    JOIN name ro ON ro.id = g.roster_id
+   WHERE g.text <> ''
+     AND (v_one IS NULL OR g.desk_id = v_one)
+     AND (p_since IS NULL OR g.created >= p_since)
+   ORDER BY g.created DESC, g.id DESC
+   LIMIT v_off, p_size;
+END //
+
+DELIMITER ;

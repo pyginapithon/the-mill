@@ -1,0 +1,344 @@
+"""#818 PR B on a real book: --doing on activity commands, read by `mill connected`. Row F118.
+
+The CLI runs in this process (real parser, request body, handler and SPs);
+only the /ws hop is replaced by dispatch_ws, as in the #238 matrix.
+
+(a) --doing on send, reply, mark, create todo, claim, pass, note, hold, drop
+    and score writes one doing entry linked to that command's own item;
+(b) the newest entry is current; a reply under the letter or a pass without
+    --doing ends it; a mark never does; a reply or pass that carries --doing
+    starts the next one;
+(c) `mill connected` shows doing, on, age, idle/last and who is waiting on
+    the desk (unanswered letters, claimed cards others watch); --history pages;
+(d) cards have no title: create todo --doing stores no doing key, and a
+    legacy stored key shows as the head of the detail;
+(e) there is no `mill doing` command; join and invite placeholders write no
+    doing text; a missing or retired item is refused;
+    a refused or over-long --doing stores nothing; a failed doing write never
+    undoes the command.
+"""
+from __future__ import annotations
+
+import io
+import json
+import sys
+import uuid
+from contextlib import redirect_stderr, redirect_stdout
+
+import pytest
+
+pytestmark = pytest.mark.sql
+
+from agent_coord.helpers.errors import CoordError
+from agent_coord.server.records.db import rows_done, scalar_done
+from tests.server.records.conftest import seed_names
+
+ME = "d818-me"
+PEER = "d818-peer"
+R = "r818"
+
+
+class _Book:
+    def __init__(self, cn):
+        self._cn = cn
+        self._tokens: dict = {}
+
+
+def _dispatch(w, body: dict):
+    from agent_coord.client.outbound import canonical_command
+    from agent_coord.server.api.mill import rpc
+    from agent_coord.server.asgi import hold_envelope_ok
+
+    command = canonical_command(str(body.get("verb") or body.get("cmd") or ""))
+    args = {k: v for k, v in dict(body).items() if k not in ("verb", "cmd", "owner", "token")}
+    try:
+        result = rpc.dispatch_ws(w.book, w.desk, command, args)
+    except CoordError as e:
+        raise CoordError(str(e)) from None
+    return {"ok": hold_envelope_ok(command, result), "result": result, "sync": []}
+
+
+class World:
+    def __init__(self, cn, tmp):
+        self.cn = cn
+        self.book = _Book(cn)
+        self.desk = ME
+        self.body = tmp / "body.txt"
+        self.body.write_text("a letter for #818", encoding="utf-8")
+
+    def run(self, argv, desk=ME):
+        from agent_coord import __main__ as cli
+
+        self.desk = desk
+        out, err = io.StringIO(), io.StringIO()
+        with redirect_stdout(out), redirect_stderr(err):
+            try:
+                code = int(cli.main(list(argv)) or 0)
+            except SystemExit as e:
+                code = e.code if isinstance(e.code, int) else (0 if e.code is None else 2)
+            except CoordError as e:
+                print(str(e), file=sys.stderr)
+                code = 1
+        return code, out.getvalue(), err.getvalue()
+
+    def ok(self, argv, desk=ME):
+        code, out, err = self.run(argv, desk)
+        assert code == 0, (argv, out[-400:], err[-400:])
+        lines = [ln for ln in out.splitlines() if ln.strip().startswith(("{", "["))]
+        row = json.loads(lines[-1]) if lines else {}
+        return row.get("result", row) if isinstance(row, dict) else row
+
+    def letter(self, to=ME, desk=PEER) -> int:
+        res = self.ok(["send", "--to-desk", to, "--body-file", str(self.body)], desk=desk)
+        return int(res["id"])
+
+    def card(self, desk=PEER, **kw) -> tuple[str, int]:
+        from agent_coord.server.records import todo as rec_todo
+
+        need = "n818-" + uuid.uuid4().hex[:6]
+        self.ok(["create", "todo", R, need, "--detail", "card for #818"], desk=desk)
+        return need, int(rec_todo.find(self.cn, R, need)["id"])
+
+    def me(self, desk=ME) -> dict:
+        rows = self.ok(["connected", "--desk", desk])
+        assert len(rows) == 1, rows
+        return rows[0]
+
+    def entries(self, desk=ME) -> list[dict]:
+        return rows_done(
+            self.cn,
+            "SELECT g.id, g.text, g.on_type, g.on_id FROM doing g JOIN name n ON n.id = g.desk_id"
+            " WHERE n.type = 'desk' AND n.name = %s ORDER BY g.id",
+            (desk,),
+        )
+
+
+@pytest.fixture(scope="module")
+def w(cn, tmp_path_factory):
+    from agent_coord.client.tokens import token_hash
+    from agent_coord.server.records import join as here
+
+    seed_names(cn, (R, "roster"), ("the-mill", "roster"), (ME, "desk"), (PEER, "desk"))
+    for d in (ME, PEER):
+        here.upsert(cn, R, d, "builder", token_hash=token_hash("tok-" + d), doing="present")
+    mp = pytest.MonkeyPatch()
+    world = World(cn, tmp_path_factory.mktemp("d818"))
+    mp.setenv("AGENT_COORD_MILL_HOME", str(tmp_path_factory.mktemp("d818home")))
+    mp.setenv("AGENT_COORD_MILL_URL", "http://127.0.0.1:9")
+    mp.setattr("agent_coord.client.http.mill_http_call", lambda body: _dispatch(world, body))
+    mp.setattr("agent_coord.server.api.mill.rpc._require_live_ws", lambda owner: None)
+    for mod in ("agent_coord.client.http", "agent_coord.client.outbound"):
+        mp.setattr(mod + ".resolve_desk_owner", lambda cli="": world.desk, raising=False)
+    yield world
+    mp.undo()
+
+
+# (e) placeholders and the gone command ------------------------------------------
+
+def test_join_placeholder_writes_no_doing_text(w):
+    texts = [r["text"] for r in w.entries(ME)]
+    assert "present" not in texts and "invited" not in texts
+
+
+def test_invite_placeholder_writes_no_doing_text(w):
+    from agent_coord.client.tokens import token_hash
+    from agent_coord.server.records import join as here
+
+    seed_names(w.cn, ("d818-new", "desk"))
+    here.upsert(w.cn, R, "d818-new", "builder", token_hash=token_hash("tok-new"), doing="invited")
+    assert all(r["text"] in ("", None) for r in w.entries("d818-new"))
+
+
+def test_a_missing_or_retired_item_is_refused(w):
+    from agent_coord.server.records import doing as rec_doing
+
+    top = int(scalar_done(w.cn, "SELECT COALESCE(MAX(id), 0) FROM mail"))
+    with pytest.raises(Exception, match="the item is gone"):
+        rec_doing.put(w.cn, ME, "x", "mail", top + 1000)
+    with pytest.raises(Exception, match="the item is gone"):
+        rec_doing.put(w.cn, ME, "x", "room", 1)
+    need, tid = w.card()
+    w.ok(["retire", "todo", R, need, "--yes"], desk=PEER)
+    with pytest.raises(Exception, match="the item is gone"):
+        rec_doing.put(w.cn, ME, "x", "todo", tid)
+
+
+def test_there_is_no_doing_command(w):
+    code, out, err = w.run(["doing", "x"])
+    assert code == 2 and "invalid choice" in err
+
+
+# (a)+(b) reply, mark ---------------------------------------------------------
+
+def test_reply_doing_links_the_letter_replied_to_and_a_plain_reply_ends_it(w):
+    mid = w.letter()
+    res = w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "answering the ask"])
+    assert res["doing_entry"]["on"] == f"mail-{mid}"
+    view = w.me()
+    assert view["doing"] == "answering the ask" and view["on"] == f"mail-{mid}"
+    assert view["age"].endswith("s")
+    assert f'doing "answering the ask" on mail-{mid}' in view["line"]
+    # A reply under that letter without --doing ends it.
+    w.ok(["reply", str(mid), "--body-file", str(w.body)])
+    view = w.me()
+    assert view["doing"] == "" and "idle" in view
+    assert view["last"] == {"doing": "answering the ask", "on": f"mail-{mid}", "age": view["last"]["age"]}
+
+
+def test_mark_never_ends_a_doing(w):
+    mid = w.letter()
+    res = w.ok(["mark", str(mid), "--doing", "reading it"])
+    assert res["doing_entry"]["on"] == f"mail-{mid}"
+    w.ok(["mark", str(mid)])
+    view = w.me()
+    assert view["doing"] == "reading it" and view["on"] == f"mail-{mid}"
+
+
+def test_send_doing_links_the_new_letter(w):
+    res = w.ok(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", "asking peer"])
+    assert res["doing_entry"]["on"] == f"mail-{int(res['id'])}"
+
+
+def test_reply_carrying_doing_starts_the_next_one(w):
+    mid = w.letter()
+    w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "step one"])
+    w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "step two"])
+    view = w.me()
+    assert view["doing"] == "step two" and view["on"] == f"mail-{mid}"
+
+
+# (a)+(b)+(d) cards -------------------------------------------------------------
+
+def test_create_todo_doing_is_a_doing_not_a_title(w):
+    from agent_coord.server.records import todo as rec_todo
+
+    need = "n818-create"
+    res = w.ok(["create", "todo", R, need, "--detail", "why", "--doing", "filing the card"])
+    tid = int(res["id"])
+    assert "doing" not in res
+    assert res["doing_entry"]["on"] == f"todo-{tid}"
+    stored = json.loads(rec_todo.find(w.cn, R, need)["body"])
+    assert "doing" not in stored and stored["detail"] == "why"
+    card = w.ok(["todo", R, need])
+    card = card[0] if isinstance(card, list) else card
+    assert "doing" not in json.dumps(card).replace('"doing_', "")
+
+
+def test_legacy_doing_key_is_shown_as_detail():
+    from agent_coord.server.records.todo import unpack
+
+    got = unpack(json.dumps({"slug": "old", "doing": "old title", "detail": "notes"}), 1)
+    assert got["detail"] == "old title\nnotes" and got["doing"] == ""
+    again = unpack(json.dumps({"slug": "old", "doing": "old title", "detail": "old title\nnotes"}), 1)
+    assert again["detail"] == "old title\nnotes"
+
+
+def test_find_ranks_on_need_roster_and_body_only():
+    from agent_coord.client.http import _FIND_RANK
+
+    assert [k for k, _, _ in _FIND_RANK] == ["need_id", "project_id", "detail"]
+
+
+def test_claim_doing_then_pass_ends_it_and_pass_with_doing_starts_next(w):
+    need, tid = w.card()
+    res = w.ok(["claim", R, need, "--doing", "fixing it"])
+    assert res["doing_entry"]["on"] == f"todo-{tid}"
+    assert w.me()["doing"] == "fixing it"
+    w.ok(["note", R, need, "--note", "half way", "--doing", "testing it"])
+    assert w.me()["doing"] == "testing it"
+    w.ok(["pass", R, need])
+    view = w.me()
+    assert view["doing"] == "" and view["last"]["on"] == f"todo-{tid}"
+    need2, tid2 = w.card()
+    w.ok(["claim", R, need2])
+    w.ok(["pass", R, need2, "--doing", "waiting on review"])
+    view = w.me()
+    assert view["doing"] == "waiting on review" and view["on"] == f"todo-{tid2}"
+
+
+# (a)+(b) hold and score ----------------------------------------------------------
+
+def test_hold_doing_links_the_hold_and_drop_ends_it(w):
+    res_name = "r818-" + uuid.uuid4().hex[:6]
+    res = w.ok(["hold", res_name, "--doing", "editing the file"])
+    assert res["doing_entry"]["on"].startswith("hold-")
+    assert w.me()["doing"] == "editing the file"
+    w.ok(["drop", res_name])
+    assert w.me()["doing"] == ""
+
+
+def test_refused_hold_records_no_doing(w):
+    res_name = "r818-" + uuid.uuid4().hex[:6]
+    w.ok(["hold", res_name], desk=PEER)
+    before = len(w.entries(ME))
+    code, out, err = w.run(["hold", res_name, "--doing", "want it"])
+    assert code != 0
+    assert len(w.entries(ME)) == before
+
+
+def test_score_doing_links_the_score(w):
+    res = w.ok(["score", R, "k818", "3", "--doing", "measuring"])
+    assert res["doing_entry"]["on"] == f"score-{int(res['id'])}"
+
+
+# (e) refusals and the command standing --------------------------------------------
+
+def test_over_long_doing_is_refused_and_nothing_stored(w):
+    before = len(w.entries(ME))
+    mid = w.letter()
+    n = scalar_done(w.cn, "SELECT COUNT(*) FROM mail")
+    code, out, err = w.run(["reply", str(mid), "--body-file", str(w.body), "--doing", "x" * 600])
+    assert code != 0 and "--doing" in (err + out)
+    assert scalar_done(w.cn, "SELECT COUNT(*) FROM mail") == n
+    assert len(w.entries(ME)) == before
+
+
+def test_a_failed_doing_write_never_undoes_the_command(w, monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("doing: the item is gone")
+
+    monkeypatch.setattr("agent_coord.server.records.doing.put", boom)
+    mid = w.letter()
+    res = w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "x"])
+    assert res["id"] and "doing_error" in res and "stands" in res["doing_error"]
+
+
+# (c) the read ------------------------------------------------------------------
+
+def test_connected_shows_who_is_waiting_on_the_desk(w):
+    mid = w.letter()
+    need, tid = w.card()
+    w.ok(["claim", R, need])
+    w.ok(["watch", "todo", str(tid)], desk=PEER)
+    view = w.me()
+    letters = view["waiting_on_it"]["letters"]
+    assert letters["n"] >= 1 and letters["newest"][0] == {"id": f"mail-{mid}", "from": PEER, "age": letters["newest"][0]["age"]}
+    assert len(letters["newest"]) <= 3
+    cards = view["waiting_on_it"]["cards"]
+    assert cards["n"] >= 1 and any(c["id"] == f"todo-{tid}" and PEER in c["watchers"] for c in cards["newest"])
+    assert "Waiting on it:" in view["line"] and f"mail-{mid}" in view["line"]
+    # Replying under the letter takes it off the list.
+    w.ok(["reply", str(mid), "--body-file", str(w.body)])
+    assert all(x["id"] != f"mail-{mid}" for x in w.me()["waiting_on_it"]["letters"]["newest"])
+
+
+def test_connected_roster_is_optional_and_lists_active_desks(w):
+    rows = w.ok(["connected"])
+    assert {ME, PEER} <= {r["owner"] for r in rows}
+    rows = w.ok(["connected", R])
+    assert {ME, PEER} <= {r["owner"] for r in rows}
+    code, out, err = w.run(["connected", "--desk", "d818-nobody"])
+    assert code != 0 and "no desk" in (err + out)
+
+
+def test_history_lists_entries_with_ended_and_pages(w):
+    got = w.ok(["connected", "--history", "--desk", ME])
+    hist = got["history"]
+    assert hist and all(e["desk"] == ME and e["doing"] for e in hist)
+    assert any(e["ended"] for e in hist) and any(not e["ended"] for e in hist)
+    assert got["page"]["n"] == 1 and got["page"]["entries"] >= len(hist)
+    assert w.ok(["connected", "--history", "--since", "2999-01-01"])["history"] == []
+    code, out, err = w.run(["connected", "--history", "--since", "soonish"])
+    assert code != 0 and "not a date" in (err + out)
+    code, out, err = w.run(["connected", "--page", "2"])
+    assert code != 0 and "--history" in (err + out)

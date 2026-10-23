@@ -1020,11 +1020,11 @@ def _page_rows(cn, tab: str, *, scope: str = "", desk: str = "", project: str = 
 
 
 def _todo_title(body) -> str:
-    import json
+    from agent_coord.server.records.todo import unpack
+
     raw = str(body or "")
     try:
-        obj = json.loads(raw)
-        text = str(obj.get("doing") or obj.get("detail") or "")
+        text = str(unpack(raw, "").get("detail") or "")
     except Exception:
         text = raw
     return " ".join(text.split())[:80]

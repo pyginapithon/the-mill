@@ -160,7 +160,7 @@ def test_join_updates_bump_activity_and_row_stays(cn) -> None:
     token = "a" * 64
     jid = int(here.upsert(cn, "life_join", "life_join", "", token, "working")[0]["id"])
     assert _n(cn, "doing", jid) == 1
-    nxt = int(here.doing(cn, "life_join", "life_join", "still working")[0]["id"])
+    nxt = int(here.upsert(cn, "life_join", "life_join", "", None, "still working")[0]["id"])
     assert nxt > jid and _n(cn, "doing", nxt) == 1
     assert scalar(cn, "SELECT text FROM doing WHERE id=%s", (jid,)) == "working"
     here.delete(cn, "life_join", "life_join")

@@ -32,11 +32,16 @@ def unpack(body: str, fallback_id: Any) -> dict[str, Any]:
         if isinstance(got, dict):
             payload = got
             slug_s = str(got.get("slug") or slug_s)
-            doing = str(got.get("doing") or "")
+            # #818: cards have no title. A legacy stored "doing" key is shown
+            # as the head of the detail; nothing is migrated.
+            legacy = str(got.get("doing") or "").strip()
             detail = str(got.get("detail") or "")
+            if legacy and not detail.startswith(legacy):
+                detail = legacy + ("\n" + detail if detail else "")
             progress = str(got.get("progress") or "")
     return {
         "need_id": slug_s,
+        # #818: always "" now (no card title); kept so Wall readers do not break (PR C).
         "doing": doing,
         "detail": detail,
         "progress": progress,

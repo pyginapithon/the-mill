@@ -284,6 +284,7 @@ _SP_FULL_REFRESH: tuple[str, ...] = (
     "sp_mail.sql",
     "sp_todo.sql",
     "sp_join.sql",
+    "sp_doing.sql",  # #818 PR B: mill doing write, now and history reads
     "sp_hold.sql",
     "sp_score.sql",
     "sp_label.sql",
@@ -360,6 +361,8 @@ def _ensure_sp_full(cn) -> list[str]:
 # #722: functions an existing book refreshes from tip (Office alias of roster id 1).
 _FN_REFRESH: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("fn_name.sql", ("mill_name_get", "mill_name_put")),
+    # #818 PR B: when a doing entry ended (reply under the letter, pass or done).
+    ("sp_doing.sql", ("mill_doing_end",)),
 )
 
 

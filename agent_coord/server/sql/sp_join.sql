@@ -296,29 +296,6 @@ BEGIN
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id;
 END //
 
--- #818: append-only. Each call is a new doing entry; nothing is overwritten.
-CREATE PROCEDURE mill_join_doing(
-  IN p_project VARCHAR(64),
-  IN p_desk    VARCHAR(64),
-  IN p_doing   VARCHAR(512)
-)
-BEGIN
-  DECLARE v_ts DATETIME(6);
-  DECLARE v_id BIGINT UNSIGNED;
-  DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
-  SET v_ts = MILL_NOW();
-  SET v_desk = MILL_NAME_GET('desk', p_desk);
-  SET v_id = NULL;
-  IF v_desk IS NOT NULL AND EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
-    UPDATE seat SET updated = v_ts WHERE desk_id = v_desk;
-    CALL mill_doing_insert(v_desk, 1, p_doing, v_ts, v_id);
-    CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
-  END IF;
-  COMMIT;
-  SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, IFNULL(p_doing, '') AS doing;
-END //
-
 -- A command that writes nothing else (#635): bump the seat and the current
 -- entry's activity. No new doing entry.
 CREATE PROCEDURE mill_join_touch(

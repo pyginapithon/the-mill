@@ -46,7 +46,6 @@ BOOK = {
     "add": ["todo:{TID}"],
     "remove": ["todo:{TID}"],
     "score": ["{P}", "c238-kpi", "5"],
-    "doing": ["{P}", "--doing", "testing"],
 }
 
 KIND = {
@@ -90,7 +89,12 @@ KIND = {
     ("score", "target"): "int", ("score", "note"): "text",
     ("score", "better"): "enum", ("score", "unit"): "text", ("score", "limit"): "int",
     ("score", "at"): "text",
-    ("doing", "project"): "name", ("doing", "doing"): "text",
+    # #818 PR B: --doing on every activity write; connected reads doing.
+    ("send", "doing"): "text", ("reply", "doing"): "text", ("mark", "doing"): "text",
+    ("claim", "doing"): "text", ("unclaim", "doing"): "text", ("assign", "doing"): "text",
+    ("pass", "doing"): "text", ("note", "doing"): "text", ("unpark", "doing"): "text",
+    ("drop", "doing"): "text", ("score", "doing"): "text",
+    ("connected", "desk"): "name", ("connected", "since"): "text", ("connected", "page"): "int",
 }
 
 CASES = {
