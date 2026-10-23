@@ -154,7 +154,8 @@ END //
 --   letter: up to 3 per desk, newest first: letters the desk was asked on
 --           (not copied, #818 D1) that it has not handled and has not
 --           replied under (n = how many in all).
---   card:   up to 3 per desk: cards it has claimed that another desk watches.
+--   card:   up to 3 per desk: cards it has claimed that another desk watches,
+--           newest claim first; age is since the claim (todo.claimed_at, #818 D2).
 -- Listed: p_desk alone when named; else every desk on p_roster when named;
 -- else every joined desk when p_all; else desks active in the last day.
 CREATE PROCEDURE mill_doing_now(
@@ -251,9 +252,9 @@ BEGIN
              (SELECT GROUP_CONCAT(wn.name ORDER BY wn.name SEPARATOR ',')
                 FROM watcher w JOIN name wn ON wn.id = w.desk_id
                WHERE w.type = 'todo' AND w.id = td.id AND w.desk_id <> td.assigned_id) AS watchers,
-             TIMESTAMPDIFF(SECOND, td.updated, v_now) AS age_s,
+             TIMESTAMPDIFF(SECOND, td.claimed_at, v_now) AS age_s,
              COUNT(*) OVER (PARTITION BY td.assigned_id) AS n,
-             ROW_NUMBER() OVER (PARTITION BY td.assigned_id ORDER BY td.updated DESC, td.id DESC) AS rn
+             ROW_NUMBER() OVER (PARTITION BY td.assigned_id ORDER BY td.claimed_at DESC, td.id DESC) AS rn
         FROM tmp_doing_desk t
         JOIN todo td ON td.assigned_id = t.desk_id AND td.status = 'claimed'
         JOIN name d ON d.id = td.assigned_id
