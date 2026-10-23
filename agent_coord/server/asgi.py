@@ -145,9 +145,8 @@ def _ack_rows(desk: str, ids: list) -> None:
         with Book() as c:
             ack_sync(c._cn, desk_name(desk), ids)
     except Exception as e:
-        from agent_coord.server.redact import redact_format
-
-        _log.warning("%s", redact_format("ws ack fail desk=%s err=%s", desk, e))
+        err = type(e).__name__  # the class only; no desk path or exception text reaches the log
+        _log.warning("ws ack fail err=%s", err)
 
 
 async def _ws_handle_client_text(
