@@ -708,7 +708,7 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
         last_text = str(r.get("last_text") or "")
         if last_text:
             out["last"] = {"doing": last_text, "on": _item(r.get("last_on_type"), r.get("last_on_id")),
-                           "age": _age(r.get("last_age_s"))}
+                           "age": _age(r.get("last_age_s")), "ended_by": r.get("ended_by")}
         head = f"{who}: idle" + (f" {out['idle']}" if out.get("idle") else "")
         if last_text:
             head += f' (last: "{last_text}"' + (f" on {out['last']['on']}" if out["last"]["on"] else "") + ")"
@@ -738,8 +738,9 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
     return out
 
 
-def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
-    """`mill connected --history`: past doing entries, newest first, 50 a page."""
+def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int] | None = None) -> dict[str, Any]:
+    """`mill connected --history`: past doing entries, newest first, 50 a page.
+    on keeps one item's entries (the Wall's card trail, GET /api/v1/doing/history?on=)."""
     from datetime import datetime
 
     from agent_coord.server.records import doing as rec_doing
@@ -757,7 +758,8 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
     if page < 1:
         raise CoordError("connected --page: N is 1 or more")
     size = DOING_PAGE
-    rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size)
+    rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size,
+                             on[0] if on else "", on[1] if on else None)
     total = int(rows[0].get("total") or 0) if rows else 0
     if not rows and page > 1:
         raise CoordError(f"connected --history --page {page}: past the last page")
@@ -898,11 +900,15 @@ def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project:
     item = _doing_item(c, command, body, out, project)
     if item is None:
         raise CoordError("no item was written, so no doing can be recorded")
+    from agent_coord.server.records.db import retryable_db
+
     try:
         got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1])
     except CoordError:
         raise
     except Exception as e:
+        if retryable_db(e):
+            raise  # a deadlock, lock wait or dropped connection: request_tx runs it again
         raise CoordError(_sql_refusal(e) or "the doing could not be stored") from e
     if isinstance(out, dict):
         out = dict(out)
@@ -917,7 +923,10 @@ def _run_command(c: Book, fn: Any, command: str, body: dict[str, Any], project: 
 
     With --doing (#818) the command and its doing row are one transaction: both
     commit, or a refusal of either rolls both back and nothing is written; its
-    pokes, letters and webhooks go out only after the commit.
+    pokes, letters and webhooks go out only after the commit. A deadlock, lock
+    wait or dropped connection runs the whole request once more (request_tx);
+    if that fails too the reply is the same "--doing refused ... nothing was
+    changed".
     """
     if not (owner and text):
         out = fn(c, body, project, owner)
@@ -928,10 +937,18 @@ def _run_command(c: Book, fn: Any, command: str, body: dict[str, Any], project: 
         out = fn(c, body, project, owner)
         return _doing_after(c, command, body, out, project, owner, text)
 
+    from agent_coord.server.records.db import TRANSIENT_ERRNO, retryable_db, transient_errno
+
     try:
         return request_tx(c._cn, run)
     except RequestRolledBack as e:
-        msg = _sql_refusal(e.cause) or str(e.cause).split(":", 1)[-1].strip() or type(e.cause).__name__
+        errno = transient_errno(e.cause)
+        if errno is not None:
+            msg = f"the book was busy ({TRANSIENT_ERRNO[errno]} {errno}) twice; try again"
+        elif retryable_db(e.cause):
+            msg = "the book connection failed twice; try again"
+        else:
+            msg = _sql_refusal(e.cause) or str(e.cause).split(":", 1)[-1].strip() or type(e.cause).__name__
         raise CoordError(f"{command} --doing refused: {msg[:160]}; nothing was changed") from e
     except CoordError as e:
         raise CoordError(f"{command} --doing refused: {e}; nothing was changed", sync=getattr(e, "sync", None)) from e

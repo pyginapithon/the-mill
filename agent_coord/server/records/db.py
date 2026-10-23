@@ -190,11 +190,31 @@ def book_down(exc: BaseException) -> bool:
     return False
 
 
+# #818: a deadlock (1213, the connector raises InternalError) or a lock wait
+# timeout (1205, DatabaseError) is worth one more try; matched on the code.
+TRANSIENT_ERRNO = {1213: "deadlock", 1205: "lock wait timeout"}
+
+
+def transient_errno(exc: BaseException | None) -> int | None:
+    """1213 or 1205 when exc (or what caused it) is a deadlock or lock wait, else None."""
+    seen = 0
+    while exc is not None and seen < 5:
+        errno = getattr(exc, "errno", None)
+        if errno in TRANSIENT_ERRNO:
+            return int(errno)
+        exc = exc.__cause__
+        seen += 1
+    return None
+
+
 def retryable_db(exc: BaseException) -> bool:
-    """One more try for a dropped connection. Never for a duplicate key (1062)."""
-    if type(exc).__name__ not in ("OperationalError", "InterfaceError"):
-        return False
+    """One more try for a dropped connection, a deadlock or a lock wait.
+    Never for a duplicate key (1062)."""
     if getattr(exc, "errno", None) == 1062 or "Duplicate entry" in str(exc):
+        return False
+    if transient_errno(exc) is not None:
+        return True
+    if type(exc).__name__ not in ("OperationalError", "InterfaceError"):
         return False
     return book_down(exc)
 
@@ -476,11 +496,20 @@ def _req_flag(cn, on: bool) -> None:
 
 
 def request_tx(cn, run):
-    """run() as one transaction on cn: it commits only when run() returns and no
-    statement failed on the way (a handler that catches a failed call does not
-    hide it); otherwise everything rolls back and RequestRolledBack (or the
-    error) is raised. after_commit work runs after the commit. A deadlock or
-    lock wait retries the whole run once."""
+    """run() as one transaction on cn (#818). Every call() and stored procedure
+    on cn joins it: call() neither commits nor retries, and the procedures skip
+    their own START TRANSACTION / COMMIT (@mill_req_tx).
+
+    It commits only when run() returns and no statement failed on the way (a
+    handler that catches a failed call does not hide it). Otherwise everything
+    rolls back: RequestRolledBack is raised for a failed statement, else run()'s
+    own error. after_commit work runs after the commit; a rollback drops it.
+
+    When the failure is retryable (retryable_db: a dropped connection, a deadlock
+    1213 or a lock wait 1205, whether raised or caught by a handler), the whole
+    run goes again once on the same connection. If that fails too, a transient
+    cause is raised as RequestRolledBack, so the caller can say nothing changed.
+    """
     for attempt in (1, 2):
         try:
             cn.rollback()  # no read snapshot carried in
@@ -504,10 +533,19 @@ def request_tx(cn, run):
                 _req_flag(cn, False)
             except Exception:
                 pass
-            cause = e.cause if isinstance(e, RequestRolledBack) else e
-            if attempt == 1 and isinstance(cause, Exception) and retryable_db(cause):
+            raised = e.cause if isinstance(e, RequestRolledBack) else e
+            # A handler may turn a failed call into its own error; the failed call decides.
+            cause = next(
+                (x for x in (st["failed"], raised) if isinstance(x, Exception) and retryable_db(x)),
+                None,
+            )
+            if cause is None:
+                raise
+            if attempt == 1:
                 continue
-            raise
+            if isinstance(e, RequestRolledBack) and e.cause is cause:
+                raise
+            raise RequestRolledBack(cause) from e
         _REQ_TX.pop(id(cn), None)
         try:
             _req_flag(cn, False)
