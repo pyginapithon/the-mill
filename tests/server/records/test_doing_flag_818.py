@@ -15,7 +15,9 @@ only the /ws hop is replaced by dispatch_ws, as in the #238 matrix.
 (e) there is no `mill doing` command; join and invite placeholders write no
     doing text; a missing or retired item is refused;
     a refused or over-long --doing stores nothing; a failed doing write never
-    undoes the command.
+    undoes the command;
+(f) an entry ends on a real event only: clock-out or reset ends it (ended_by
+    cleared, the empty row is never a doing).
 """
 from __future__ import annotations
 
@@ -367,3 +369,35 @@ def test_history_lists_entries_with_ended_and_pages(w):
     assert code != 0 and "not a date" in (err + out)
     code, out, err = w.run(["connected", "--page", "2"])
     assert code != 0 and "--history" in (err + out)
+
+
+# (f) a doing ends on a real event only -------------------------------------------
+
+def _joined(w, desk: str) -> str:
+    from agent_coord.client.tokens import token_hash
+    from agent_coord.server.records import join as here
+
+    seed_names(w.cn, (desk, "desk"))
+    here.upsert(w.cn, R, desk, "builder", token_hash=token_hash("tok-" + desk), doing="present")
+    return desk
+
+
+def _hist(w, desk: str) -> list[dict]:
+    return w.ok(["connected", "--history", "--desk", desk])["history"]
+
+
+@pytest.mark.parametrize("how", ["clock-out", "reset"])
+def test_clock_out_or_reset_ends_the_doing(w, how):
+    from agent_coord.server.records import join as here
+
+    desk = _joined(w, f"d818-{how}-" + uuid.uuid4().hex[:4])
+    mid = w.letter(to=desk)
+    w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "mid task"], desk=desk)
+    assert w.me(desk)["doing"] == "mid task"
+    (here.delete if how == "clock-out" else here.reset)(w.cn, R, desk)
+    view = w.me(desk)
+    assert view["doing"] == "" and "idle" in view
+    assert view["last"]["doing"] == "mid task" and f'{desk}: idle' in view["line"]
+    rows = _hist(w, desk)
+    assert [r["doing"] for r in rows] == ["mid task"]  # the empty row is never a doing
+    assert rows[0]["ended"] is True and rows[0]["ended_by"] == "cleared"
