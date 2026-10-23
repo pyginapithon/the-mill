@@ -30,11 +30,13 @@ hold group_by
 hold office
 hold yes
 hold doing
+hold waiting_on
 drop (command)
 drop resource
 drop office
 drop yes
 drop doing
+drop waiting_on
 send (command)
 send to
 send to_desk
@@ -44,6 +46,7 @@ send name
 send office
 send yes
 send doing
+send waiting_on
 reply (command)
 reply mail_id
 reply body_file
@@ -52,6 +55,7 @@ reply roster
 reply office
 reply yes
 reply doing
+reply waiting_on
 mail-thread (command)
 mail-thread mail_id
 mail-thread scope
@@ -65,6 +69,7 @@ mark ids
 mark office
 mark yes
 mark doing
+mark waiting_on
 trail (command)
 trail node
 trail label
@@ -100,6 +105,7 @@ score at
 score office
 score yes
 score doing
+score waiting_on
 score-add (command)
 score-add name
 score-add target
@@ -272,6 +278,7 @@ create todo parent_id
 create todo yes
 create todo office
 create todo doing
+create todo waiting_on
 create roster (command)
 create roster slug
 create roster yes
@@ -307,6 +314,7 @@ note full
 note office
 note yes
 note doing
+note waiting_on
 claim (command)
 claim project
 claim need
@@ -316,12 +324,14 @@ claim take_over
 claim office
 claim yes
 claim doing
+claim waiting_on
 unclaim (command)
 unclaim project
 unclaim need
 unclaim office
 unclaim yes
 unclaim doing
+unclaim waiting_on
 unpark (command)
 unpark project
 unpark need
@@ -330,6 +340,7 @@ unpark parent_id
 unpark office
 unpark yes
 unpark doing
+unpark waiting_on
 assign (command)
 assign project
 assign need
@@ -337,6 +348,7 @@ assign desk
 assign office
 assign yes
 assign doing
+assign waiting_on
 pass (command)
 pass project
 pass need
@@ -345,6 +357,7 @@ pass back
 pass office
 pass yes
 pass doing
+pass waiting_on
 invite (command)
 invite door
 invite rotate

@@ -668,6 +668,42 @@ def _ensure_join_wake_on(cn) -> list[str]:
     return applied
 
 
+_WAITING_TYPE = "enum('mail','todo','hold','desk')"
+
+
+def _ensure_doing_waiting(cn) -> list[str]:
+    """#822: blocked-on is fields on the doing row: widen waiting_type to a desk
+    or hold and add waiting_why (the reason). Each ALTER is guarded, so a run
+    killed between them resumes at the one left. No edge or link table."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "doing") and _column_exists(cur, "doing", "waiting_type"):
+            cur.execute(
+                "SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE()"
+                " AND TABLE_NAME = 'doing' AND COLUMN_NAME = 'waiting_type'"
+            )
+            if str(cur.fetchone()[0]).lower() != _WAITING_TYPE:
+                cur.execute(
+                    "ALTER TABLE doing MODIFY COLUMN waiting_type "
+                    "ENUM('mail','todo','hold','desk') NULL"
+                )
+                applied.append("doing.waiting_type")
+            if not _column_exists(cur, "doing", "waiting_why"):
+                cur.execute(
+                    "ALTER TABLE doing ADD COLUMN waiting_why VARCHAR(200) CHARACTER SET utf8mb4"
+                    " COLLATE utf8mb4_0900_ai_ci NULL AFTER waiting_id"
+                )
+                applied.append("doing.waiting_why")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 _TREE_READ_SQL = (
     "CREATE TABLE IF NOT EXISTS tree_read ("
     " desk_id BIGINT UNSIGNED NOT NULL,"
@@ -1257,6 +1293,8 @@ def _ensure_steps(cn) -> dict[str, Any]:
             # #818 after the join column steps (the seat copy reads them).
             did_818 = apply_doing_818(cn)
             applied.extend(did_818)
+            # #822 columns before the routine reload (mill_doing_put names waiting_why).
+            applied.extend(_ensure_doing_waiting(cn))
             if did_818 or not current:
                 applied.extend(reload_routines(cn))
             applied.extend(_ensure_score_series(cn))

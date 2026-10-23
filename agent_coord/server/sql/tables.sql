@@ -212,7 +212,9 @@ CREATE TABLE IF NOT EXISTS seat (
 
 -- #818: what a desk is doing. Append-only: one row per entry, never overwritten.
 -- The desk's current doing is its newest row. on_* is the activity the entry
--- is about (any type but doing); waiting_* is what it waits on. Both optional (PR B writes them).
+-- is about (any type but doing); waiting_* is what it is blocked on (#822:
+-- a desk, letter, card or hold, plus the reason) as fields on this one row.
+-- No edge or link table: who is blocked on a desk is a read (mill_doing_now).
 CREATE TABLE IF NOT EXISTS doing (
   type          ENUM('mail','todo','doing','hold','score') NOT NULL DEFAULT 'doing',
   id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -222,8 +224,9 @@ CREATE TABLE IF NOT EXISTS doing (
   text          VARCHAR(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NOT NULL DEFAULT '',
   on_type       ENUM('mail','todo','hold','score') NULL,
   on_id         BIGINT UNSIGNED NULL,
-  waiting_type  ENUM('mail','todo') NULL,
+  waiting_type  ENUM('mail','todo','hold','desk') NULL,
   waiting_id    BIGINT UNSIGNED NULL,
+  waiting_why   VARCHAR(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci NULL,
   PRIMARY KEY (type, id),
   UNIQUE KEY idx_id (id),
   KEY idx_desk_created (desk_id, created),
