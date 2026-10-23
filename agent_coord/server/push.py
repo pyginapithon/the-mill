@@ -402,7 +402,7 @@ def fanout(
     """After a records write: poke watchers (ws / webhook / poll no-op).
 
     skip_desk leaves out the desk whose own act caused the write. Its /ws connect
-    runs before its socket sits in the Hub, so without this the desk's own JOIN
+    runs before its socket sits in the Hub, so without this the desk's own DOING
     would be queued as missed and handed straight back in its connect sync.
 
     rows, when passed, is the watcher list to poke. probe-delete reads it before

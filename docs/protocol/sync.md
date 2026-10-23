@@ -14,7 +14,7 @@ Three kinds:
 
 | Kind | Who gets it | Watcher |
 | :--- | :--- | :--- |
-| HINT | A desk watching that activity (todo, hold, name, join, score) | Yes |
+| HINT | A desk watching that activity (todo, hold, name, doing, score) | Yes |
 | MAIL | Each desk in `mail_to` | No |
 | receipt | The sender, when a receiver first opens a mail whose `receipt` is set | No |
 
@@ -48,7 +48,7 @@ When the desk has cards it can work on under the label named after it, a focus l
 
 It is not a queue and not a frame; nothing else reads it. No focus card: no line.
 
-`kind: sync` is a JSON list, the push queue. A missed JOIN inside that list is a queue item, not a frame to ignore. Print-and-exit or hold is the model skill, not this page.
+`kind: sync` is a JSON list, the push queue. A missed DOING inside that list is a queue item, not a frame to ignore. Print-and-exit or hold is the model skill, not this page.
 
 ### A mill command
 

@@ -42,18 +42,6 @@ ACTIVITY_TYPES = (
     CONST_SCORE,
 )
 
-# #818: the activity type join was renamed doing. A TYPE argument still takes
-# join for one release (0.7.16) so an older client keeps working; it is read
-# as doing. Output always says doing.
-CONST_JOIN = "join"
-ACTIVITY_TYPE_ALIASES = {CONST_JOIN: CONST_DOING}
-
-
-def activity_type(raw: object) -> str:
-    """Lowercased TYPE with the one-release join -> doing alias applied."""
-    kind = str(raw or "").strip().lower()
-    return ACTIVITY_TYPE_ALIASES.get(kind, kind)
-
 # Dictionary kind. Not an activity type and not a watcher type.
 CONST_WATCH_NAME = "name"
 

@@ -45,9 +45,8 @@ def test_add_watch_defaults_to_self_with_hint(live):
     assert live["hint"] == [("todo", 9, 42, "need:detail")]
 
 
-@pytest.mark.parametrize("typ,stored", [("todo", "todo"), ("doing", "doing"), ("join", "doing"), ("hold", "hold"), ("score", "score")])
+@pytest.mark.parametrize("typ,stored", [("todo", "todo"), ("doing", "doing"), ("hold", "hold"), ("score", "score")])
 def test_every_non_mail_kind_is_a_watcher(live, typ, stored):
-    # #818: join is read as doing for one release.
     _go({"verb": "add", "type": typ, "id": 3})
     _go({"verb": "remove", "type": typ, "id": 3})
     assert live["hint"][-1][:3] == (stored, 3, 42) and live["del"] == [(stored, 3, 42)]
@@ -65,6 +64,8 @@ def test_mail_is_recipients_never_watchers(live):
     ({"verb": "add", "type": "mail", "id": 7, "hint": "x"}, "--hint"),
     ({"verb": "remove", "type": "todo", "id": 7, "hint": "x"}, "--hint"),
     ({"verb": "add", "type": "tree", "id": 1}, "TARGET is type:id"),
+    ({"verb": "add", "type": "join", "id": 1}, "TARGET is type:id"),  # #818: join is no type now
+    ({"verb": "remove", "type": "join", "id": 1}, "TARGET is type:id"),
     ({"verb": "add", "type": "todo", "id": 0}, "TARGET is type:id"),
     ({"verb": "add", "type": "todo", "id": "abc"}, "TARGET is type:id"),
     ({"verb": "add", "type": "todo", "id": 3, "who": "ghost"}, "no such desk or roster ghost"),

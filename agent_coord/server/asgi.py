@@ -55,7 +55,7 @@ def ws_auth_close(exc: BaseException) -> tuple[int, str]:
 
 
 def _note_connect(c: Any, want: str) -> None:
-    """Record the /ws connect (JOIN fanout). Only a connect that sits is recorded (#332)."""
+    """Record the /ws connect (DOING fanout). Only a connect that sits is recorded (#332)."""
     from agent_coord.server.records import join as rec_join
 
     try:

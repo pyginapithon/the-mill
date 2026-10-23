@@ -49,9 +49,8 @@ def note_connect(cn, desk: str) -> None:
         return
     from agent_coord.server.push import fanout
 
-    # The connecting desk is not sitting yet; do not queue its own JOIN back to it.
-    # #818: the activity type is doing; the hint word stays JOIN (older desks skip it).
-    fanout(cn, "doing", int(jid), "JOIN", skip_desk=desk)
+    # The connecting desk is not sitting yet; do not queue its own DOING back to it.
+    fanout(cn, "doing", int(jid), "DOING", skip_desk=desk)
 
 
 def mark_socket(cn, desk: str, *, up: bool) -> None:

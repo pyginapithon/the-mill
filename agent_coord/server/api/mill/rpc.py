@@ -14,7 +14,6 @@ from typing import Any
 
 from agent_coord.const import (
     ACTIVITY_TYPES,
-    activity_type,
     CONST_ADMIN,
     CONST_DESK,
     CONST_HOLD,
@@ -225,10 +224,7 @@ def _poke(
             from agent_coord.server.records.db import scalar
 
             when = str(scalar(c._cn, "SELECT NOW(6)") or "")
-        # #818: a doing poke keeps the JOIN hint word on the wire, so an older
-        # desk still skips it (dispatch skips hint JOIN) and wakes no vendor.
-        hint = "JOIN" if typ == "doing" else typ.upper()
-        fanout(c._cn, typ, int(nid), hint, skip_desk=_stored(owner or ""), when=when)
+        fanout(c._cn, typ, int(nid), typ.upper(), skip_desk=_stored(owner or ""), when=when)
     except Exception as e:
         try:
             from agent_coord.server.push import mill_admin_alert
@@ -2546,7 +2542,7 @@ def _hold_ref_id(cn, name: str, command: str) -> int:
 
 def _add_target(body: dict[str, Any], command: str, cn=None) -> tuple[str, int]:
     """TARGET of mill add/remove: an activity type and a positive id (#265), or a todo ROSTER/NEED (#274)."""
-    typ = activity_type(body.get("type"))
+    typ = str(body.get("type") or "").strip().lower()
     try:
         nid = int(body.get("id") or 0)
     except (TypeError, ValueError):
@@ -3261,9 +3257,6 @@ def dispatch_ws(
     # client. `host` (the Admin office-host marker) is re-set below only from a
     # verified loopback transport peer, never from the /ws args.
     _strip_server_only(body)
-    # #818: TYPE join is read as doing for one release (an older client).
-    if "type" in body and str(body.get("type") or "").strip().lower() == "join":
-        body["type"] = "doing"
     from agent_coord.server.admin.guard import mark_host
 
     if peer and not forwarded:

@@ -1423,7 +1423,7 @@ def wait_one_hint(
 
     skip_ping drops hub PING. skip_kinds drops those top-level kinds.
     kind sync is not in the default skip set: it is the push queue.
-    A missed JOIN inside that list is a queue item, not a frame to ignore.
+    A missed DOING inside that list is a queue item, not a frame to ignore.
 
     hold_empty_sync defaults false: an empty sync list returns. mill
     connect-wait and mill-hold pass true: an empty list keeps the socket
@@ -1515,7 +1515,7 @@ def wait_one_hint(
                 if kind == "sync":
                     items = msg.get("sync")
                     queued = items if isinstance(items, list) else []
-                    # Whole list is the queue. Do not drop a missed JOIN inside it.
+                    # Whole list is the queue. Do not drop a missed DOING inside it.
                     # An item a sitting connect of this desk already got (outcome
                     # sent) does not end the wait; an undelivered one does (#328).
                     if hold_empty_sync and not any(_undelivered(it) for it in queued):

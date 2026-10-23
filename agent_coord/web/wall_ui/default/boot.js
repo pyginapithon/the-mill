@@ -4881,7 +4881,7 @@
           if (!unread && typeof mailMsgHumanRequiredOpen === "function" && mailMsgHumanRequiredOpen(m)) unread = true;
         }
       }
-      if (!title && (type === "name" || type === "doing" || type === "join")) {
+      if (!title && (type === "name" || type === "doing")) {
         title = millNameBare(type, (node && (node.name || node.owner)) || "") || ("#" + String(id || ""));
       }
       if (!title) title = type ? (type + " #" + String(id || "")) : "(untitled)";

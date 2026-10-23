@@ -24,7 +24,7 @@ ACTIVITIES: dict[str, str] = {
     "todo": "TODO",
     "hold": "HOLD",
     "score": "SCORE",
-    "join": "JOIN",
+    "doing": "DOING",
     "name": "NAME",
 }
 
@@ -51,11 +51,9 @@ def check_frame(obj: Mapping[str, Any], custom: str | None = None) -> None:
         raise ValueError("frame is not an object")
     typ = str(obj.get("type") or "")
     hint = str(obj.get("hint") or "")
-    # #818: the join activity type is doing; the hint word stays JOIN
-    row = "join" if typ == "doing" else typ
-    if row not in ACTIVITIES:
+    if typ not in ACTIVITIES:
         raise ValueError(f"type {typ!r} is not in the activity table")
-    expect = ACTIVITIES[row]
+    expect = ACTIVITIES[typ]
     if hint != expect:
         raise ValueError(f"hint {hint!r} != {expect} for type {typ}")
     if hint == "PING" or typ == "heartbeat":
