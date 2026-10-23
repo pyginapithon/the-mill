@@ -11,6 +11,9 @@ later one. The letter is still in mail, but the desk is never told.
 Wanted: a letter whose sync frame never reached the desk still reaches it in a
 later sync. The barrier sits between the take and the send, so the order is
 forced, not timed.
+
+Fixed: the sync rows are read without deleting them (hold=True) and deleted by id
+only after send_text returns (ack_sync). A row is always queued, delivered, or both.
 """
 from __future__ import annotations
 
@@ -183,12 +186,12 @@ def test_superseded_connect_keeps_the_batch_it_never_sent(wall, monkeypatch) -> 
     orig = push.connect_sync_frame
     taken, release, seen = threading.Event(), threading.Event(), {}
 
-    def take_then_hold(cn, desk):
-        out = orig(cn, desk)
+    def take_then_hold(cn, desk, **kw):
+        out = orig(cn, desk, **kw)
         if desk == D1 and not seen:
             seen["took"] = [int(i.get("id") or 0) for i in out["sync"] if i.get("kind") == "mail"]
             taken.set()
-            release.wait(15)  # after the take has committed, before send_text (asgi.py 612 -> 616)
+            release.wait(15)  # after the read, before send_text (asgi.py 612 -> 616)
         return out
 
     monkeypatch.setattr(push, "connect_sync_frame", take_then_hold)
@@ -200,9 +203,9 @@ def test_superseded_connect_keeps_the_batch_it_never_sent(wall, monkeypatch) -> 
         mid = int(sent["result"]["id"])
         assert queued(D1) == [mid]
 
-        a = await Desk(port, D1).up()  # connect A: takes the row, its send is held
+        a = await Desk(port, D1).up()  # connect A: reads the row, its send is held
         assert await asyncio.to_thread(taken.wait, 10)
-        assert seen["took"] == [mid] and queued(D1) == []
+        assert seen["took"] == [mid]
 
         b = await Desk(port, D1).up()  # connect B: plain connect, takes the seat
         await b.synced()
@@ -219,8 +222,26 @@ def test_superseded_connect_keeps_the_batch_it_never_sent(wall, monkeypatch) -> 
             "the letter's push_queue row was deleted by connect A's sync, A was superseded "
             "before its sync frame was sent, and no later sync carried it"
         )
+        assert queued(D1) == [], "a sent sync frame leaves its rows queued"
 
     try:
         asyncio.run(run())
     finally:
         release.set()
+
+
+def test_peek_leaves_rows_and_ack_deletes_only_those(book) -> None:
+    from agent_coord.server.records import push as rec_push
+
+    rec_push.put(book, D1, "mail", {"kind": "mail", "id": 901}, "missed")
+    rec_push.put(book, D1, "mail", {"kind": "mail", "id": 902}, "missed")
+    book.commit()
+    held = rec_push.peek(book, D1)
+    assert [i["id"] for i in held] == [901, 902] and len(held.ids) == 2
+    assert queued(D1) == [901, 902]  # read, not deleted
+    rec_push.put(book, D1, "mail", {"kind": "mail", "id": 903}, "missed")
+    book.commit()
+    assert rec_push.ack(book, held.ids) == 2
+    assert queued(D1) == [903]  # a row put after the read stays
+    assert rec_push.ack(book, held.ids) == 0  # a second ack is harmless
+
