@@ -21,10 +21,22 @@ TEXT_MAX = 512
 ON_TYPES = ("mail", "todo", "hold", "score")
 
 
-def put(cn, desk: str, text: str, on_type: str, on_id: int) -> dict[str, Any]:
+WHY_MAX = 200
+
+
+def put(cn, desk: str, text: str, on_type: str, on_id: int,
+        waiting: tuple[str, str, str] | None = None) -> dict[str, Any]:
+    """waiting (#822): (type, ref, why), type desk (ref the name) or mail, todo,
+    hold (ref the id). Stored as fields on this row; no edge or link table."""
     from agent_coord.server.records.name import bare
 
-    rows = call(cn, "mill_doing_put", [bare(desk, CONST_DESK), text[:TEXT_MAX], on_type, int(on_id)])
+    w_type, w_ref, w_why = waiting or (None, None, None)
+    if w_type == "desk":
+        w_ref = bare(str(w_ref), CONST_DESK)
+    rows = call(cn, "mill_doing_put", [
+        bare(desk, CONST_DESK), text[:TEXT_MAX], on_type, int(on_id),
+        w_type, w_ref, (w_why or "")[:WHY_MAX] if w_type else None,
+    ])
     return rows[0] if rows else {}
 
 

@@ -72,18 +72,25 @@ END //
 
 -- One new entry for the desk, on the item the command just wrote. The roster
 -- is that item's (its activity row). Watchers follow (mill_doing_insert).
--- waiting_type/waiting_id stay NULL: no command sets them yet.
+-- #822 blocked-on (--waiting-on): p_w_type 'desk' with p_w_ref the desk name,
+-- or 'mail', 'todo' or 'hold' with p_w_ref the id, plus the reason. Stored as
+-- waiting_type, waiting_id, waiting_why on this one row; no edge or link table.
+-- A missing or deleted target, or the desk itself, refuses the entry.
 CREATE PROCEDURE mill_doing_put(
   IN p_desk      VARCHAR(64),
   IN p_text      VARCHAR(512),
   IN p_on_type   VARCHAR(8),
-  IN p_on_id     BIGINT UNSIGNED
+  IN p_on_id     BIGINT UNSIGNED,
+  IN p_w_type    VARCHAR(8),
+  IN p_w_ref     VARCHAR(64),
+  IN p_w_why     VARCHAR(200)
 )
 BEGIN
   DECLARE v_ts DATETIME(6);
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
   DECLARE v_roster BIGINT UNSIGNED;
+  DECLARE v_wid BIGINT UNSIGNED;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION
   BEGIN
     ROLLBACK;
@@ -97,13 +104,33 @@ BEGIN
      OR NOT EXISTS (SELECT 1 FROM activity WHERE type = p_on_type AND id = p_on_id AND deleted IS NULL) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: the item is gone';
   END IF;
+  SET v_wid = NULL;
+  IF IFNULL(p_w_type, '') = 'desk' THEN
+    SET v_wid = (SELECT id FROM name WHERE type = 'desk' AND name = p_w_ref AND deleted IS NULL);
+    IF v_wid IS NULL THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: --waiting-on names no desk or item';
+    END IF;
+    IF v_wid = v_desk THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: a desk is not blocked on itself';
+    END IF;
+  ELSEIF IFNULL(p_w_type, '') IN ('mail', 'todo', 'hold') THEN
+    SET v_wid = CAST(p_w_ref AS UNSIGNED);
+    IF NOT EXISTS (SELECT 1 FROM activity WHERE type = p_w_type AND id = v_wid AND deleted IS NULL) THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: --waiting-on names no desk or item';
+    END IF;
+  ELSEIF IFNULL(p_w_type, '') <> '' THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'doing: --waiting-on names no desk or item';
+  END IF;
   SET v_roster = IFNULL((SELECT roster_id FROM activity WHERE type = p_on_type AND id = p_on_id), 1);
   IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   UPDATE seat SET updated = v_ts WHERE desk_id = v_desk;
   CALL mill_doing_insert(v_desk, v_roster, p_text, v_ts, v_id);
   -- The row was inserted by this call; nothing older is touched.
-  UPDATE doing SET on_type = p_on_type, on_id = p_on_id WHERE id = v_id;
+  UPDATE doing SET on_type = p_on_type, on_id = p_on_id,
+                   waiting_type = IF(v_wid IS NULL, NULL, p_w_type), waiting_id = v_wid,
+                   waiting_why = IF(v_wid IS NULL, NULL, NULLIF(p_w_why, ''))
+   WHERE id = v_id;
   CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
   IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS created, v_desk AS desk_id, v_roster AS roster_id;
@@ -156,6 +183,10 @@ END //
 --           replied under (n = how many in all).
 --   card:   up to 3 per desk: cards it has claimed that another desk watches,
 --           newest claim first; age is since the claim (todo.claimed_at, #818 D2).
+--   blocked: up to 3 per desk, newest first: other desks whose current entry
+--           (not ended) is blocked on it (#822): on the desk, a card it holds
+--           as volunteer, a hold it holds, or a letter it received. A read of
+--           the waiting_* fields on doing rows; there is no edge or link table.
 -- Listed: p_desk alone when named; else every desk on p_roster when named;
 -- else every joined desk when p_all; else desks active in the last day.
 CREATE PROCEDURE mill_doing_now(
@@ -189,7 +220,8 @@ BEGIN
                       WHERE a.desk_id = s.desk_id AND a.created > v_now - INTERVAL 1 DAY)));
 
   SELECT 'desk' AS part, d.name AS desk,
-         cur.id, cur.text, cur.on_type, cur.on_id, cur.waiting_type, cur.waiting_id,
+         cur.id, cur.text, cur.on_type, cur.on_id, cur.waiting_type, cur.waiting_id, cur.waiting_why,
+         (SELECT wn.name FROM name wn WHERE cur.waiting_type = 'desk' AND wn.id = cur.waiting_id) AS waiting_name,
          TIMESTAMPDIFF(SECOND, cur.created, v_now) AS age_s,
          -- the first of its own event and a clear
          CASE WHEN en.fin IS NULL THEN en.clr WHEN en.clr IS NULL THEN en.fin
@@ -205,7 +237,7 @@ BEGIN
     JOIN name d ON d.id = t.desk_id
     JOIN seat st ON st.desk_id = t.desk_id
     LEFT JOIN LATERAL (
-      SELECT g.id, g.created, g.text, g.on_type, g.on_id, g.waiting_type, g.waiting_id
+      SELECT g.id, g.created, g.text, g.on_type, g.on_id, g.waiting_type, g.waiting_id, g.waiting_why
         FROM doing g WHERE g.desk_id = t.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
        ORDER BY g.created DESC, g.id DESC LIMIT 1
     ) cur ON TRUE
@@ -268,6 +300,39 @@ BEGIN
    WHERE x.rn <= 3
    ORDER BY x.desk, x.rn;
 
+  SELECT 'blocked' AS part, x.desk, x.waiter, x.waiting_type, x.waiting_id, x.waiting_why, x.age_s, x.n
+    FROM (
+      SELECT d.name AS desk, wn.name AS waiter, w.waiting_type, w.waiting_id, w.waiting_why,
+             TIMESTAMPDIFF(SECOND, w.created, v_now) AS age_s,
+             COUNT(*) OVER (PARTITION BY t.desk_id) AS n,
+             ROW_NUMBER() OVER (PARTITION BY t.desk_id ORDER BY w.created DESC, w.id DESC) AS rn
+        FROM (
+          -- each seated desk's current entry, when it waits on something and has not ended
+          SELECT s.desk_id AS waiter_id, cur.*
+            FROM seat s
+            JOIN LATERAL (
+              SELECT g.id, g.created, g.on_type, g.on_id, g.waiting_type, g.waiting_id, g.waiting_why
+                FROM doing g WHERE g.desk_id = s.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
+               ORDER BY g.created DESC, g.id DESC LIMIT 1
+            ) cur ON TRUE
+           WHERE cur.waiting_type IS NOT NULL
+             AND mill_doing_end(s.desk_id, cur.id, cur.on_type, cur.on_id, cur.created) IS NULL
+             AND mill_doing_cleared(s.desk_id, cur.id, cur.created) IS NULL
+        ) w
+        JOIN tmp_doing_desk t ON t.desk_id <> w.waiter_id AND (
+             (w.waiting_type = 'desk' AND w.waiting_id = t.desk_id)
+          OR (w.waiting_type = 'todo' AND EXISTS (SELECT 1 FROM todo td WHERE td.id = w.waiting_id
+                AND td.status = 'claimed' AND td.assigned_id = t.desk_id))
+          OR (w.waiting_type = 'hold' AND EXISTS (SELECT 1 FROM hold h WHERE h.id = w.waiting_id
+                AND h.desk_id = t.desk_id))
+          OR (w.waiting_type = 'mail' AND EXISTS (SELECT 1 FROM mail_to mt WHERE mt.type = 'mail'
+                AND mt.id = w.waiting_id AND mt.desk_id = t.desk_id)))
+        JOIN name d ON d.id = t.desk_id
+        JOIN name wn ON wn.id = w.waiter_id
+    ) x
+   WHERE x.rn <= 3
+   ORDER BY x.desk, x.rn;
+
   DROP TEMPORARY TABLE IF EXISTS tmp_doing_desk;
 END //
 
@@ -293,7 +358,8 @@ BEGIN
   END IF;
   SET v_off = (GREATEST(IFNULL(p_page, 1), 1) - 1) * GREATEST(IFNULL(p_size, 50), 1);
   SELECT g.id, d.name AS desk, g.created, g.text, g.on_type, g.on_id,
-         g.waiting_type, g.waiting_id, ro.name AS roster,
+         g.waiting_type, g.waiting_id, g.waiting_why, ro.name AS roster,
+         (SELECT wn.name FROM name wn WHERE g.waiting_type = 'desk' AND wn.id = g.waiting_id) AS waiting_name,
          mill_doing_end(g.desk_id, g.id, g.on_type, g.on_id, g.created) AS ended_at,
          mill_doing_cleared(g.desk_id, g.id, g.created) AS cleared_at,
          (SELECT MIN(nx.created) FROM doing nx

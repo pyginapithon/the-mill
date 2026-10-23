@@ -447,6 +447,10 @@ DOING_HELP = (
     "what you are doing now, in a few words; mill connected shows it on this command's item. "
     "No end step: a reply or pass without --doing ends it"
 )
+WAITING_ON_HELP = (
+    "with --doing: what this doing is blocked on, then why: a desk, mail-ID, todo-ID or hold-ID "
+    "(--waiting-on \"gardener the column names\"). mill connected shows it, and the desk you wait on sees you"
+)
 DOING_FLAG_COMMANDS = (
     "send", "reply", "mark", "create", "claim", "unclaim", "assign", "pass", "note", "unpark", "hold", "drop", "score",
 )
@@ -1426,6 +1430,7 @@ def _build_parser() -> MillArgumentParser:
     for _name in DOING_FLAG_COMMANDS:
         _dp = _ct if _name == "create" else sub.choices[_name]
         _dp.add_argument("--doing", default="", metavar="TEXT", help=DOING_HELP)
+        _dp.add_argument("--waiting-on", dest="waiting_on", default="", metavar="WHAT [WHY]", help=WAITING_ON_HELP)
     return p
 
 

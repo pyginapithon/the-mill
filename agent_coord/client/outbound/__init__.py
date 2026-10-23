@@ -73,6 +73,7 @@ _STR = (
     "need",
     "detail",
     "doing",
+    "waiting_on",
     "status",
     "desk",
     "dst",
@@ -259,6 +260,9 @@ def _guard_args(command: str, cmd: str, args: Any) -> None:
         doing = str(getattr(args, "doing", "") or "")
         if len(doing) > DOING_MAX:
             raise CoordError(f"{name}: --doing must be 0..{DOING_MAX} chars")
+        # #822: blocked-on rides the doing entry; alone it has nothing to sit on.
+        if str(getattr(args, "waiting_on", "") or "").strip() and not doing.strip():
+            raise CoordError(f"{name}: --waiting-on goes with --doing; nothing was changed")
 
 
 def body_from_args(args: Any) -> dict[str, Any]:

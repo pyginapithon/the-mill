@@ -7,6 +7,7 @@ Bearer or PRIVATE-TOKEN. mill-wall does not write ~/.mill/session for laptops.
 from __future__ import annotations
 
 import logging
+import re
 import secrets
 import threading
 from collections import OrderedDict
@@ -655,16 +656,16 @@ def _h_session(c: Book, body: dict[str, Any], project: str, owner: str | None) -
 
 
 def _doing_rows(rows: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, list]]]:
-    """Group mill_doing_now's three parts: (desk row, {letters, cards})."""
+    """Group mill_doing_now's parts: (desk row, {letters, cards, blocked desks})."""
     extra: dict[str, dict[str, list]] = {}
     desks: list[dict[str, Any]] = []
     for r in rows:
         part = str(r.get("part") or "")
         if part == "desk":
             desks.append(r)
-        elif part in ("letter", "card"):
-            extra.setdefault(str(r.get("desk") or ""), {"letter": [], "card": []})[part].append(r)
-    return [(d, extra.get(str(d.get("desk") or ""), {"letter": [], "card": []})) for d in desks]
+        elif part in ("letter", "card", "blocked"):
+            extra.setdefault(str(r.get("desk") or ""), {"letter": [], "card": [], "blocked": []})[part].append(r)
+    return [(d, extra.get(str(d.get("desk") or ""), {"letter": [], "card": [], "blocked": []})) for d in desks]
 
 
 def _age(seconds: Any) -> str:
@@ -700,6 +701,12 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
     if text and not ended:
         out.update({"doing": text, "on": on, "age": _age(r.get("age_s"))})
         head = f'{who}: doing "{text}"' + (f" on {on}" if on else "") + f" ({out['age']})"
+        # #822: what this entry is blocked on (fields on its own doing row).
+        wait = _waiting_view(r.get("waiting_type"), r.get("waiting_id"), r.get("waiting_name"), r.get("waiting_why"))
+        if wait:
+            out["waiting_on"] = wait
+            target = wait["on"][5:] if wait["on"].startswith("desk-") else wait["on"]
+            head += f", waiting on {target}" + (f" ({wait['why']})" if wait["why"] else "")
     else:
         out["doing"] = ""
         if ended and r.get("now") is not None:
@@ -725,11 +732,19 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
          "claimed_at": str(x["claimed_at"])[:19] if x.get("claimed_at") is not None else None}
         for x in by["card"]
     ]
+    # #822: desks whose current doing is blocked on this one (a read of their rows).
+    blocked = [
+        {"desk": _stored(x.get("waiter") or ""), "age": _age(x.get("age_s")),
+         **(_waiting_view(x.get("waiting_type"), x.get("waiting_id"), who, x.get("waiting_why")) or {})}
+        for x in by.get("blocked", [])
+    ]
     n_letters = int(by["letter"][0].get("n") or 0) if by["letter"] else 0
     n_cards = int(by["card"][0].get("n") or 0) if by["card"] else 0
+    n_blocked = int(by["blocked"][0].get("n") or 0) if by.get("blocked") else 0
     out["waiting_on_it"] = {
         "letters": {"n": n_letters, "newest": letters},
         "cards": {"n": n_cards, "newest": cards},
+        "desks": {"n": n_blocked, "newest": blocked},
     }
     bits = []
     if n_letters:
@@ -738,6 +753,9 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
     if n_cards:
         x = cards[0]
         bits.append(f"{n_cards} watched card{'s' if n_cards != 1 else ''} it claimed (newest {x['id']} {x['need']}, {x['age']})")
+    if n_blocked:
+        x = blocked[0]
+        bits.append(f"{n_blocked} desk{'s' if n_blocked != 1 else ''} blocked on it (newest {x['desk']} on {x['on']}, {x['age']})")
     out["line"] = head + ". Waiting on it: " + ("; ".join(bits) if bits else "nothing") + "."
     return out
 
@@ -785,6 +803,8 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int]
             "roster": _stored(r.get("roster") or ""),
             "ended": how is not None,
             "ended_by": how,
+            **({"waiting_on": w} if (w := _waiting_view(r.get("waiting_type"), r.get("waiting_id"),
+                                                        r.get("waiting_name"), r.get("waiting_why"))) else {}),
         })
     return {"history": entries, "page": block}
 
@@ -816,18 +836,44 @@ DOING_COMMANDS = frozenset(
 
 
 def _doing_text(command: str, body: dict[str, Any]) -> str:
-    """The --doing text this call carries, checked before the command runs."""
-    if command not in DOING_COMMANDS:
-        return ""
-    raw = body.get("doing")
-    if raw is None:
-        return ""
-    text = " ".join(str(raw).replace("\x00", "").split())
-    if not text:
-        return ""
+    """The --doing text this call carries, checked before the command runs.
+    A --waiting-on (#822) is checked here too, so a bad one runs nothing."""
+    raw = body.get("doing") if command in DOING_COMMANDS else None
+    text = " ".join(str(raw).replace("\x00", "").split()) if raw is not None else ""
     if len(text) > 512:
         raise CoordError(f"{command}: --doing must be 1..512 characters; nothing stored")
+    _doing_waiting(command, body, text)
     return text
+
+
+_WAIT_ITEM = re.compile(r"^(mail|todo|hold)-(\d{1,19})$")
+
+
+def _doing_waiting(command: str, body: dict[str, Any], text: str) -> tuple[str, str, str] | None:
+    """#822 --waiting-on "WHAT [WHY]": what this doing is blocked on. WHAT is a
+    desk, mail-ID, todo-ID or hold-ID; the rest is the reason. None when absent."""
+    raw = " ".join(str(body.get("waiting_on") or "").replace("\x00", "").split())
+    if not raw:
+        return None
+    if command not in DOING_COMMANDS or not text:
+        raise CoordError(f"{command}: --waiting-on goes with --doing; nothing was changed")
+    what, _, why = raw.partition(" ")
+    if len(why) > 200:
+        raise CoordError(f"{command}: --waiting-on reason must be 0..200 characters; nothing was changed")
+    hit = _WAIT_ITEM.match(what.lower())
+    if hit:
+        return (hit.group(1), hit.group(2), why)
+    if len(what) > 64:
+        raise CoordError(f"{command} --doing refused: --waiting-on names no desk or item; nothing was changed")
+    return ("desk", what, why)
+
+
+def _waiting_view(typ: Any, nid: Any, name: Any, why: Any) -> dict[str, Any] | None:
+    """{on, why} of a blocked-on: on is desk-NAME or TYPE-ID."""
+    if not typ or nid is None:
+        return None
+    on = f"desk-{_stored(name or '')}" if typ == "desk" else f"{typ}-{int(nid)}"
+    return {"on": on, "why": str(why or "")}
 
 
 def _first_need(raw: Any) -> str:
@@ -923,8 +969,9 @@ def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project:
         raise CoordError("no item was written, so no doing can be recorded")
     from agent_coord.server.records.db import retryable_db
 
+    waiting = _doing_waiting(command, body, text)
     try:
-        got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1])
+        got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1], waiting)
     except CoordError:
         raise
     except Exception as e:
@@ -934,6 +981,9 @@ def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project:
     if isinstance(out, dict):
         out = dict(out)
         out["doing_entry"] = {"id": int(got.get("id") or 0), "on": f"{item[0]}-{item[1]}"}
+        if waiting:
+            w_on = f"desk-{_stored(waiting[1])}" if waiting[0] == "desk" else f"{waiting[0]}-{int(waiting[1])}"
+            out["doing_entry"]["waiting_on"] = {"on": w_on, "why": waiting[2]}
     if got.get("id"):
         _poke(c, "doing", got.get("id"), "doing", owner=owner)  # waits for the commit
     return out
