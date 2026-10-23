@@ -5,17 +5,21 @@
 -- letter; on a card when its desk passes it (ships it as the volunteer) or the
 -- card is done; on a hold when the desk drops it. Marking a letter never ends
 -- it. A score entry does not end on its own (score semantics are open).
+-- Clock-out, reset and retire end it too (cleared): they append an empty row
+-- with no item (mill_doing_clear), read by mill_doing_cleared.
 
 DROP FUNCTION IF EXISTS mill_doing_end;
+DROP FUNCTION IF EXISTS mill_doing_cleared;
 DROP PROCEDURE IF EXISTS mill_doing_put;
 DROP PROCEDURE IF EXISTS mill_doing_now;
 DROP PROCEDURE IF EXISTS mill_doing_history;
 
 DELIMITER //
 
--- When the entry ended, or NULL while it is current. Derived, never stored.
+-- When the entry ended by its own event, or NULL while it is current. Derived, never stored.
 CREATE FUNCTION mill_doing_end(
   p_desk    BIGINT UNSIGNED,
+  p_id      BIGINT UNSIGNED,
   p_on_type VARCHAR(8),
   p_on_id   BIGINT UNSIGNED,
   p_created DATETIME(6)
@@ -48,6 +52,24 @@ BEGIN
        AND (h.desk_id IS NULL OR h.desk_id <> p_desk)
      LIMIT 1;
   END IF;
+  RETURN v_at;
+END //
+
+-- When clock-out, reset or retire cleared the entry (an empty row with no
+-- item after it), or NULL.
+CREATE FUNCTION mill_doing_cleared(
+  p_desk    BIGINT UNSIGNED,
+  p_id      BIGINT UNSIGNED,
+  p_created DATETIME(6)
+) RETURNS DATETIME(6)
+  NOT DETERMINISTIC
+  READS SQL DATA
+BEGIN
+  DECLARE v_at DATETIME(6);
+  SELECT MIN(e.created) INTO v_at
+    FROM doing e
+   WHERE e.desk_id = p_desk AND e.text = '' AND e.on_type IS NULL
+     AND (e.created > p_created OR (e.created = p_created AND e.id > p_id));
   RETURN v_at;
 END //
 
@@ -133,7 +155,9 @@ BEGIN
   SELECT 'desk' AS part, d.name AS desk,
          cur.id, cur.text, cur.on_type, cur.on_id, cur.waiting_type, cur.waiting_id,
          TIMESTAMPDIFF(SECOND, cur.created, v_now) AS age_s,
-         IF(cur.id IS NULL, NULL, mill_doing_end(t.desk_id, cur.on_type, cur.on_id, cur.created)) AS ended_at,
+         -- the first of its own event and a clear
+         CASE WHEN en.fin IS NULL THEN en.clr WHEN en.clr IS NULL THEN en.fin
+              ELSE LEAST(en.fin, en.clr) END AS ended_at,
          lst.id AS last_id, lst.text AS last_text, lst.on_type AS last_on_type, lst.on_id AS last_on_id,
          TIMESTAMPDIFF(SECOND, lst.created, v_now) AS last_age_s,
          st.updated AS heartbeat, v_now AS now
@@ -145,6 +169,10 @@ BEGIN
         FROM doing g WHERE g.desk_id = t.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
        ORDER BY g.created DESC, g.id DESC LIMIT 1
     ) cur ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT mill_doing_end(t.desk_id, cur.id, cur.on_type, cur.on_id, cur.created) AS fin,
+             mill_doing_cleared(t.desk_id, cur.id, cur.created) AS clr
+    ) en ON TRUE
     LEFT JOIN LATERAL (
       SELECT g.id, g.created, g.text, g.on_type, g.on_id
         FROM doing g WHERE g.desk_id = t.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
@@ -202,7 +230,8 @@ BEGIN
 END //
 
 -- Past --doing entries (text and on), newest first, one page (p_page from 1).
--- Each row says whether it has ended and whether a newer entry replaced it.
+-- Each row says when its event finished it, when it was cleared and when a
+-- newer entry replaced it; the first of the three is how it ended.
 -- total counts every matching entry (adoption count).
 CREATE PROCEDURE mill_doing_history(
   IN p_desk  VARCHAR(64),
@@ -220,7 +249,8 @@ BEGIN
   SET v_off = (GREATEST(IFNULL(p_page, 1), 1) - 1) * GREATEST(IFNULL(p_size, 50), 1);
   SELECT g.id, d.name AS desk, g.created, g.text, g.on_type, g.on_id,
          g.waiting_type, g.waiting_id, ro.name AS roster,
-         mill_doing_end(g.desk_id, g.on_type, g.on_id, g.created) AS ended_at,
+         mill_doing_end(g.desk_id, g.id, g.on_type, g.on_id, g.created) AS ended_at,
+         mill_doing_cleared(g.desk_id, g.id, g.created) AS cleared_at,
          (SELECT MIN(nx.created) FROM doing nx
            WHERE nx.desk_id = g.desk_id AND nx.on_type IS NOT NULL AND nx.text <> ''
              AND (nx.created > g.created OR (nx.created = g.created AND nx.id > g.id))) AS replaced_at,

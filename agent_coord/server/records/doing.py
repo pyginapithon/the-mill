@@ -4,7 +4,8 @@ the reads behind `mill connected` (what each desk is doing, and its history).
 Writes: one entry per command, linked to the item that command wrote. The
 newest entry is the desk's current doing. There is no end step: the entry
 ends on its own when the desk replies under the letter, passes the card (or
-the card is done), or drops the hold (see mill_doing_end).
+the card is done), or drops the hold (see mill_doing_end), and when the desk
+clocks out or is reset (an empty row with no item, see mill_doing_cleared).
 """
 
 from __future__ import annotations

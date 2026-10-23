@@ -760,9 +760,11 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
         block["next"] = f"--page {page + 1}"
     entries = []
     for r in rows:
-        end, newer = r.get("ended_at"), r.get("replaced_at")
-        # Whichever came first: a finish (reply, pass, drop) or a newer --doing.
-        how = "finished" if end is not None and (newer is None or end <= newer) else ("newer" if newer is not None else None)
+        # Whichever came first: its own event (reply, pass, drop),
+        # clock-out or reset (cleared), or a newer --doing.
+        ends = [(r.get("ended_at"), "finished"), (r.get("cleared_at"), "cleared"), (r.get("replaced_at"), "newer")]
+        hit = [(at, by) for at, by in ends if at is not None]
+        how = min(hit, key=lambda x: x[0])[1] if hit else None
         entries.append({
             "id": int(r["id"]),
             "desk": _stored(r.get("desk") or ""),

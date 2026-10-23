@@ -361,8 +361,8 @@ def _ensure_sp_full(cn) -> list[str]:
 # #722: functions an existing book refreshes from tip (Office alias of roster id 1).
 _FN_REFRESH: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("fn_name.sql", ("mill_name_get", "mill_name_put")),
-    # #818 PR B: when a doing entry ended (reply under the letter, pass or done).
-    ("sp_doing.sql", ("mill_doing_end",)),
+    # #818 PR B: when a doing entry ended (its own event, or cleared).
+    ("sp_doing.sql", ("mill_doing_end", "mill_doing_cleared")),
 )
 
 
