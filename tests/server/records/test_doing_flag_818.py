@@ -382,6 +382,83 @@ def test_a_list_command_with_doing_is_all_or_nothing(w):
     assert _counts(w) == before
 
 
+
+def _transient(errno: int):
+    """The class the connector really raises: InternalError for 1213, DatabaseError for 1205."""
+    from mysql.connector import errors
+
+    state = "40001" if errno == 1213 else "HY000"
+    return errors.get_mysql_exception(errno, f"injected {errno}", state)
+
+
+def _fail_sp(monkeypatch, prefix: str, errno: int, times: int) -> dict:
+    """The first `times` calls of a procedure named prefix* inside a --doing request raise errno."""
+    import agent_coord.server.records.db as db
+
+    real = db._run_proc
+    n = {"k": 0}
+
+    def flaky(cur, name, args):
+        if name.startswith(prefix) and db._REQ_TX and n["k"] < times:
+            n["k"] += 1
+            raise _transient(errno)
+        return real(cur, name, args)
+
+    monkeypatch.setattr(db, "_run_proc", flaky)
+    return n
+
+
+@pytest.mark.parametrize("errno", [1213, 1205, 2013])
+def test_a_transient_error_in_the_doing_write_retries_the_whole_request(w, monkeypatch, errno):
+    """Validator probes c6 and c6b: the doing write hits a deadlock, lock wait or
+    lost connection once; the whole request runs again and lands once."""
+    from agent_coord.server.records import doing as rec_doing
+
+    real = rec_doing.put
+    n = {"k": 0}
+
+    def flaky(cn, *a, **k):
+        n["k"] += 1
+        if n["k"] == 1:
+            raise _transient(errno)
+        return real(cn, *a, **k)
+
+    monkeypatch.setattr(rec_doing, "put", flaky)
+    seen = _spy_fanout(monkeypatch)
+    before = _counts(w)
+    res = w.ok(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", f"retry {errno}"])
+    after = _counts(w)
+    assert n["k"] == 2
+    assert after["mail"] == before["mail"] + 1 and after["doing"] == before["doing"] + 1
+    assert [s for s in seen if s[0] == "doing"] == [("doing", int(res["doing_entry"]["id"]))]
+
+
+@pytest.mark.parametrize("errno", [1213, 1205])
+def test_a_transient_error_in_the_command_retries_the_whole_request(w, monkeypatch, errno):
+    """Validator probe c8: the command's own procedure hits a deadlock or lock wait once."""
+    n = _fail_sp(monkeypatch, "mill_mail", errno, 1)
+    before = _counts(w)
+    w.ok(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", f"again {errno}"])
+    after = _counts(w)
+    assert n["k"] == 1
+    assert after["mail"] == before["mail"] + 1 and after["doing"] == before["doing"] + 1
+
+
+@pytest.mark.parametrize("errno", [1213, 1205])
+def test_a_transient_error_that_outlasts_the_retry_is_refused_and_changes_nothing(w, monkeypatch, errno):
+    """Validator probe c9, with the retry in place: it fails both times, so the
+    reply says the --doing command was refused and nothing was changed."""
+    n = _fail_sp(monkeypatch, "mill_mail", errno, 99)
+    seen = _spy_fanout(monkeypatch)
+    before = _counts(w)
+    code, out, err = w.run(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", f"busy {errno}"])
+    txt = err + out
+    assert code != 0 and "send --doing refused" in txt and "nothing was changed" in txt, txt
+    assert str(errno) in txt
+    assert n["k"] == 2
+    assert _counts(w) == before and seen == []
+
+
 # (c) the read ------------------------------------------------------------------
 
 def test_connected_shows_who_is_waiting_on_the_desk(w):
