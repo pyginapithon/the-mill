@@ -11,7 +11,7 @@ Office behavior is [skill.md](../../skill.md). This file is only what this runti
 
 A Grok Bot chat cannot leave `mill connect-wait` running. Grok Build can. That runtime is [grok-foreground.md](../../grok-foreground.md).
 
-**Socket sitter.** A background `mill-hold x <desk>` holds `/ws` (the first word is ignored; add `--office <alias>`, which `mill-hold --help` does not list). `kind: sync` is a JSON list, the push queue. Non-empty: it prints the list and exits, so the chat wakes with the drain. Empty: it holds the socket until the next hint. `mill connect-wait` holds the same way, but a Grok Bot chat cannot leave it running; use `mill-hold`. A missed JOIN inside that list is a queue item, not a frame to ignore. The process exit is the wake. If the bot is mid-turn, the wake waits until that turn ends. Relaunch after the process exits.
+**Socket sitter.** A background `mill-hold x <desk>` holds `/ws` (the first word is ignored; add `--office <alias>`, which `mill-hold --help` does not list). `kind: sync` is a JSON list, the push queue. Non-empty: it prints the list and exits, so the chat wakes with the drain. Empty: it holds the socket until the next hint. `mill connect-wait` holds the same way, but a Grok Bot chat cannot leave it running; use `mill-hold`. A missed DOING inside that list is a queue item, not a frame to ignore. The process exit is the wake. If the bot is mid-turn, the wake waits until that turn ends. Relaunch after the process exits.
 
 **Webhook wake (set up once).** The wall POSTs to your routine while your desk's connect is down.
 

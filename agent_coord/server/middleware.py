@@ -690,7 +690,7 @@ def _scope_strip(cn, kind: str, label: str) -> dict:
             "  OR j.time_connect >= j.time_disconnect)) AS connected"
             " FROM member m"
             " JOIN name d ON d.id = m.desk_id AND d.deleted IS NULL"
-            " LEFT JOIN `join` j ON j.desk_id = d.id"
+            " LEFT JOIN seat j ON j.desk_id = d.id"
             " WHERE m.name_id=%s ORDER BY d.name",
             (aid,),
         )
@@ -789,7 +789,7 @@ _RECENT_ACTIVITY_EXPR = (
     "   WHEN 'todo' THEN LEFT(td.body, 80)"
     "   WHEN 'hold' THEN hr.name"
     "   WHEN 'score' THEN sc.kpi"
-    "   WHEN 'join' THEN jd.name"
+    "   WHEN 'doing' THEN jd.name"
     "   ELSE NULL END))"
 )
 
@@ -805,7 +805,7 @@ _RECENT_ACTIVITY_JOINS = (
     " LEFT JOIN hold ho ON ra.type = 'hold' AND ho.id = ra.id"
     " LEFT JOIN name hr ON hr.id = ho.resource_id"
     " LEFT JOIN score sc ON ra.type = 'score' AND sc.id = ra.id"
-    " LEFT JOIN `join` js ON ra.type = 'join' AND js.id = ra.id"
+    " LEFT JOIN doing js ON ra.type = 'doing' AND js.id = ra.id"
     " LEFT JOIN name jd ON jd.id = js.desk_id"
 )
 
@@ -850,7 +850,7 @@ def _page_rows(cn, tab: str, *, scope: str = "", desk: str = "", project: str = 
             elif scope != "mine":
                 return {"tab": tab, "rows": []}
             cur.execute(
-                "SELECT n.id FROM name n JOIN `join` j ON j.desk_id=n.id WHERE " + where,
+                "SELECT n.id FROM name n JOIN seat j ON j.desk_id=n.id WHERE " + where,
                 tuple(params),
             )
             ids = [int(r[0]) for r in cur.fetchall() if r and r[0]]
@@ -860,11 +860,11 @@ def _page_rows(cn, tab: str, *, scope: str = "", desk: str = "", project: str = 
         rows: list[dict] = []
         if tab == "here" and ids:
             cur.execute(
-                "SELECT n.name, j.doing,"
+                "SELECT n.name, (SELECT g.text FROM doing g WHERE g.desk_id = j.desk_id ORDER BY g.created DESC, g.id DESC LIMIT 1),"
                 " (j.time_connect IS NOT NULL AND (j.time_disconnect IS NULL"
                 "  OR j.time_connect >= j.time_disconnect)) AS connected,"
                 + _RECENT_ACTIVITY_EXPR
-                + " FROM name n JOIN `join` j ON j.desk_id=n.id"
+                + " FROM name n JOIN seat j ON j.desk_id=n.id"
                 + _RECENT_ACTIVITY_JOINS.format(desk="n.id")
                 + " WHERE n.id IN (" + marks + ") ORDER BY connected DESC, n.name LIMIT 40",
                 tuple(ids),
@@ -880,13 +880,13 @@ def _page_rows(cn, tab: str, *, scope: str = "", desk: str = "", project: str = 
             ]
         elif tab == "here" and affil:
             cur.execute(
-                "SELECT d.name, j.doing,"
+                "SELECT d.name, (SELECT g.text FROM doing g WHERE g.desk_id = j.desk_id ORDER BY g.created DESC, g.id DESC LIMIT 1),"
                 " (j.time_connect IS NOT NULL AND (j.time_disconnect IS NULL"
                 "  OR j.time_connect >= j.time_disconnect)) AS connected,"
                 + _RECENT_ACTIVITY_EXPR
                 + " FROM member m"
                 " JOIN name d ON d.id=m.desk_id AND d.deleted IS NULL"
-                " LEFT JOIN `join` j ON j.desk_id=d.id"
+                " LEFT JOIN seat j ON j.desk_id=d.id"
                 + _RECENT_ACTIVITY_JOINS.format(desk="d.id")
                 + " WHERE m.name_id=%s ORDER BY connected DESC, d.name LIMIT 40",
                 (affil,),
@@ -1387,7 +1387,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                                     " j.lan_ip, j.updated,"
                                     + _RECENT_ACTIVITY_EXPR
                                     + " FROM name n"
-                                    " JOIN `join` j ON j.desk_id = n.id"
+                                    " JOIN seat j ON j.desk_id = n.id"
                                     + _RECENT_ACTIVITY_JOINS.format(desk="n.id")
                                     + " WHERE n.deleted IS NULL AND n.type = %s"
                                     " AND ("
@@ -1546,7 +1546,7 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                                 "SELECT n.id, n.name,"
                                 " (j.time_connect IS NOT NULL AND (j.time_disconnect IS NULL"
                                 "  OR j.time_connect >= j.time_disconnect)) AS connected"
-                                " FROM name n JOIN `join` j ON j.desk_id = n.id"
+                                " FROM name n JOIN seat j ON j.desk_id = n.id"
                                 " WHERE " + where,
                                 tuple(params),
                             )

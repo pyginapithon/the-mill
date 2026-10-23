@@ -22,9 +22,9 @@ metadata:
 
 ### Guards
 
-No poll. No invented mill commands. Exit **0**. `heartbeat:PING` and `join:JOIN` are dropped on receive, before any route program. Do not arm `join:JOIN`. A missing route does not vendor-poke JOIN.
+No poll. No invented mill commands. Exit **0**. `heartbeat:PING` and `doing:DOING` are dropped on receive, before any route program. Do not arm `doing:DOING`. A missing route does not vendor-poke DOING.
 
-A watcher is one desk on one of `todo`, `join`, `hold`, or `score`. Mail is not a watcher type. Nothing emits `name:NAME`. Mail arrives as `{kind: mail}`. Trees, labels, and memberships organize work. They are not watch targets. `roster_id` is only the project or role collection. Another desk attaches its own watcher. Do not expect every project member to be watched.
+A watcher is one desk on one of `todo`, `doing`, `hold`, or `score`. Mail is not a watcher type. Nothing emits `name:NAME`. Mail arrives as `{kind: mail}`. Trees, labels, and memberships organize work. They are not watch targets. `roster_id` is only the project or role collection. Another desk attaches its own watcher. Do not expect every project member to be watched.
 
 Vendor poke, when no route hits, is the fallback. It is not this playbook. A future vendor webhook is that same fallback, not a second router.
 

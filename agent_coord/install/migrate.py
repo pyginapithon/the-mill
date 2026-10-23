@@ -270,7 +270,7 @@ def _ensure_watcher_hint(cn) -> list[str]:
 # Whole-file procedure refresh. Every DROP/CREATE PROCEDURE in these files is
 # re-applied on each ensure. mill_join_upsert and mill_member_put/delete once
 # called mill_watcher_put/delete('name', ...). Tip mill_watcher_* take
-# ENUM('todo','join','hold','score'), so a stale caller fails the seat mint.
+# ENUM('todo','doing','hold','score') (#818; 'join' before), so a stale caller fails the seat mint.
 # sp_name.sql rides along (name_type shape: mill_name_host/delete/rename/reclaim).
 # Order: after _ensure_watcher_hint so the callees are tip first.
 # sp_hold.sql: an existing book must pick up the #194 re-hold refresh in mill_hold_upsert.
@@ -296,7 +296,7 @@ _SP_FULL_REFRESH: tuple[str, ...] = (
 _PAYLOAD_ACTIVITY_FKS: tuple[tuple[str, str], ...] = (
     ("mail", "fk_mail_activity"),
     ("todo", "fk_todo_activity"),
-    ("join", "fk_join_activity"),
+    ("join", "fk_join_activity"),  # pre-#818 books; the 818 migration renames join to doing
     ("hold", "fk_hold_activity"),
     ("score", "fk_score_activity"),
 )
@@ -409,7 +409,8 @@ def _ensure_activity_soft_delete(cn) -> list[str]:
                 "mail_no_delete_in_tree",
                 "hold_no_delete_in_tree",
                 "hold_no_delete",
-                "join_no_delete_in_tree",
+                "join_no_delete_in_tree",  # DROP only: pre-#818 books (#818 renames join to doing)
+                "doing_no_delete_in_tree",
                 "score_no_delete_in_tree",
                 "name_no_delete",
             )
@@ -476,7 +477,9 @@ def _ensure_activity_soft_delete(cn) -> list[str]:
 # _PAYLOAD_ACTIVITY_FKS); do not list one here or ensure would add it back.
 # Kept as they are: fk_label_activity (CASCADE), fk_mail_to_mail (CASCADE), human_* FKs.
 _FK_RULES: tuple[tuple[str, str, str, str, str, str], ...] = (
-    ("join", "fk_join_desk", "desk_id", "name", "id", "RESTRICT"),  # #96
+    ("seat", "fk_seat_desk", "desk_id", "name", "id", "RESTRICT"),  # #96 (#818: was join)
+    ("doing", "fk_doing_desk", "desk_id", "name", "id", "RESTRICT"),  # #818
+    ("doing", "fk_doing_roster", "roster_id", "name", "id", "RESTRICT"),  # #818
     ("score_evidence", "fk_score_evidence_score", "score_id", "score", "id", "RESTRICT"),  # #95
     ("score_point", "fk_score_point_score", "score_id", "score", "id", "RESTRICT"),  # #288
     ("score_point", "fk_score_point_desk", "desk_id", "name", "id", "RESTRICT"),  # #288
@@ -600,7 +603,7 @@ def _ensure_push_expired(cn) -> list[str]:
 
 
 def _ensure_join_token_hash(cn) -> list[str]:
-    """Index join.token_hash so bearer lookup is not a full seat scan."""
+    """Index join.token_hash so bearer lookup is not a full seat scan (pre-#818 books)."""
     applied: list[str] = []
     cur = cn.cursor()
     try:
@@ -625,7 +628,8 @@ def _ensure_join_endpoint_key(cn) -> list[str]:
     applied: list[str] = []
     cur = cn.cursor()
     try:
-        if _table_exists(cur, "join") and not _column_exists(cur, "join", "endpoint_key"):
+        # #818: only a seat-shaped join (a run cut after the reshape has no endpoint_url).
+        if _table_exists(cur, "join") and _column_exists(cur, "join", "endpoint_url") and not _column_exists(cur, "join", "endpoint_key"):
             cur.execute(
                 "ALTER TABLE `join` ADD COLUMN endpoint_key "
                 "VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER endpoint_url"
@@ -645,7 +649,8 @@ def _ensure_join_wake_on(cn) -> list[str]:
     applied: list[str] = []
     cur = cn.cursor()
     try:
-        if _table_exists(cur, "join") and not _column_exists(cur, "join", "wake_on"):
+        # #818: only a seat-shaped join (a run cut after the reshape has no endpoint_key).
+        if _table_exists(cur, "join") and _column_exists(cur, "join", "endpoint_key") and not _column_exists(cur, "join", "wake_on"):
             cur.execute(
                 "ALTER TABLE `join` ADD COLUMN wake_on "
                 "ENUM('all','addressed') NOT NULL DEFAULT 'all' AFTER endpoint_key"
@@ -857,6 +862,7 @@ def _ensure_label_ord(cn) -> list[str]:
 
 
 ROSTER_070 = "migrate_070_roster.sql"
+DOING_818 = "migrate_818_doing.sql"
 
 
 def roster_070_needed(cn) -> bool:
@@ -931,6 +937,55 @@ def apply_roster_070(cn) -> list[str]:
     return [ROSTER_070] + reload_routines(cn)
 
 
+def doing_818_needed(cn) -> bool:
+    """#818: True while the book has a `join` table or a type column that lists 'join'."""
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "join"):
+            return True
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'doing' AND COLUMN_NAME = 'on_type'"
+            " AND COLUMN_TYPE <> %s",
+            ("enum('mail','todo','hold','score')",),
+        )
+        if int(cur.fetchone()[0] or 0) > 0:
+            return True
+        cur.execute(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'type'"
+            " AND TABLE_NAME IN ('activity','label','tree','mail','mail_to','todo','doing','hold','score','watcher')"
+            " AND COLUMN_TYPE LIKE %s",
+            ("%'join'%",),
+        )
+        return int(cur.fetchone()[0] or 0) > 0
+    finally:
+        cur.close()
+
+
+def apply_doing_818(cn) -> list[str]:
+    """#818: seat split off, activity type join renamed to doing, the `join`
+    table becomes the append-only doing table (same ids). Then reload every
+    routine. Each step in the file checks the book first, so a second run (or
+    a run after a partial one) does only what is left."""
+    if not doing_818_needed(cn):
+        return []
+    cur = cn.cursor()
+    try:
+        for stmt in split_script((sql_dir() / DOING_818).read_text(encoding="utf-8-sig")):
+            cur.execute(stmt)
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    # The routine reload is not here: _ensure_steps reloads after this step
+    # whenever the routines are not this pack's, so a run killed after the
+    # RENAME (when this check is already false) still gets its reload.
+    return [DOING_818]
+
+
 SQL_FIX = "mill install sql --apply"
 _STAMP_FN = "MILL_SQL_STAMP"
 
@@ -963,21 +1018,101 @@ def _stamp_sql(cn, digest: str) -> None:
         cur.close()
 
 
-def sql_state(cn) -> dict[str, Any]:
-    """Does the book hold this pack's SQL? Read only. ok, pack and book (12 hex each), fix."""
-    pack = sql_digest()
+_ROUTINES_FN = "MILL_ROUTINES_STAMP"
+_ROUTINE_RE = re.compile(r"^\s*CREATE\s+(?:DEFINER\s*=\s*\S+\s+)?(PROCEDURE|FUNCTION)\s+`?([A-Za-z0-9_]+)`?", re.I)
+
+
+@functools.lru_cache(maxsize=1)
+def shipped_routines() -> frozenset[tuple[str, str]]:
+    """(PROCEDURE|FUNCTION, lower name) for every routine the fn_/sp_ files create."""
+    out: set[tuple[str, str]] = set()
+    for path in sql_apply_order():
+        if not (path.stem.startswith("fn_") or path.stem.startswith("sp_")):
+            continue
+        for stmt in split_script(path.read_text(encoding="utf-8-sig")):
+            m = _ROUTINE_RE.match(stmt)
+            if m:
+                out.add((m.group(1).upper(), m.group(2).lower()))
+    return frozenset(out)
+
+
+def _routine_rows(cur) -> list[tuple[str, str, str]]:
+    cur.execute(
+        "SELECT ROUTINE_TYPE, ROUTINE_NAME, SHA2(IFNULL(ROUTINE_DEFINITION, ''), 256)"
+        " FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE()"
+        " AND ROUTINE_NAME NOT IN (%s, %s) AND ROUTINE_NAME NOT LIKE 'mill\\_migrate\\_%%'",
+        (_STAMP_FN, _ROUTINES_FN),
+    )
+    rows = []
+    for r in cur.fetchall():
+        rows.append(tuple(x.decode("utf-8") if isinstance(x, (bytes, bytearray)) else str(x) for x in r))
+    return sorted(rows, key=lambda r: (r[0], r[1].lower()))
+
+
+def routines_fingerprint(cn) -> str:
+    """sha256 over (type, name, body hash) of every routine in the book but the stamps (#818)."""
     cur = cn.cursor()
     try:
-        cur.execute(f"SELECT {_STAMP_FN}()")
+        rows = _routine_rows(cur)
+    finally:
+        cur.close()
+    h = hashlib.sha256()
+    for t, n, d in rows:
+        h.update(f"{t}:{n.lower()}:{d}\n".encode("ascii"))
+    return h.hexdigest()
+
+
+def _stamp_routines(cn) -> None:
+    """Record the routines' fingerprint after a run that finished (#818)."""
+    digest = routines_fingerprint(cn)
+    cur = cn.cursor()
+    try:
+        cur.execute(f"DROP FUNCTION IF EXISTS {_ROUTINES_FN}")
+        cur.execute(
+            f"CREATE FUNCTION {_ROUTINES_FN}() RETURNS CHAR(64) CHARSET ascii"
+            f" DETERMINISTIC NO SQL RETURN '{digest}'"
+        )
+        cn.commit()
+    finally:
+        cur.close()
+
+
+def _read_stamp(cur, fn: str) -> str:
+    try:
+        cur.execute(f"SELECT {fn}()")
         row = cur.fetchone()
-        book = str((row or [""])[0] or "")
+        return str((row or [""])[0] or "")
     except Exception as e:
         if getattr(e, "errno", None) != 1305:  # FUNCTION does not exist: a book from before the stamp
             raise
-        book = ""
+        return ""
+
+
+def sql_state(cn) -> dict[str, Any]:
+    """Does the book hold this pack's SQL? Read only. ok, pack and book (12 hex each), fix.
+
+    #818: also the routines. Every routine the pack ships must be there, and
+    the routines must be the ones the last finished ensure left (their
+    fingerprint equals the stamp it wrote). A run killed mid-reload, or a
+    routine changed or dropped by hand, is not ok."""
+    pack = sql_digest()
+    cur = cn.cursor()
+    try:
+        book = _read_stamp(cur, _STAMP_FN)
+        stamped = _read_stamp(cur, _ROUTINES_FN)
+        rows = _routine_rows(cur)
     finally:
         cur.close()
-    return {"ok": book == pack, "pack": pack[:12], "book": book[:12], "fix": SQL_FIX}
+    have = {(t.upper(), n.lower()) for t, n, _ in rows}
+    missing = sorted(n for _, n in shipped_routines() - have)
+    h = hashlib.sha256()
+    for t, n, d in rows:
+        h.update(f"{t}:{n.lower()}:{d}\n".encode("ascii"))
+    routines_ok = not missing and bool(stamped) and stamped == h.hexdigest()
+    out = {"ok": book == pack and routines_ok, "pack": pack[:12], "book": book[:12], "fix": SQL_FIX}
+    if not routines_ok:
+        out["routines"] = "missing " + ",".join(missing[:5]) if missing else "changed since the last ensure"
+    return out
 
 
 def install_sql(cn, *, apply: bool) -> dict[str, Any]:
@@ -996,6 +1131,7 @@ def ensure(cn) -> dict[str, Any]:
     pack's SQL digest (#614). mill install and mill install sql --apply call it."""
     res = _ensure_steps(cn)
     _stamp_sql(cn, sql_digest())
+    _stamp_routines(cn)
     return res
 
 
@@ -1009,6 +1145,9 @@ def _ensure_steps(cn) -> dict[str, Any]:
         wipe = (os.environ.get("MILL_RECORDS_WIPE") or "").strip() == "1"
         if _table_exists(cur, "activity") and not wipe:
             cur.close()
+            # #818: read before any step. A book whose routines are not this
+            # pack's (another pack, or a run killed mid-reload) gets the full reload.
+            current = bool(sql_state(cn).get("ok"))
             # 0.7.0 roster first: later steps name roster_id and the roster type.
             applied.extend(apply_roster_070(cn))
             # Column before the procedure refresh, so mill_label_select can read l.ord.
@@ -1016,6 +1155,11 @@ def _ensure_steps(cn) -> dict[str, Any]:
             # Column before the procedure refresh: mill_join_wake_* name it (#618).
             applied.extend(_ensure_join_endpoint_key(cn))
             applied.extend(_ensure_join_wake_on(cn))
+            # #818 after the join column steps (the seat copy reads them).
+            did_818 = apply_doing_818(cn)
+            applied.extend(did_818)
+            if did_818 or not current:
+                applied.extend(reload_routines(cn))
             applied.extend(_ensure_score_series(cn))
             applied.extend(_ensure_payload_fk_drop(cn))
             applied.extend(_ensure_watcher_hint(cn))

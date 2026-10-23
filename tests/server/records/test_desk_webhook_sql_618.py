@@ -1,4 +1,4 @@
-"""#618 on a real book: join holds the desk's own webhook URL and key. Row F68 (desk-webhook).
+"""#618 on a real book: the seat holds the desk's own webhook URL and key. Row F68 (desk-webhook).
 
 Seen live: nothing wrote join.endpoint_url or delivery_mode, so no desk could be
 armed. The key is per desk now, and only the POST-time read returns it.
@@ -30,7 +30,7 @@ def _seat(cn, desk: str) -> None:
 def _updated(cn, desk: str):
     return scalar_done(
         cn,
-        "SELECT j.updated FROM `join` j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
+        "SELECT j.updated FROM seat j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
         (desk,),
     )
 
@@ -52,7 +52,7 @@ def test_arm_then_off_and_reads_never_carry_the_key(cn):
     assert rec_join.wake_target(cn, "fx618-d1") is None
     mode = scalar_done(
         cn,
-        "SELECT j.delivery_mode FROM `join` j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
+        "SELECT j.delivery_mode FROM seat j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
         ("fx618-d1",),
     )
     assert mode == "websocket"
@@ -72,10 +72,10 @@ def test_watcher_rows_never_carry_the_key(cn):
     rec_join.wake_arm(cn, "fx618-d4", URL, KEY)
     jid = scalar_done(
         cn,
-        "SELECT j.id FROM `join` j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
+        "SELECT MAX(j.id) FROM doing j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
         ("fx618-d4",),
     )
-    rows = call(cn, "mill_watcher_select", ["join", int(jid)]) or []
+    rows = call(cn, "mill_watcher_select", ["doing", int(jid)]) or []
     assert rows and all(KEY not in repr(r) for r in rows)
 
 
@@ -94,7 +94,7 @@ def test_reset_and_retire_forget_the_webhook(cn):
     cn.commit()
     key = scalar_done(
         cn,
-        "SELECT j.endpoint_key FROM `join` j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
+        "SELECT j.endpoint_key FROM seat j JOIN name d ON d.id = j.desk_id WHERE d.type = 'desk' AND d.name = %s",
         ("fx618-d6",),
     )
     assert key is None

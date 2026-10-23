@@ -6,7 +6,7 @@ from typing import Any
 
 from agent_coord.const import (
     CONST_HOLD,
-    CONST_JOIN,
+    CONST_DOING,
     CONST_MAIL,
     CONST_OFFICE,
     CONST_SCORE,
@@ -635,18 +635,18 @@ def _filter_tree_nodes(nodes: list[dict], want: set[str] | None) -> list[dict]:
 
 
 def _tree_face(typ: str, raw: dict, meta: dict) -> tuple[str, str, str]:
-    """Label a tree node. tree.type is an activity: mail todo join hold score."""
+    """Label a tree node. tree.type is an activity: mail todo doing hold score."""
     title = str(meta.get("title") or "")
     status = str(meta.get("status") or "")
     who = str(meta.get("who") or "")
     iid = raw.get("id")
-    if typ == CONST_JOIN:
+    if typ == CONST_DOING:
         desk = _nm(str(raw.get("join_desk") or ""))
         doing = _clip(str(raw.get("join_doing") or ""))
-        label = desk or title or f"join {iid}"
+        label = desk or title or f"doing {iid}"
         if doing:
             label = f"{label} | {doing}" if desk else doing
-        return label, "join", ""
+        return label, "doing", ""
     if typ == CONST_HOLD:
         res = _nm(str(raw.get("hold_resource") or ""))
         desk = _nm(str(raw.get("hold_desk") or ""))

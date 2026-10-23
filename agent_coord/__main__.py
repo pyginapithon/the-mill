@@ -1032,8 +1032,8 @@ def _build_parser() -> MillArgumentParser:
         if _command == "remove":
             _ap.add_argument("--yes", action="store_true", help="skip the prompt")
     for _command, _what in (("watch", "wake me on"), ("unwatch", "stop waking me on")):
-        _wp = sub.add_parser(_command, help=f"mill {_command} TYPE ID: {_what} a todo, hold, score or join (self only); a todo also by ROSTER/NEED")
-        _wp.add_argument("type", metavar="TYPE", choices=("todo", "hold", "score", "join", "room"))
+        _wp = sub.add_parser(_command, help=f"mill {_command} TYPE ID: {_what} a todo, hold, score or doing (self only); a todo also by ROSTER/NEED")
+        _wp.add_argument("type", metavar="TYPE", choices=("todo", "hold", "score", "doing", "room"))
         _wp.add_argument("target", metavar="ID", help="activity id; a todo also by ROSTER/NEED (cold-test/fix-login)")
         if _command == "watch":
             _wp.add_argument("--hint", default="", help="per-listener wake recipe")
