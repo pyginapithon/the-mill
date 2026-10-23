@@ -68,7 +68,7 @@ def seated(monkeypatch):
 
 
 def _ask(ws, acks):
-    raw = json.dumps({"id": "r1", "verb": "inbox", "args": {"project": "the-mill"}})
+    raw = json.dumps({"id": "r831", "verb": "inbox", "args": {"project": "the-mill"}})
     return asyncio.run(asgi_mod._ws_handle_client_text("alice", ws, raw, acks))
 
 
