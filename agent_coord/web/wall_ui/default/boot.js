@@ -1191,7 +1191,7 @@
         const states = {};
         desks.forEach(a => {
           const named = String((a && (a.state || a.status)) || "");
-          const st = (named || wallDoingFace(a && a.doing).now).toLowerCase();
+          const st = (named || wallDoingText(a && a.owner, a && a.doing)).toLowerCase();
           if (st.indexOf("wait") >= 0) states.waiting = true;
           else if (st === "idle" || st === "here" || st === "gone") states.idle = true;
           else if (st) states.working = true;
@@ -4178,7 +4178,7 @@
           if (!r || typeof r !== 'object') return;
           const id = String(r.id || '');
           if (!id || titles[id]) return;
-          const t = String(r.doing || r.detail || r.title || r.need_id || '').trim();
+          const t = String(r.detail || r.title || r.need_id || '').trim();
           if (t) titles[id] = t;
         });
       };
@@ -4213,7 +4213,7 @@
           if (parentId) {
             parentLabel = String(
               titles[parentId] ||
-              parent.title || parent.doing || parent.detail ||
+              parent.title || parent.detail ||
               ('#' + parentId)
             ).trim();
             if (parentLabel.length > 42) parentLabel = parentLabel.slice(0, 40) + '\u2026';
@@ -4232,7 +4232,7 @@
           if (!cur || (cur.hidden && !row.hidden) || (!cur.hidden && !row.hidden && row.lft < cur.lft)) {
             byId[id] = row;
           }
-          stack.push({ id: id, rgt: rgt, title: titles[id] || n.title || n.doing || '' });
+          stack.push({ id: id, rgt: rgt, title: titles[id] || n.title || '' });
         });
       });
       return byId;
@@ -4307,94 +4307,58 @@
         return true;
       });
     }
-    /* join.doing is newest-first, separated by " | ". \ and | inside an entry are escaped. */
-    function wallDoingUnescape(text) {
-      const src = String(text || "");
-      let out = "";
-      for (let i = 0; i < src.length; i++) {
-        if (src[i] === "\\" && i + 1 < src.length) {
-          out += src[i + 1];
-          i += 1;
-          continue;
-        }
-        out += src[i];
+    /* #818 PR C: what a desk is doing is the server's view (GET /api/v1/doing, the same
+     * payload as `mill connected`). doing/doing-paint.js reads it into WALL_DOING; the Wall
+     * never recomputes it and never guesses a state from the text. Until the view is read,
+     * or when the route is not there, a desk shows its seat's doing text as is. */
+    function wallDoingView(owner) {
+      const v = window.WALL_DOING;
+      if (!v || v.state !== "ok" || !v.byOwner) return null;
+      return v.byOwner[String(owner || "").trim()] || null;
+    }
+    function wallDoingText(owner, seatText) {
+      const v = wallDoingView(owner);
+      if (v) return String(v.doing || "").trim();
+      return String(seatText || "").trim();
+    }
+    function wallDoingWaitN(view) {
+      /* Letters and cards waiting on a desk: the server's counts (waiting_on_it), never ours. */
+      const w = (view && view.waiting_on_it) || {};
+      return (Number((w.letters || {}).n) || 0) + (Number((w.cards || {}).n) || 0);
+    }
+    function wallDoingBlock(owner, seatText) {
+      if (window.WALL_UI_DEFAULT_DOING_PAINT && typeof wallDoingDeskHtml === "function") {
+        const html = wallDoingDeskHtml(owner, seatText);
+        if (html) return html;
       }
-      return out;
+      return `<div class="here-doing"><div class="here-doing-now">${esc(wallDoingText(owner, seatText) || "-")}</div></div>`;
     }
-    function wallDoingPipeIsSep(stored, pipe) {
-      let slashes = 0;
-      let j = pipe - 1;
-      while (j >= 0 && stored[j] === "\\") {
-        slashes += 1;
-        j -= 1;
+    function wallDoingRow(owner, seatText) {
+      if (window.WALL_UI_DEFAULT_DOING_PAINT && typeof wallDoingRowHtml === "function") {
+        const html = wallDoingRowHtml(owner, seatText);
+        if (html) return html;
       }
-      return slashes % 2 === 0;
+      return `<span class="here-doing">${esc(wallDoingText(owner, seatText))}</span>`;
     }
-    function wallDoingSplit(stored) {
-      const text = String(stored || "");
-      if (!text) return [];
-      const sep = " | ";
-      const parts = [];
-      let buf = "";
-      let i = 0;
-      while (i < text.length) {
-        if (text.startsWith(sep, i) && wallDoingPipeIsSep(text, i + 1)) {
-          parts.push(wallDoingUnescape(buf));
-          buf = "";
-          i += sep.length;
-          continue;
-        }
-        buf += text[i];
-        i += 1;
-      }
-      parts.push(wallDoingUnescape(buf));
-      return parts;
-    }
-    function wallDoingFace(stored) {
-      const parts = wallDoingSplit(stored);
-      const older = [];
-      for (let i = 1; i < parts.length; i++) {
-        const t = String(parts[i] || "").trim();
-        if (t) older.push(t);
-      }
-      return { now: String(parts[0] || "").trim(), older: older };
-    }
-    function wallDoingBlock(now, older) {
-      const line = String(now || "").trim();
-      const back = [];
-      (older || []).forEach(function (s) {
-        const t = String(s || "").trim();
-        if (t) back.push(t);
-      });
-      const backHtml = back.length
-        ? `<div class="here-doing-back">${back.map(function (s) { return esc(s); }).join("<br>")}</div>`
-        : "";
-      return `<div class="here-doing"><div class="here-doing-now">${esc(line || "-")}</div>${backHtml}</div>`;
-    }
-    function wallDoingRow(now, older) {
-      const line = String(now || "").trim();
-      const back = [];
-      (older || []).forEach(function (s) {
-        const t = String(s || "").trim();
-        if (t) back.push(t);
-      });
-      const title = back.length ? ` title="${esc(back.join("\n"))}"` : "";
-      return `<span class="here-doing"${title}>${esc(line)}</span>`;
-    }
-    function parseWaitingOn(doing) {
-      const s = String(doing || "").trim();
-      let m = s.match(/\bwaiting(?:\s+on|\s+for)?\s*[:\-]?\s*(.+)$/i);
-      if (m) return m[1].trim().slice(0, 80);
-      m = s.match(/\bblocked(?:\s+on|\s+by|\s+for)?\s*[:\-]?\s*(.+)$/i);
-      if (m) return m[1].trim().slice(0, 80);
+    function wallDoingMeta(owner) {
+      if (window.WALL_UI_DEFAULT_DOING_PAINT && typeof wallDoingMetaHtml === "function") return wallDoingMetaHtml(owner) || "";
       return "";
     }
-    function formatWaitingOnList(raw) {
-      const parts = String(raw || "").split(",").map(s => s.trim()).filter(Boolean);
-      if (!parts.length) return "";
-      if (parts.length === 1) return parts[0];
-      if (parts.length === 2) return parts[0] + "," + parts[1];
-      return parts[0] + " +" + (parts.length - 1);
+    /* Lazy entries (doing/doing-paint.js replaces these stubs; lib/lazy.js MODULES.doingPaint). */
+    function wallDoingSync() { return wallLazyCall("doingPaint", "wallDoingSync", wallDoingSync, arguments); }
+    function wallDoingTrail() { return wallLazyCall("doingPaint", "wallDoingTrail", wallDoingTrail, arguments); }
+    function wallDoingTrailSlot(item) {
+      /* A card's doing rows, in order, from GET /api/v1/doing/history?on=ITEM. Blank until read. */
+      const key = String(item || "");
+      let inner = "";
+      if (window.WALL_UI_DEFAULT_DOING_PAINT && typeof wallDoingTrailHtml === "function") inner = wallDoingTrailHtml(key) || "";
+      /* A span: the slot also sits inside the plan's card button (phrasing content only). */
+      return `<span class="doing-trail" data-doing-trail="${esc(key)}">${inner}</span>`;
+    }
+    function wallClaimedSlot(r) {
+      /* #818 slot: claimed_at on cards is a coming server field. Blank until it lands. */
+      const at = String((r && r.claimed_at) || "").trim();
+      return `<span class="card-claimed" data-slot="claimed_at">${at ? esc("claimed " + dt(at).slice(5, 16)) : ""}</span>`;
     }
     function leftoverRec(d, projectId) {
       /* 0.3 leftover is spend, not a JOB. Do not paint leftover mill work. */
@@ -4402,34 +4366,28 @@
     }
     function hereGlance(d, agent) {
       /* SESSION_GLANCE SoR: docs/acceptance/ACCEPTANCE-SESSION-GLANCE.md
-         No claimed JOB => idle even if doing non-empty (unless waiting_on set).
-         waiting_on field is the honest wait target (desk/role/JOB:id). */
-      const field = String(agent.waiting_on || "").trim();
-      const face = wallDoingFace(agent.doing);
-      const doing = face.now;
+         #818: the state comes from the server's doing view when it is read (doing -> working,
+         none -> idle). Without it: a claimed card, the seat's doing text, or recent activity
+         -> working, else here. Never parsed out of the text. */
+      const view = wallDoingView(agent.owner);
+      const doing = wallDoingText(agent.owner, agent.doing);
       const jobs = millJobsForOwner(d, agent.owner, millGid(agent));
-      const left = leftoverRec(d, millGid(agent));
       const stale = !!(agent.stale || (agent.alive === false));
       const jobRec = jobs.length ? jobs[0] : null;
       const job = jobRec ? {
         need_id: jobRec.need_id || "",
         eta: jobRec.eta || "",
         progress: jobRec.progress || "",
-        title: jobRec.doing || jobRec.detail || ""
+        title: jobRec.detail || ""
       } : null;
-      const pack = (state, waiting_on, note) => ({
-        state, waiting_on: waiting_on || "", note: note || "", doing, doingOlder: face.older, job, stale, field
-      });
-      if (field) {
-        const on = formatWaitingOnList(field);
-        return pack("waiting", on, "on " + on);
+      const pack = (state, note) => ({ state, waiting_on: "", note: note || "", doing, view, job, stale });
+      if (view) {
+        if (stale && !doing) return pack("gone", "gone");
+        if (doing) return pack("working", doing);
+        return pack("idle", view.idle ? ("idle " + view.idle) : "idle");
       }
-      if (doing.toLowerCase() === "working") {
-        return pack("working", "", doing);
-      }
-      /* 0.3: card/mail mutate is presence. Recent updated or mutate => working not idle. */
       if (!jobs.length) {
-        if (stale || agent.alive === false) return pack("gone", "", "gone");
+        if (stale || agent.alive === false) return pack("gone", "gone");
         const owner = String(agent.owner || "");
         const mutate = { mail: 1, todo: 1, hold: 1, score: 1, attach: 1 };
         const now = Date.now();
@@ -4441,19 +4399,11 @@
           const ts = Date.parse(e.at || e.updated || "");
           return Number.isFinite(ts) && (now - ts) < 15 * 60 * 1000;
         });
-        if (doing || recentAct || recentHb) return pack("working", "", doing || "activity");
-        return pack("here", "", "here");
-      }
-      if (/\bblocked\b/i.test(doing)) {
-        const on = parseWaitingOn(doing) || "blocked";
-        return pack("blocked", on, "on " + on);
-      }
-      if (/^waiting\b/i.test(doing) || /\bwaiting\s+(on|for)\b/i.test(doing)) {
-        const on = parseWaitingOn(doing) || "";
-        return pack(on ? "waiting" : "blocked", on || "(no target - set waiting_on)", on ? ("on " + on) : "waiting with no target");
+        if (doing || recentAct || recentHb) return pack("working", doing || "activity");
+        return pack("here", "here");
       }
       const jobNote = job && job.need_id ? ("JOB " + job.need_id) : "";
-      return pack("working", "", jobNote || doing || "on a claimed card");
+      return pack("working", jobNote || doing || "on a claimed card");
     }
     function sgChip(g) {
       const st = g.state || "idle";
@@ -4555,13 +4505,14 @@
       const nid = String(r.need_id || "").trim() || "(no id)";
       const asker = String(r.creator || r.asker || "").trim();
       const volunteer = String(r.assigned || r.volunteer || r.owner || "").trim();
-      const human = /^\s*HUMAN\b/i.test(String(r.doing || r.detail || ""));
+      const human = /^\s*HUMAN\b/i.test(String(r.detail || ""));
       const meta = [];
       if (asker) meta.push("asker " + asker);
       if (volunteer && owned) meta.push("claimed by " + volunteer);
       if (r.progress) meta.push(String(r.progress));
       if (r.eta) meta.push("ETA " + t(r.eta));
-      const metaLine = meta.length ? `<div class="meta">${esc(meta.join(" | "))}</div>` : "";
+      const claimedSlot = wallClaimedSlot(r);
+      const metaLine = meta.length ? `<div class="meta">${esc(meta.join(" | "))} ${claimedSlot}</div>` : claimedSlot;
       const cues = [];
       if (r.stale) cues.push("stale");
       if (r.holder_dead) cues.push("holder_dead");
@@ -4572,10 +4523,10 @@
       const pid = String(nest.parentId || "");
       const spine = millNestSpineHtml(nest, !!showParentChip);
       const todoId = String(r.id || "");
-      const todoTrunc = (r.doing_trunc === true || r.detail_trunc === true) ? "1" : "0";
-      const doingLine = String(r.doing || "").trim();
+      const todoTrunc = r.detail_trunc === true ? "1" : "0";
+      /* #818: cards have no title; the card line is its detail. */
       const detailLine = String(r.detail || "").trim();
-      const cardLine = doingLine || detailLine || "(no instructions)";
+      const cardLine = detailLine || "(no instructions)";
       const cardNote = detailOpen && detailLine && detailLine !== cardLine
         ? `<div class="todo-card-note">${esc(detailLine)}</div>` : "";
       return `<div class="card ${cls}${human ? " human-card" : ""}${r.fading ? " fading" : ""}${nestCls}${detailOpen ? " is-open" : ""}" data-todo-id="${esc(todoId)}" data-todo-trunc="${todoTrunc}" data-depth="${d}"${pid ? ` data-parent="${esc(pid)}"` : ""}>` +
@@ -4584,6 +4535,7 @@
         `<div>${esc(cardLine)}</div>` +
         cardNote +
         metaLine + cueLine +
+        (detailOpen && todoId ? wallDoingTrailSlot("todo-" + todoId) : "") +
         `</div>`;
     }
 
@@ -4859,14 +4811,14 @@
     function millTreePayload(d, node) {
       const type = String((node && node.type) || "").toLowerCase();
       const id = node && node.id;
-      let title = String((node && (node.title || node.doing || node.detail || node.subject || node.body)) || "").trim();
+      let title = String((node && (node.title || node.detail || node.subject || node.body)) || "").trim();
       let status = String((node && node.status) || "").toLowerCase();
       let who = String((node && (node.who || node.src || node.owner || node.volunteer || node.asker)) || "").trim();
       let unread = false;
       if (!title && type === "todo") {
         const r = millTodoCardLookup(d, id);
         if (r) {
-          title = String(r.doing || r.detail || r.title || r.need_id || "").trim();
+          title = String(r.detail || r.title || r.need_id || "").trim();
           status = String(r.status || status).toLowerCase();
           who = String(r.volunteer || r.assigned || r.owner || r.asker || who).trim();
         }
@@ -5112,8 +5064,6 @@
       const agents = uniqueDesksByOwner(d.agents || []);
       const agent = agents.find(a => String(a.owner || "").trim() === owner) || { owner: owner, alive: false };
       const g = hereGlance(d, agent);
-      const doingNow = g.doing || wallDoingFace(agent.doing).now;
-      const doingOlder = Array.isArray(g.doingOlder) ? g.doingOlder : wallDoingFace(agent.doing).older;
       const book = (_hereDesk.key === hereDeskKey(owner)) ? _hereDesk : null;
       const ready = !!(book && book.ready);
       const got = (book && book.got) || {};
@@ -5124,7 +5074,7 @@
           ? "The card list did not load."
           : (jobs.length
             ? jobs.slice(0, 8).map(card => {
-                const title = card.doing || card.detail || card.need_id || "claimed card";
+                const title = card.detail || card.need_id || "claimed card";
                 return `<div>${esc(title)}</div>`;
               }).join("")
             : "No claimed card in this slice"));
@@ -5159,7 +5109,7 @@
           histRows.push({ at: String(m.created || ""), text: "letter " + (who || "desk") + (line ? ": " + line : "") });
         });
         jobs.forEach(function (card) {
-          const title = String(card.doing || card.detail || card.need_id || "card").replace(/\s+/g, " ").trim().slice(0, 72);
+          const title = String(card.detail || card.need_id || "card").replace(/\s+/g, " ").trim().slice(0, 72);
           const st = card.status ? String(card.status) + " " : "";
           histRows.push({ at: String(card.updated_at || card.asked_at || ""), text: "card " + st + title });
         });
@@ -5179,11 +5129,12 @@
           : "Nothing has changed for this desk in this slice.");
       const html =
         `<div class="here-desk-head"><b>${esc(millName("desk", owner))}</b> <span class="here-state">${esc(g.state || "")}</span></div>` +
-        wallDoingBlock(doingNow, doingOlder) +
+        wallDoingBlock(owner, agent.doing) +
         `<details class="here-fold"><summary>Card</summary><div class="here-fold-body">${cardBody}</div></details>` +
         promise +
         `<details class="here-fold"><summary>Chat</summary><div class="here-fold-body">${chatBody}</div></details>` +
         `<details class="here-fold"><summary>History</summary><div class="here-fold-body">${histBody}</div></details>` +
+        `<details class="here-fold" data-fold="doing"><summary>Doing trail</summary><div class="here-fold-body">${wallDoingTrailSlot("desk-" + owner)}</div></details>` +
         give;
       if (el.getAttribute("data-here-owner") === owner && el._hereHtml === html) return;
       const open = {};
@@ -5198,6 +5149,7 @@
         const sum = node.querySelector("summary");
         if (sum && open[String(sum.textContent || "")]) node.open = true;
       });
+      try { wallDoingTrail(); } catch (eTrail) {}
     }
     function wireHereFront() {
       if (document._hereFrontWired) return;
@@ -5304,9 +5256,8 @@
               const st = String(r.status || "").toLowerCase();
               const detailOpen = String(r.id || "") === String(_todoDetailId);
               const shrunk = todoStatusCollapsed(st) && !detailOpen;
-              const doingLine = String(r.doing || "").trim();
               const detailLine = String(r.detail || "").trim();
-              const title = doingLine || detailLine || r.title || r.need_id || "";
+              const title = detailLine || r.title || r.need_id || "";
               const cardNote = detailOpen && detailLine && detailLine !== title
                 ? `<div class="todo-card-note">${esc(detailLine)}</div>` : "";
               const who = [r.asker || r.src ? ("asker " + (r.asker || r.src)) : "",
@@ -5318,7 +5269,7 @@
               _pp = nest.parentId || "";
               const pid = String(nest.parentId || "");
               const todoId = String(r.id || "");
-              const todoTrunc = (r.doing_trunc === true || r.detail_trunc === true) ? "1" : "0";
+              const todoTrunc = r.detail_trunc === true ? "1" : "0";
               const detail = shrunk ? "" : (
                 `<div class="ttl"><b>${esc(title)}</b><code>${esc(r.need_id || "")}</code></div>` +
                 `<span class="who">${esc(who)}</span>` +
@@ -5382,17 +5333,19 @@
       h.innerHTML = ordered.map(r => {
         const g = hereGlance(d, r);
         const owner = String(r.owner || "").trim();
-        const doingNow = g.doing || wallDoingFace(r.doing).now;
-        const doingOlder = Array.isArray(g.doingOlder) ? g.doingOlder : wallDoingFace(r.doing).older;
         const on = owner && owner === _hereOwner ? " on" : "";
-        return `<button type="button" class="here-row${on}" data-here-owner="${esc(owner)}">` +
+        /* #818: the item link and the waiting-on pill sit beside the row button, not in it. */
+        return `<div class="here-line" data-here-owner="${esc(owner)}">` +
+          `<button type="button" class="here-row${on}" data-here-owner="${esc(owner)}">` +
           `<span class="here-dot ${esc(g.state || "")}"></span>` +
           `<span class="here-name">${esc(millName("desk", owner))}</span>` +
           `<span class="here-state">${esc(g.state || "")}</span>` +
-          wallDoingRow(doingNow, doingOlder) +
-          `</button>`;
+          wallDoingRow(owner, r.doing) +
+          `</button>` + wallDoingMeta(owner) + `</div>`;
       }).join("");
       h.scrollTop = hereTop;
+      /* #818: the doing view loads after this first paint (lazy) and repaints only on change. */
+      try { wallDoingSync(); } catch (eDoing) {}
       if (_hereOwner) {
         try { hereDeskLoad(_hereOwner); } catch (eHereLoad) {}
         paintHereDesk(d, _hereOwner);
@@ -5853,6 +5806,7 @@
       else if (_presenceKey === q.key && _presenceSource === "activity") src = _presenceRows;
       else src = tlRows.length ? tlRows : evRows;
       return (src || []).map(r => ({
+        id: r.id,
         at: r.updated || r.at,
         updated: r.updated || r.at,
         kind: r.type || r.kind,
@@ -5958,7 +5912,7 @@
       if (proto === "kpi") return k === "kpi" || (k === "refuse" && det.indexOf("kpi") === 0);
       return WIRE_KIND[k] === proto;
     }
-    const PRESENCE_TYPES = ["mail", "todo", "here", "hold", "score", "attach", "name"];
+    const PRESENCE_TYPES = ["mail", "todo", "doing", "hold", "score", "attach", "name"];
     /* WALL_ACTIVITY_STATE_92: row.state from mill_activity_select via events / between rows.
      * deleted (any type) or sent (live letter); null paints nothing. Read-only pill. */
     function activityStatePill(row) {
@@ -6002,15 +5956,24 @@
         if (proj && pr.indexOf(proj) < 0) return false;
         return true;
       });
-      if (!rows.length) {
+      /* #818: one muted row per doing entry (the newest sighting), so a desk's steps never flood the diary. */
+      const seenDoing = {};
+      const rowsOne = rows.filter(p => {
+        if (String(p.kind || p.type || "").toLowerCase() !== "doing" || p.id == null) return true;
+        const key = String(p.id);
+        if (seenDoing[key]) return false;
+        seenDoing[key] = 1;
+        return true;
+      });
+      if (!rowsOne.length) {
         log.innerHTML = '<div class="idle">Nothing in this diary filter.</div>';
         return;
       }
-      log.innerHTML = rows.slice().reverse().map(p => {
+      log.innerHTML = rowsOne.slice().reverse().map(p => {
         const kind = String(p.kind || p.type || "");
         const when = t(p.at || p.updated);
         const n = p.n != null && p.n !== "" ? String(p.n) : "";
-        return `<div class="hist-row kind-${esc(kind)}">` +
+        return `<div class="hist-row kind-${esc(kind)}${kind === "doing" ? " muted" : ""}">` +
           `<span class="when">${esc(when)}</span>` +
           `<span class="k">${esc(kind)}</span>` +
           `<span class="who">${esc(millName("desk", p.owner || ""))}</span>` +
@@ -6176,9 +6139,8 @@
       el.innerHTML = ids.map(pid => {
         const rows = by[pid].map(r => {
           const st = !r.alive ? "dead" : r.remote ? "remote" : "alive";
-          const face = wallDoingFace(r.doing);
           return `<tr class="${st}"><td>${esc(r.owner)}</td><td>${esc(r.pid)}</td>` +
-            `<td>${esc(r.owner_host || "")}</td><td>${wallDoingRow(face.now, face.older)}</td>` +
+            `<td>${esc(r.owner_host || "")}</td><td>${wallDoingRow(r.owner, r.doing)}</td>` +
             `<td data-sort="${esc(r.heartbeat || "")}">${esc(t(r.heartbeat))}</td></tr>`;
         }).join("");
         return `<div class="station"><h3>${esc(pid)}</h3><table data-table="agents-${esc(pid)}"><thead><tr>` +
@@ -6325,7 +6287,7 @@
         const leadCard = claimedN[0] || shippedN[0];
         const lead = leadCard ? ((leadCard.volunteer || "") + " on " + (leadCard.need_id || "")) : "";
         doing = open.length + " open, " + claimedN.length + " claimed, " + shippedN.length + " shipped" + (lead ? ". " + lead : ".");
-        parts = claimedN.concat(shippedN).map(r => chip(r.need_id || "", r.status || "", r.volunteer || r.doing || "", false));
+        parts = claimedN.concat(shippedN).map(r => chip(r.need_id || "", r.status || "", r.volunteer || "", false));
       } else if (tab === "mail") {
         const box = d.mailbox || [];
         const unread = box.filter(m => typeof mailWallUnread === "function" ? mailWallUnread(m) : false);
@@ -6346,8 +6308,8 @@
         parts = (shared.desks || []).slice(0, 14).map(n => {
           const agent = (d.agents || []).find(a => floorDeskKey(a.owner) === n.owner) || { owner: n.owner, doing: n.doing || "", alive: false };
           const g = hereGlance(d, agent);
-          const hot = g.state === "blocked" || g.stale;
-          return chip(n.owner || "", g.stale ? "stale" : (g.state || ""), String(g.doing || wallDoingFace(n.doing).now || "").slice(0, 36), hot);
+          const hot = !!g.stale;
+          return chip(n.owner || "", g.stale ? "stale" : (g.state || ""), String(g.doing || wallDoingText(n.owner, n.doing) || "").slice(0, 36), hot);
         });
       } else {
         const sm = (document.querySelector("[data-session-mode].on") || {}).getAttribute
@@ -6379,17 +6341,20 @@
           }
           const glances = live.map(a => ({ a: a, g: hereGlance(d, a) }));
           const nWork = glances.filter(x => x.g.state === "working").length;
-          const nWait = glances.filter(x => x.g.state === "waiting" || x.g.state === "blocked").length;
-          const nHot = glances.filter(x => x.g.stale || x.g.state === "gone" || x.g.state === "blocked").length;
+          /* #818: "waiting" is who waits on a desk (the server's waiting_on_it), and only once
+             the doing view is read; nothing is guessed from a desk's text. */
+          const viewRead = glances.some(x => x.g.view);
+          const nWaitOn = glances.filter(x => wallDoingWaitN(x.g.view) > 0).length;
+          const nHot = glances.filter(x => x.g.stale || x.g.state === "gone").length;
           name = cutName;
-          doing = live.length + " desks here. " +
-            (nWait ? nWait + " waiting." : "Nobody waiting.") +
+          doing = live.length + " desks here." +
+            (viewRead ? (nWaitOn ? " " + nWaitOn + " with mail or cards waiting on them." : " Nothing waiting on them.") : "") +
             (nHot ? " " + nHot + " need eyes." : (nWork ? " " + nWork + " working." : ""));
           hotBox = nHot > 0;
           parts = glances.map(x => {
             const g = x.g;
-            const hot = !!(g.stale || g.state === "gone" || g.state === "blocked");
-            return chip(x.a.owner || "", g.stale ? "stale" : g.state, String(g.doing || wallDoingFace(x.a.doing).now || "").slice(0, 36), hot);
+            const hot = !!(g.stale || g.state === "gone");
+            return chip(x.a.owner || "", g.stale ? "stale" : g.state, String(g.doing || wallDoingText(x.a.owner, x.a.doing) || "").slice(0, 36), hot);
           });
         }
       }
@@ -7993,7 +7958,7 @@
       return !!(m && m.body_trunc === true);
     }
     function wallTodoIsTrunc(r) {
-      return !!(r && (r.doing_trunc === true || r.detail_trunc === true));
+      return !!(r && r.detail_trunc === true);
     }
     function wallFindMailRow(id) {
       const box = (window._floor && window._floor.mailbox) || [];
@@ -8049,7 +8014,6 @@
         for (let i = 0; i < arr.length; i++) {
           if (String(arr[i] && arr[i].id) !== want) continue;
           const merged = Object.assign({}, arr[i], full);
-          delete merged.doing_trunc;
           delete merged.detail_trunc;
           arr[i] = merged;
           hit = true;
@@ -8058,7 +8022,6 @@
       if (!hit) {
         if (!Array.isArray(d.needs)) d.needs = [];
         const row = Object.assign({}, full);
-        delete row.doing_trunc;
         delete row.detail_trunc;
         d.needs.push(row);
       }
@@ -8537,7 +8500,7 @@
         }
       }
     });
-    /* wow144 lean: on open, if body_trunc / doing_trunc / detail_trunc, fetch detail
+    /* wow144 lean: on open, if body_trunc / detail_trunc, fetch detail
      * and merge into local _floor then re-paint (Wall contract card rule-lean-rows: mill todo wall-contract rule-lean-rows). */
     document.addEventListener("click", ev => {
       const tr = ev.target.closest("#mail tr[data-mail-id]");
@@ -8571,6 +8534,7 @@
         } catch (eOpenCard) {}
         if (!same) {
           try { wallOpenTodoIfTrunc(tid); } catch (eLeanTodo) {}
+          try { wallDoingTrail(); } catch (eTrail) {}
         }
       }
     });
