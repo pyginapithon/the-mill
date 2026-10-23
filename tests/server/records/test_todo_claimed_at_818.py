@@ -223,3 +223,24 @@ def test_a_run_killed_after_the_column_was_added_converges(w):
     assert int(scalar_done(
         w.cn, "SELECT COUNT(*) FROM todo WHERE status = 'claimed' AND claimed_at IS NULL"
     )) == 0
+
+
+# (d) the Wall reads it -------------------------------------------------------------
+
+from tests.server.records.test_doing_routes_818 import _get, wall  # noqa: E402,F401
+
+
+def test_cards_carry_claimed_at_in_connected_and_the_wall_route(w, wall):  # noqa: F811
+    _no_claims(w.cn)
+    need, tid = _card(w)
+    w.ok(["claim", R, need])
+    w.ok(["watch", "todo", str(tid)], desk=PEER)
+    _back(w.cn, tid, 2)
+    w.ok(["note", R, need, "--note", "later"], desk=PEER)
+    at = str(_row(w.cn, tid)["claimed_at"])[:19]
+    view = _card_view(w, tid)
+    assert view["claimed_at"] == at and view["age"] == "2h"
+    code, got = _get(wall, f"/api/v1/doing?desk={ME}")
+    assert code == 200, got
+    route = next(c for c in got[0]["waiting_on_it"]["cards"]["newest"] if c["id"] == f"todo-{tid}")
+    assert route == view and set(route) == {"id", "need", "roster", "watchers", "age", "claimed_at"}
