@@ -11,7 +11,7 @@ Tables in `agent_coord/server/sql/tables.sql`. Python: `agent_coord/server/recor
 | `name` | Bare string plus type `desk`, `project`, `role`, `label`, `tree`, or `res`. PK `id`. UNIQUE `(type, name)`. `n` is the desk count for a project or a role. Seeds: `(1, project, Office)`, `(2, role, Admin)`. A name row is not an activity. |
 | `activity` | `(type, id)`. Types: `mail`, `todo`, `join`, `hold`, `score`. `roster_id` is required, default 1 (Office). `bytes` is the last payload UTF-8 length (mail or todo body). |
 | `mail` | letter (sender `desk_id`, body, `roster_id`). No dest. |
-| `mail_to` | dest `desk_id`, `opened`, `receipt`. No roster column. JOIN `name` for the desk name. Survives mill member-remove. |
+| `mail_to` | dest `desk_id`, `opened`, `receipt`, `asked` (1 named on the letter, 0 copied: reached only as a room member on reply-all; waiting on a desk counts asked rows). No roster column. JOIN `name` for the desk name. Survives mill member-remove. |
 | `member` | N-N `(name_id, desk_id)`. `name_id` is a project or a role. Not a label. `name.n` = desk count. |
 | `todo` | One JSON `body`. The floor prints `need_id`: the need string the creator passed, kept in that JSON body (`todo.py` reads it back from the `slug` key). **`need_id` is not a name tuple** (not `(type, name)` / not `ROLE_` / `PROJ_` speech). There is no need column. `updated_id` last desk that wrote; `creator_id` mill create todo; `assigned_id` claimer; `roster_id` project or role. |
 | `` `join` `` | live seat; unique `desk_id`. Groups and roles are `member`. `doing` VARCHAR(512). Desk bearer is `token_hash`. |

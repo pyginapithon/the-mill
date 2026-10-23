@@ -722,6 +722,54 @@ _SCORE_POINT_SQL = (
 )
 
 
+def _ensure_mail_to_asked(cn) -> list[str]:
+    """#818 D1: mail_to.asked (1 asked, 0 copied). Each step checks the book, so
+    a run killed between them converges on the next ensure.
+
+    1. Add the column NULL. 2. Backfill the NULL rows: a row whose stored wake
+    for that letter and desk (push_queue kind mail, wake_reason room, #627) says
+    the desk got it only as a room member is copied (0); every other row is
+    asked (1), the default. The room wake is the same split the reply made, so
+    the rule is exact where the row is kept; rows already handed back by a sync
+    or expired are not, and stay asked. 3. NOT NULL DEFAULT 1.
+    """
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if not _table_exists(cur, "mail_to"):
+            return applied
+        if not _column_exists(cur, "mail_to", "asked"):
+            cur.execute("ALTER TABLE mail_to ADD COLUMN asked TINYINT(1) NULL AFTER receipt")
+            applied.append("mail_to.asked")
+        cur.execute(
+            "SELECT IS_NULLABLE FROM information_schema.COLUMNS"
+            " WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'mail_to' AND COLUMN_NAME = 'asked'"
+        )
+        if str((cur.fetchone() or ("NO",))[0]) == "YES":
+            if _table_exists(cur, "push_queue"):
+                cur.execute(
+                    "UPDATE mail_to mt JOIN ("
+                    " SELECT DISTINCT p.desk_id,"
+                    " CAST(JSON_UNQUOTE(JSON_EXTRACT(p.payload, '$.id')) AS UNSIGNED) AS mail_id"
+                    " FROM push_queue p"
+                    " WHERE p.kind = 'mail'"
+                    " AND JSON_UNQUOTE(JSON_EXTRACT(p.payload, '$.wake_reason')) = 'room'"
+                    ") r ON r.desk_id = mt.desk_id AND r.mail_id = mt.id"
+                    " SET mt.asked = 0 WHERE mt.type = 'mail' AND mt.asked IS NULL"
+                )
+            cur.execute("UPDATE mail_to SET asked = 1 WHERE asked IS NULL")
+            cn.commit()
+            cur.execute("ALTER TABLE mail_to MODIFY COLUMN asked TINYINT(1) NOT NULL DEFAULT 1")
+            applied.append("mail_to.asked_backfill")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 def _ensure_score_series(cn) -> list[str]:
     """#288 step 1: score.better, score.unit and the score_point table. Additive; no wipe."""
     applied: list[str] = []
@@ -1161,6 +1209,8 @@ def _ensure_steps(cn) -> dict[str, Any]:
             # Column before the procedure refresh: mill_join_wake_* name it (#618).
             applied.extend(_ensure_join_endpoint_key(cn))
             applied.extend(_ensure_join_wake_on(cn))
+            # #818 D1: before the routine reload (mill_mail_to_copied, mill_doing_now read it).
+            applied.extend(_ensure_mail_to_asked(cn))
             # #818 after the join column steps (the seat copy reads them).
             did_818 = apply_doing_818(cn)
             applied.extend(did_818)

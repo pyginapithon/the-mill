@@ -319,6 +319,15 @@ def to_put(
 
 
 
+def to_copied(cn, mail_id: int, desks) -> None:
+    """#818 D1: mark these recipients copied (room members only) on one letter."""
+    import json
+
+    names = sorted({str(d or "").strip() for d in (desks or ()) if str(d or "").strip()})
+    if names:
+        call(cn, "mill_mail_to_copied", [int(mail_id), json.dumps(names)])
+
+
 def set_sender_roster(
     cn,
     mail_id: int,

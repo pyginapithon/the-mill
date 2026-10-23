@@ -6,6 +6,7 @@ DROP PROCEDURE IF EXISTS mill_mail_select;
 DROP PROCEDURE IF EXISTS mill_mail_inbox;
 DROP PROCEDURE IF EXISTS mill_mail_get;
 DROP PROCEDURE IF EXISTS mill_mail_to_put;
+DROP PROCEDURE IF EXISTS mill_mail_to_copied;
 DROP PROCEDURE IF EXISTS mill_mail_to_node_put;
 DROP PROCEDURE IF EXISTS mill_mail_to_node_delete;
 
@@ -34,6 +35,22 @@ BEGIN
     INSERT IGNORE INTO mail_to (type, id, desk_id, receipt)
     VALUES ('mail', p_id, v_to, IFNULL(p_receipt, 0));
   END IF;
+END //
+
+-- #818 D1: the desks a reply reaches only as room members (reply-all, not
+-- named) are copied on it; every other recipient stays asked (the default).
+-- p_desks is a JSON array of desk names. Called by reply right after the
+-- letter's recipients are written, before the wakes.
+CREATE PROCEDURE mill_mail_to_copied(
+  IN p_id    BIGINT UNSIGNED,
+  IN p_desks JSON
+)
+BEGIN
+  UPDATE mail_to mt
+    JOIN name d ON d.id = mt.desk_id AND d.type = 'desk'
+    JOIN JSON_TABLE(p_desks, '$[*]' COLUMNS (desk VARCHAR(64) PATH '$')) j ON j.desk = d.name
+     SET mt.asked = 0
+   WHERE mt.type = 'mail' AND mt.id = p_id;
 END //
 
 CREATE PROCEDURE mill_mail_to_node_put(
