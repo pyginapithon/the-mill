@@ -115,7 +115,7 @@ BEGIN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'Admin is not granted by join: roster Admin is granted only by member-add on the office host';
   END IF;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_proj = MILL_NAME_PUT('roster', p_project);
   SET v_desk = MILL_NAME_PUT('desk', p_desk);
@@ -166,7 +166,7 @@ BEGIN
   END IF;
   CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
   CALL mill_watcher_put('doing', v_id, v_desk);
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, p_desk AS owner;
 END //
 
@@ -180,14 +180,14 @@ BEGIN
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_roster BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   IF v_desk IS NOT NULL AND EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
     CALL mill_doing_clear(v_desk, v_ts, v_id, v_roster);
     CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_desk AS owner, 'clocked-out' AS op;
 END //
 
@@ -201,7 +201,7 @@ BEGIN
   DECLARE v_roster BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
   DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_desk = NULL;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   -- #608: a retired desk resolves too, so reset still revokes its seat.
   SELECT id INTO v_desk FROM name WHERE type = 'desk' AND name = TRIM(p_desk) LIMIT 1;
@@ -216,7 +216,7 @@ BEGIN
     -- Keep the ended entry's activity roster (not 1/Office).
     CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_desk AS owner, 'reset' AS op;
 END //
 
@@ -283,7 +283,7 @@ BEGIN
   DECLARE v_ts DATETIME(6);
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
@@ -292,31 +292,8 @@ BEGIN
   END IF;
   CALL mill_doing_anchor(v_desk, '', v_id);
   CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id;
-END //
-
--- #818: append-only. Each call is a new doing entry; nothing is overwritten.
-CREATE PROCEDURE mill_join_doing(
-  IN p_project VARCHAR(64),
-  IN p_desk    VARCHAR(64),
-  IN p_doing   VARCHAR(512)
-)
-BEGIN
-  DECLARE v_ts DATETIME(6);
-  DECLARE v_id BIGINT UNSIGNED;
-  DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
-  SET v_ts = MILL_NOW();
-  SET v_desk = MILL_NAME_GET('desk', p_desk);
-  SET v_id = NULL;
-  IF v_desk IS NOT NULL AND EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
-    UPDATE seat SET updated = v_ts WHERE desk_id = v_desk;
-    CALL mill_doing_insert(v_desk, 1, p_doing, v_ts, v_id);
-    CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
-  END IF;
-  COMMIT;
-  SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, IFNULL(p_doing, '') AS doing;
 END //
 
 -- A command that writes nothing else (#635): bump the seat and the current
@@ -328,7 +305,7 @@ BEGIN
   DECLARE v_ts DATETIME(6);
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_id = NULL;
@@ -337,7 +314,7 @@ BEGIN
     CALL mill_doing_anchor(v_desk, '', v_id);
     CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id;
 END //
 
@@ -349,7 +326,7 @@ BEGIN
   DECLARE v_ts DATETIME(6);
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_id = NULL;
@@ -362,7 +339,7 @@ BEGIN
     CALL mill_doing_anchor(v_desk, '', v_id);
     CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, p_up AS up;
 END //
 
@@ -374,7 +351,7 @@ BEGIN
   DECLARE v_ts DATETIME(6);
   DECLARE v_id BIGINT UNSIGNED;
   DECLARE v_desk BIGINT UNSIGNED;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_id = NULL;
@@ -385,7 +362,7 @@ BEGIN
       CALL mill_activity_put('doing', v_id, v_ts, v_desk, 1, MILL_WEIGHT('doing'), NULL);
     END IF;
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_desk AS desk_id, p_ip AS lan_ip;
 END //
 

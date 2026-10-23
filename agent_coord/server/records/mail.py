@@ -5,6 +5,7 @@ from __future__ import annotations
 from agent_coord.const import CONST_DESK, CONST_MAIL, CONST_ROSTER
 
 from .db import call, scalar, scalar_done
+from .db import commit as _db_commit
 
 
 def _stored(value) -> str:
@@ -340,7 +341,7 @@ def set_sender_roster(
             "UPDATE mail SET roster_id = %s WHERE type = 'mail' AND id = %s",
             (aff_id, int(mail_id)),
         )
-        cn.commit()
+        _db_commit(cn)  # #818: not inside a request transaction
     finally:
         cur.close()
 
@@ -540,7 +541,7 @@ def advance_read_cursor(cn, desk_id: int, tree_id: int, last_id: int) -> None:
             "ON DUPLICATE KEY UPDATE last_id = GREATEST(tree_read.last_id, new.last_id)",
             (int(desk_id), int(tree_id), int(last_id)),
         )
-        cn.commit()
+        _db_commit(cn)  # #818: not inside a request transaction
     except Exception as exc:
         if int(getattr(exc, "errno", 0) or 0) == 1146:
             return
@@ -851,7 +852,7 @@ def room_participant(cn, mail_id: int, desk: str, room: "RoomRead | None" = None
         cur.close()
     if not dids:
         try:
-            cn.commit()
+            _db_commit(cn)  # #818: not inside a request transaction
         except Exception:
             pass
         return False

@@ -28,6 +28,7 @@ from agent_coord.server.redact import err_text
 from urllib.parse import parse_qs, urlparse
 
 from agent_coord.const import (
+    CONST_DESK,
     CONST_MAIL,
     CONST_OFFICE,
     CONST_TODO,
@@ -403,6 +404,59 @@ def _json(obj: Any) -> bytes:
     from agent_coord.server.mill_json import dumps_mill_bytes
 
     return dumps_mill_bytes(obj)
+
+
+_DOING_ITEM = re.compile(r"(mail|todo|hold|score)-([1-9][0-9]{0,18})")
+
+
+def _doing_read(path: str, qs: dict[str, list[str]]) -> tuple[int, Any]:
+    """#818 GET /api/v1/doing and /api/v1/doing/history: the `mill connected`
+    views, read-only, for the Wall (PR C). Behind the same door and on the same
+    office book as every other Wall GET; the Wall computes nothing itself.
+
+    /api/v1/doing takes exactly one of all=1, desk=D or project=R and returns
+    the _desk_view list. /api/v1/doing/history takes desk=D and/or on=ITEM
+    (mail-N, todo-N, hold-N, score-N), plus since= and page=, and returns
+    {history, page} with ended_by. A refusal is 400 {"error"}.
+    """
+    from agent_coord.server.api.mill import rpc
+
+    def one(key: str) -> str:
+        return str((qs.get(key) or [""])[0] or "").strip()
+
+    desk, project = one("desk"), one("project")
+    try:
+        if path == "/api/doing":
+            every = one("all").lower() in ("1", "true", "yes")
+            if int(every) + int(bool(desk)) + int(bool(project)) != 1:
+                return 400, {"error": "GET /api/v1/doing requires one of ?all=1 or ?desk= or ?project="}
+            body: dict[str, Any] = {"desk": desk, "project": project, "all": every}
+            with _office() as c:
+                return 200, rpc._h_session(c, body, project, None)
+        on_raw = one("on")
+        on = None
+        if on_raw:
+            hit = _DOING_ITEM.fullmatch(on_raw)
+            if not hit:
+                return 400, {"error": "GET /api/v1/doing/history: on= is mail-N, todo-N, hold-N or score-N"}
+            on = (hit.group(1), int(hit.group(2)))
+        if not desk and not on:
+            return 400, {"error": "GET /api/v1/doing/history requires ?desk= or ?on= (or both)"}
+        try:
+            page = rpc._doing_page(one("page")) or 1
+        except CoordError:
+            return 400, {"error": f"GET /api/v1/doing/history: page= is 1 to {rpc.DOING_PAGE_MAX}"}
+        body = {"desk": desk, "history": True, "since": one("since"), "page": page}
+        with _office() as c:
+            who = rpc._stored(desk) if desk else ""
+            if who:
+                from agent_coord.server.records import name as rec_name
+
+                if rec_name.get(c._cn, who, CONST_DESK) is None:
+                    return 400, {"error": f"connected: no desk {who[:64]}"}
+            return 200, rpc._doing_history(c, body, who, on)
+    except CoordError as e:
+        return 400, {"error": err_text(e)}
 
 
 _ERROR_PAGE = """<!DOCTYPE html>
@@ -1020,11 +1074,11 @@ def _page_rows(cn, tab: str, *, scope: str = "", desk: str = "", project: str = 
 
 
 def _todo_title(body) -> str:
-    import json
+    from agent_coord.server.records.todo import unpack
+
     raw = str(body or "")
     try:
-        obj = json.loads(raw)
-        text = str(obj.get("doing") or obj.get("detail") or "")
+        text = str(unpack(raw, "").get("detail") or "")
     except Exception:
         text = raw
     return " ".join(text.split())[:80]
@@ -1686,6 +1740,11 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         _json({"error": err_text(e)}),
                         "application/json; charset=utf-8",
                     )
+                return
+
+            if path in ("/api/doing", "/api/doing/history"):
+                code, payload = _doing_read(path, parse_qs(urlparse(self.path).query))
+                self._send(code, _json(payload), "application/json; charset=utf-8")
                 return
 
             # GET /api/v1/{rooms,mailbox,tree-mail,tree-todo,todos,agents,scores,holds,watchers,events,names,map,timeline}

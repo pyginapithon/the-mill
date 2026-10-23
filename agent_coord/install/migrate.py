@@ -284,6 +284,7 @@ _SP_FULL_REFRESH: tuple[str, ...] = (
     "sp_mail.sql",
     "sp_todo.sql",
     "sp_join.sql",
+    "sp_doing.sql",  # #818 PR B: mill doing write, now and history reads
     "sp_hold.sql",
     "sp_score.sql",
     "sp_label.sql",
@@ -360,6 +361,8 @@ def _ensure_sp_full(cn) -> list[str]:
 # #722: functions an existing book refreshes from tip (Office alias of roster id 1).
 _FN_REFRESH: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("fn_name.sql", ("mill_name_get", "mill_name_put")),
+    # #818 PR B: when a doing entry ended (its own event, or cleared).
+    ("sp_doing.sql", ("mill_doing_end", "mill_doing_cleared")),
 )
 
 
@@ -1083,7 +1086,10 @@ def _read_stamp(cur, fn: str) -> str:
         row = cur.fetchone()
         return str((row or [""])[0] or "")
     except Exception as e:
-        if getattr(e, "errno", None) != 1305:  # FUNCTION does not exist: a book from before the stamp
+        # 1305: no such function, a book from before the stamp. 1449: its definer
+        # is not a user here (a dump restored on another server). Either way the
+        # routines are not known to be this pack's: unstamped, so ensure reloads them.
+        if getattr(e, "errno", None) not in (1305, 1449):
             raise
         return ""
 

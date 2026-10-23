@@ -28,7 +28,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_res = MILL_NAME_PUT('res', p_resource);
@@ -70,7 +70,7 @@ BEGIN
   ELSE
     SET v_ok = 0;
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT v_id AS id, v_ts AS updated, v_res AS resource_id,
          IF(v_ok = 1, v_desk, v_held) AS desk_id, v_ok AS ok;
 END //
@@ -88,7 +88,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   IF v_desk IS NULL THEN
@@ -102,7 +102,7 @@ BEGIN
     -- NULL roster: keep the hold's activity roster (not 1/Office).
     CALL mill_activity_put('hold', p_id, v_ts, v_desk, NULL, NULL, NULL);
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_id AS id, IF(v_gone = 1, 'released', 'kept') AS op, IF(v_gone = 1, 1, 0) AS ok;
 END //
 

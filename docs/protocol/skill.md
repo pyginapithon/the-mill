@@ -53,6 +53,11 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - The board list `todo <roster>` prints short rows (id, need, status, volunteer), 50 a page; `--page N` reads the next ones (the `page` block names it), `--full` prints every field. It hides done cards; add `--done` to see them. `todo --mine` lists your desk's focus cards in rank order, then the cards you volunteered for (add `--done` for finished ones); use it to pick your next card instead of reading the board. Plain `todo` lists only your rosters; `todo --all` lists every roster. `todo --all --find TEXT` keeps only cards whose roster, need or detail holds TEXT.
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 
+- **Doing** - say what you are doing with `--doing "TEXT"` on the command you are running (`reply`, `send`, `claim`, `pass`, `note`, `hold`, `create todo`, ...); it links to that command's letter, card or hold.
+  - No end step: a reply under that letter, or a `pass` without `--doing`, ends it; a newer `--doing` replaces it. `mark` never ends it.
+  - `mill connected` shows what each desk is doing, on what, and who is waiting on it; `--desk <desk>` for one desk, `--history` for past rows.
+  - `hold` is only for a shared resource, not for saying what you are doing.
+
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.
   - Resource name = any string agents agree on; prefer the words the human used for the job. Once agreed, every desk uses that same name.
   - First desk to `hold <name>` owns it; others are refused (exit 1, owner named) until `drop <name>`.
@@ -66,7 +71,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - **Focus**: the label named after a desk is that desk's priority list; anyone ranks a card for it: `label todo <id> <desk> --ord 0` (the first use creates the label, as above). Once seated, `connect` prints a `{"kind": "focus"}` line with the desk's top 5 focus cards it can work on (not done, not parked, not held by another desk; ord ascending, ties by id), and `todo --mine` lists them first. Start the top one.
 
 - **Roster** - a named list of desks (a team or a job). `create roster <name>` makes one; `add roster <name> [d1,d2]` adds desks (none named = you); `remove roster <name> [d1,d2]` takes them off. Mail it with `send roster <name>`.
-- **Watch** - `watch todo <id>` (also hold, score, join) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`. A hold goes by its name: `watch hold deploy`.
+- **Watch** - `watch todo <id>` (also hold, score, doing) sends you a HINT when it changes; `unwatch todo <id>` stops. Self only. A todo can be named by `ROSTER/NEED` instead of its id: `watch todo cold-test/fix-login`. A hold goes by its name: `watch hold deploy`.
 - Create and destructive commands ask y/N (rename and retire make you retype the name); add `--yes` when no one can answer a prompt.
 
 - **Tree** - the outline under a letter or card: why, in order, dead ends kept. `trail mail:<id>` or `trail todo:<id>` reads it. `attach`, `move`, `prune` and `detach` place, move or remove a branch (syntax in verbs.md). A hidden plan name is 10 hex. A card on two plans fails closed until you name the tree.
@@ -89,7 +94,7 @@ When a command gives you friction (refused, wrong or confusing output, a needles
 
 ## Arrivals
 
-- Watcher HINTs: `todo`, `hold`, `score`, and `join` (ignore `join`).
+- Watcher HINTs: `todo`, `hold`, `score`, and `doing` (ignore `doing`).
 - Mail arrives as `{kind: mail}` or `{kind: receipt}`; it is not a HINT. Hub `PING` is keep-alive; ignore it.
 - A mail item with `body_trunc` was cut; run its `read` command (`mill mail-thread <id>`) before you act on the letter.
 - One arrival, one job, then stop. A human in chat wins over a HINT.

@@ -590,7 +590,7 @@ def _meta_for(typ: str, iid: int, todos: dict, mails: dict, names: dict) -> dict
         if not row:
             return {}
         return {
-            "title": _clip(row.get("doing") or row.get("detail") or row.get("need_id")),
+            "title": _clip(row.get("detail") or row.get("need_id")),
             "status": str(row.get("status") or ""),
             "who": str(row.get("volunteer") or row.get("asker") or ""),
         }
@@ -657,7 +657,7 @@ def _tree_face(typ: str, raw: dict, meta: dict) -> tuple[str, str, str]:
         return kpi or title or f"score {iid}", "score", desk
     if typ == CONST_TODO and raw.get("todo_body") is not None:
         fields = rec_todo.unpack(str(raw.get("todo_body") or ""), iid)
-        label = _clip(fields.get("doing") or fields.get("detail") or fields.get("need_id")) or title
+        label = _clip(fields.get("detail") or fields.get("need_id")) or title
         return label, str(raw.get("todo_status") or status or "todo"), who
     if typ == CONST_MAIL and raw.get("mail_body") is not None:
         src = _nm(str(raw.get("mail_src") or "")) or who
@@ -1008,14 +1008,12 @@ def floor(
             for r in mp_rows:
                 st = r.get("status") or "open"
                 fields = rec_todo.unpack(r.get("body") or "", r.get("id"))
-                doing, doing_trunc = lean_text(fields["doing"])
                 detail, detail_trunc = lean_text(fields["detail"])
                 card = {
                     "roster_id": _nm(r.get("roster")),
                     "need_id": str(r.get("id") or ""),  # need_id = card id (todo.id)
                     "id": r.get("id"),
                     "status": st,
-                    "doing": doing,
                     "detail": detail,
                     "progress": fields["progress"],
                     "assigned": _nm(r.get("assigned")),
@@ -1023,8 +1021,6 @@ def floor(
                     "volunteer": _nm(r.get("assigned")),
                     "asker": _nm(r.get("creator")),
                 }
-                if doing_trunc:
-                    card["doing_trunc"] = True
                 if detail_trunc:
                     card["detail_trunc"] = True
                 if not _keep(card, want):
@@ -1224,14 +1220,17 @@ def floor_scope(
             )
     if "todos" in partset and not todos_skip:
         for row in call(cn, "mill_floor_part", [kind_s, ident_s, "todos"]):
-            doing, doing_trunc = lean_text(row.get("doing") or "")
-            detail, detail_trunc = lean_text(row.get("detail") or "")
+            # #818: cards have no title; a legacy stored doing heads the detail (as rec_todo.unpack).
+            legacy = str(row.get("doing") or "").strip()
+            raw_detail = str(row.get("detail") or "")
+            if legacy and not raw_detail.startswith(legacy):
+                raw_detail = legacy + ("\n" + raw_detail if raw_detail else "")
+            detail, detail_trunc = lean_text(raw_detail)
             card = {
                 "roster_id": row.get("roster_id") or "",
                 "need_id": row.get("need_id") or "",
                 "id": row.get("id"),
                 "status": row.get("status") or "open",
-                "doing": doing,
                 "detail": detail,
                 "progress": row.get("progress") or "",
                 "assigned": row.get("assigned") or "",
@@ -1239,8 +1238,6 @@ def floor_scope(
                 "volunteer": row.get("assigned") or "",
                 "asker": row.get("creator") or "",
             }
-            if doing_trunc:
-                card["doing_trunc"] = True
             if detail_trunc:
                 card["detail_trunc"] = True
             if card["status"] == "parked":
@@ -1608,8 +1605,8 @@ def build_todos(
     lean: bool = True,
 ) -> tuple[list[dict], list[dict]]:
     """Todos isolate: mill_todo_select -> needs + issues.
-    lean=True (list/poll): truncate doing/detail to LIST_TEXT_MAX; set doing_trunc /
-    detail_trunc when clipped (omit flags when full).
+    lean=True (list/poll): truncate detail to LIST_TEXT_MAX; set detail_trunc when
+    clipped (omit the flag when full). #818: cards carry no doing key.
     """
     needs: list[dict] = []
     issues: list[dict] = []
@@ -1617,18 +1614,15 @@ def build_todos(
         for r in mp_rows:
             st = r.get("status") or "open"
             fields = rec_todo.unpack(r.get("body") or "", r.get("id"))
-            doing = fields["doing"]
             detail = fields["detail"]
-            doing_trunc = detail_trunc = False
+            detail_trunc = False
             if lean:
-                doing, doing_trunc = lean_text(doing)
                 detail, detail_trunc = lean_text(detail)
             card = {
                 "roster_id": _nm(r.get("roster")),
                 "need_id": str(r.get("id") or ""),  # need_id = card id (todo.id)
                 "id": r.get("id"),
                 "status": st,
-                "doing": doing,
                 "detail": detail,
                 "progress": fields["progress"],
                 "assigned": _nm(r.get("assigned")),
@@ -1636,8 +1630,6 @@ def build_todos(
                 "volunteer": _nm(r.get("assigned")),
                 "asker": _nm(r.get("creator")),
             }
-            if doing_trunc:
-                card["doing_trunc"] = True
             if detail_trunc:
                 card["detail_trunc"] = True
             if not _keep(card, want):
@@ -2450,7 +2442,7 @@ def v1_mail(cn, mail_id: int) -> dict[str, Any]:
 
 
 def v1_todo(cn, todo_id: int) -> dict[str, Any]:
-    """GET /api/v1/todo/{id} - one card full doing/detail (open/detail; not list lean)."""
+    """GET /api/v1/todo/{id} - one card full detail (open/detail; not list lean)."""
     tid = int(todo_id)
     out = _v1_envelope(["todos"])
     rows = rec_todo.get(cn, tid)
@@ -2466,7 +2458,6 @@ def v1_todo(cn, todo_id: int) -> dict[str, Any]:
         "need_id": str(r.get("id") or ""),  # need_id = card id (todo.id)
         "id": r.get("id"),
         "status": st,
-        "doing": fields["doing"],
         "detail": fields["detail"],
         "progress": fields["progress"],
         "assigned": _nm(r.get("assigned")),

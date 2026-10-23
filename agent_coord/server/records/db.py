@@ -190,11 +190,31 @@ def book_down(exc: BaseException) -> bool:
     return False
 
 
+# #818: a deadlock (1213, the connector raises InternalError) or a lock wait
+# timeout (1205, DatabaseError) is worth one more try; matched on the code.
+TRANSIENT_ERRNO = {1213: "deadlock", 1205: "lock wait timeout"}
+
+
+def transient_errno(exc: BaseException | None) -> int | None:
+    """1213 or 1205 when exc (or what caused it) is a deadlock or lock wait, else None."""
+    seen = 0
+    while exc is not None and seen < 5:
+        errno = getattr(exc, "errno", None)
+        if errno in TRANSIENT_ERRNO:
+            return int(errno)
+        exc = exc.__cause__
+        seen += 1
+    return None
+
+
 def retryable_db(exc: BaseException) -> bool:
-    """One more try for a dropped connection. Never for a duplicate key (1062)."""
-    if type(exc).__name__ not in ("OperationalError", "InterfaceError"):
-        return False
+    """One more try for a dropped connection, a deadlock or a lock wait.
+    Never for a duplicate key (1062)."""
     if getattr(exc, "errno", None) == 1062 or "Duplicate entry" in str(exc):
+        return False
+    if transient_errno(exc) is not None:
+        return True
+    if type(exc).__name__ not in ("OperationalError", "InterfaceError"):
         return False
     return book_down(exc)
 
@@ -431,8 +451,137 @@ def _run_proc(cur, name: str, args: list) -> list[dict[str, Any]]:
     return rows
 
 
+# #818: one transaction for a command and its doing row. While request_tx runs
+# on a connection, call() and the read helpers do not commit, and the stored
+# procedures skip their own START TRANSACTION / COMMIT (@mill_req_tx).
+_REQ_TX: dict[int, dict[str, Any]] = {}
+
+
+class RequestRolledBack(Exception):
+    """A statement failed inside request_tx; everything it wrote was rolled back."""
+
+    def __init__(self, cause: BaseException):
+        super().__init__(str(cause))
+        self.cause = cause
+
+
+def in_request_tx(cn) -> bool:
+    return id(cn) in _REQ_TX
+
+
+def commit(cn) -> None:
+    """Commit now, unless a request transaction is open (it commits at its end)."""
+    if id(cn) in _REQ_TX:
+        return
+    cn.commit()
+
+
+def after_commit(cn, fn) -> None:
+    """Run fn after the request transaction commits (dropped on a rollback); now if none is open."""
+    st = _REQ_TX.get(id(cn))
+    if st is None:
+        fn()
+        return
+    st["after"].append(fn)
+
+
+def _req_flag(cn, on: bool) -> None:
+    cur = cn.cursor()
+    try:
+        cur.execute("SET @mill_req_tx = 1" if on else "SET @mill_req_tx = NULL")
+        if on:
+            cur.execute("START TRANSACTION")
+    finally:
+        cur.close()
+
+
+def request_tx(cn, run):
+    """run() as one transaction on cn (#818). Every call() and stored procedure
+    on cn joins it: call() neither commits nor retries, and the procedures skip
+    their own START TRANSACTION / COMMIT (@mill_req_tx).
+
+    It commits only when run() returns and no statement failed on the way (a
+    handler that catches a failed call does not hide it). Otherwise everything
+    rolls back: RequestRolledBack is raised for a failed statement, else run()'s
+    own error. after_commit work runs after the commit; a rollback drops it.
+
+    When the failure is retryable (retryable_db: a dropped connection, a deadlock
+    1213 or a lock wait 1205, whether raised or caught by a handler), the whole
+    run goes again once on the same connection. If that fails too, a transient
+    cause is raised as RequestRolledBack, so the caller can say nothing changed.
+    """
+    for attempt in (1, 2):
+        try:
+            cn.rollback()  # no read snapshot carried in
+        except Exception:
+            pass
+        st: dict[str, Any] = {"after": [], "failed": None}
+        _req_flag(cn, True)
+        _REQ_TX[id(cn)] = st
+        try:
+            out = run()
+            if st["failed"] is not None:
+                raise RequestRolledBack(st["failed"])
+            cn.commit()
+        except BaseException as e:
+            try:
+                cn.rollback()
+            except Exception:
+                pass
+            _REQ_TX.pop(id(cn), None)
+            try:
+                _req_flag(cn, False)
+            except Exception:
+                pass
+            raised = e.cause if isinstance(e, RequestRolledBack) else e
+            # A handler may turn a failed call into its own error; the failed call decides.
+            cause = next(
+                (x for x in (st["failed"], raised) if isinstance(x, Exception) and retryable_db(x)),
+                None,
+            )
+            if cause is None:
+                raise
+            if attempt == 1:
+                continue
+            if isinstance(e, RequestRolledBack) and e.cause is cause:
+                raise
+            raise RequestRolledBack(cause) from e
+        _REQ_TX.pop(id(cn), None)
+        try:
+            _req_flag(cn, False)
+        except Exception:
+            pass
+        for fn in st["after"]:
+            try:
+                fn()
+            except Exception:
+                pass
+        return out
+    raise RuntimeError("request_tx: no attempt ran")
+
+
 def call(cn, name: str, args: list | tuple = ()) -> list[dict[str, Any]]:
     t0 = time.perf_counter()
+    st = _REQ_TX.get(id(cn))
+    if st is not None:
+        # Inside request_tx: no commit, no retry, no rollback here; the request decides.
+        cur = _cursor(cn)
+        try:
+            rows = _run_proc(cur, name, list(args))
+            _bump_write(name)
+            _perf(f"sql.{name}", (time.perf_counter() - t0) * 1000.0, n=len(rows), ok=1)
+            return rows
+        except Exception as e:
+            if st["failed"] is None:
+                st["failed"] = e
+            _perf(f"sql.{name}", (time.perf_counter() - t0) * 1000.0, ok=0, err=str(e)[:160])
+            raise
+        finally:
+            finish_cursor(cur)
+            try:
+                cur.close()
+            except Exception:
+                pass
     last: BaseException | None = None
     for attempt in (1, 2):
         cur = _cursor(cn)
@@ -481,7 +630,7 @@ def scalar_done(cn, sql: str, args: tuple = ()):
         return scalar(cn, sql, args)
     finally:
         try:
-            cn.commit()
+            commit(cn)
         except Exception:
             pass
 
@@ -496,7 +645,7 @@ def rows_done(cn, sql: str, args: tuple = ()) -> list[dict[str, Any]]:
     finally:
         cur.close()
         try:
-            cn.commit()
+            commit(cn)
         except Exception:
             pass
 

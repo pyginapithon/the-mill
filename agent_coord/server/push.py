@@ -410,9 +410,17 @@ def fanout(
 
     when, when passed, is the hint time; a write that leaves the activity row
     alone (a label) passes its own time so the hint is not stale (#280).
+
+    Inside a request transaction (#818) the pokes wait for its commit and are
+    dropped if it rolls back; the return is then [].
     """
     import time
 
+    from agent_coord.server.records.db import after_commit, in_request_tx
+
+    if in_request_tx(cn):
+        after_commit(cn, lambda: fanout(cn, type, id, hint, rows=rows, skip_desk=skip_desk, when=when))
+        return []
     t0 = time.perf_counter()
     try:
         from agent_coord.server.wake import post_desk
@@ -530,14 +538,19 @@ def _notify_rooms(rooms: list[str], frame: dict) -> None:
 def emit(cn, desk: str, kind: str, payload: dict, *, reason: str = "addressed", room: str | None = None) -> str:
     """Hand one async item to a sitting socket, and keep it for the sync report.
 
-    outcome is sent, missed, or error. The book row is what a later mill sync returns.
+    outcome is sent, missed, or error (deferred inside a #818 request transaction). The book row is what a later mill sync returns.
     The live frame carries an idempotency key. The stored row does not: connect
     drain picking up that key is a later change.
     """
     from agent_coord.server.mill_json import stamp_mill
     from agent_coord.server.poke_key import FIELD, letter_key, receipt_key
     from agent_coord.server.records import push as rec_push
+    from agent_coord.server.records.db import after_commit, in_request_tx
 
+    if in_request_tx(cn):
+        # #818: the letter goes out after its command commits, never for a rolled-back one.
+        after_commit(cn, lambda: emit(cn, desk, kind, payload, reason=reason, room=room))
+        return "deferred"
     frame = dict(payload)
     frame.setdefault("kind", kind)
     who = str(desk or "").strip()

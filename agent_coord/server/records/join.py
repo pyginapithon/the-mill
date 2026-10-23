@@ -22,8 +22,13 @@ def upsert(
     token_hash: str | None = None,
     doing: str | None = None,
 ) -> list[dict]:
+    from agent_coord.server.records.doing_stack import PLACEHOLDERS
     from agent_coord.server.records.name import bare
 
+    # #818 PR B: join and invite placeholders ("present", "invited") are not
+    # something a desk is doing, so they never become a doing entry.
+    if doing is not None and doing.strip() in PLACEHOLDERS:
+        doing = None
     return call(
         cn,
         "mill_join_upsert",
@@ -82,27 +87,6 @@ def set_lan_ip(cn, desk: str, ip: str) -> None:
             cn.rollback()
         except Exception:
             pass
-
-
-def doing(cn, project: str, desk: str, doing: str = "working") -> list[dict]:
-    from agent_coord.server.records.name import bare
-
-    return call(
-        cn,
-        "mill_join_doing",
-        [bare(project, CONST_ROSTER), bare(desk, CONST_DESK), doing],
-    )
-
-
-def push_doing(cn, project: str, desk: str, text: str) -> list[dict]:
-    """#818: a new doing entry (append-only); the older entries stay as rows."""
-    from agent_coord.server.records.name import bare
-
-    piece = (text or "").replace("\x00", "").strip()
-    desk_b = bare(desk, CONST_DESK) if desk else ""
-    if not piece or not desk_b:
-        return []
-    return doing(cn, project, desk_b, piece[:512])
 
 
 def touch(cn, project: str, desk: str) -> list[dict]:

@@ -21,7 +21,7 @@ BEGIN
     ROLLBACK;
     RESIGNAL;
   END;
-  START TRANSACTION;
+  IF @mill_req_tx IS NULL THEN START TRANSACTION; END IF;
   SET v_ts = MILL_NOW();
   SET v_desk = MILL_NAME_GET('desk', p_desk);
   SET v_prev = (
@@ -41,7 +41,7 @@ BEGIN
   IF v_n > 0 THEN
     UPDATE activity SET updated = v_ts WHERE type = 'mail' AND id = p_mail;
   END IF;
-  COMMIT;
+  IF @mill_req_tx IS NULL THEN COMMIT; END IF;
   SELECT p_mail AS id, v_ts AS updated, p_mail AS mail_id, v_desk AS desk_id, v_n AS n,
          v_receipt AS receipt, v_ts AS opened,
          IF(v_prev IS NULL AND v_n > 0 AND v_receipt <> 0, 1, 0) AS push_receipt,

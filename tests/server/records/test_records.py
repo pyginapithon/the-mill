@@ -126,14 +126,15 @@ def test_doing_appends_a_row_per_entry(cn) -> None:
     from agent_coord.server.records.db import rows_done
 
     here.upsert(cn, "unit", "stack", "", token_hash="b" * 64, doing="present")
-    here.push_doing(cn, "unit", "stack", "a | b")
+    here.upsert(cn, "unit", "stack", "", token_hash="b" * 64, doing="a | b")
     rows = rows_done(
         cn,
         "SELECT g.text FROM doing g JOIN name n ON n.id = g.desk_id "
         "WHERE n.type='desk' AND n.name=%s ORDER BY g.id",
         ("stack",),
     )
-    assert [r["text"] for r in rows] == ["present", "a | b"]
+    # #818 PR B: the join placeholder writes no doing text.
+    assert [r["text"] for r in rows if r["text"]] == ["a | b"]
 
 
 def test_hold_unique(cn) -> None:

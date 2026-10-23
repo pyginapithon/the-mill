@@ -66,7 +66,9 @@ def _put_back(cn, row_id: int, raw_payload: Any, idem: str) -> None:
             "WHERE id = %s AND outcome = 'sent'"
         )
         cur.execute(mark_back, (raw, int(row_id)))
-        cn.commit()
+        from agent_coord.server.records.db import commit as _db_commit
+
+        _db_commit(cn)  # #818: not inside a request transaction
     finally:
         cur.close()
 

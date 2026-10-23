@@ -216,6 +216,13 @@ def _poke(
     """
     if not nid:
         return
+    from agent_coord.server.records.db import after_commit
+
+    # #818: inside a --doing request the pokes wait for its commit.
+    after_commit(c._cn, lambda: _poke_now(c, typ, nid, command, owner=owner, fresh=fresh))
+
+
+def _poke_now(c: Book, typ: str, nid: Any, command: str, *, owner: str | None, fresh: bool) -> None:
     try:
         from agent_coord.server.push import fanout
 
@@ -364,24 +371,6 @@ def _join_delivery(c: Book, desk: str, delivery: dict[str, Any]) -> dict[str, An
     return {"webhook": "armed", "host": host, "test": got["status"], "wake_on": wake_on}
 
 
-def _h_doing(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
-    from agent_coord.server.records import join as rec_join
-
-    doing = str(body.get("doing") or "working").strip()
-    rows = rec_join.push_doing(
-        c._cn, _stored(project), _stored(owner or ""), doing
-    )
-    rec = rows[0] if rows else {}
-    if rec.get("id"):
-        _poke(c, "doing", rec.get("id"), "doing", owner=owner)
-    return {
-        "ok": True,
-        "doing": rec.get("doing") or doing,
-        "owner": owner,
-        "id": rec.get("id"),
-    }
-
-
 def _h_inbox(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import mail as rec_mail
     from agent_coord.server.records.name import by_id as name_by_id
@@ -489,7 +478,6 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
         "need_id": fields["need_id"],
         "id": r.get("id"),
         "status": st,
-        "doing": fields["doing"],
         "detail": fields["detail"],
         "progress": fields["progress"],
         "volunteer": _stored(r.get("assigned") or ""),
@@ -498,11 +486,10 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
         "tree": _stored(r.get("tree") or "") or None,
         "labels": _json_names(r.get("labels")),
     }
-    # #330: notes land in detail. A title (doing) or progress token that was
-    # never set is left out, so no field in the reply is always empty.
-    for k in ("doing", "progress"):
-        if not card[k]:
-            del card[k]
+    # #330: notes land in detail. A progress token that was never set is left
+    # out, so no field in the reply is always empty. #818: cards have no title.
+    if not card["progress"]:
+        del card["progress"]
     return card
 
 
@@ -640,27 +627,349 @@ def _h_todo(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
 
 
 def _h_session(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
-    from agent_coord.server.records import join as rec_join
-    from agent_coord.server.records.name import by_id as name_by_id
+    """`mill connected` (#274 word; RPC session). #818 PR B: what each desk is
+    doing, on which item, since when, and who is waiting on it.
+
+    ROSTER is optional (none = desks active in the last day; --all every desk;
+    --desk X one desk). --history lists past doing entries instead, a page at a time.
+    """
+    from agent_coord.server.records import doing as rec_doing
+
+    roster = _stored(str(body.get("project") or "").strip())
+    desk = _stored(str(body.get("desk") or "").strip())
+    if desk:
+        from agent_coord.server.records import name as rec_name
+
+        if rec_name.get(c._cn, desk, CONST_DESK) is None:
+            raise CoordError(f"connected: no desk {desk[:64]}")
+    elif roster:
+        _require_live_project(c._cn, roster, "connected")
+    page = _doing_page(body.get("page"))
+    if body.get("history"):
+        return _doing_history(c, body, desk)
+    if body.get("since") or page:
+        raise CoordError("connected: --since and --page go with --history")
+    return [_desk_view(r, roster, by) for r, by in _doing_rows(
+        rec_doing.now(c._cn, desk, roster, bool(body.get("all")))
+    )]
 
 
+def _doing_rows(rows: list[dict[str, Any]]) -> list[tuple[dict[str, Any], dict[str, list]]]:
+    """Group mill_doing_now's three parts: (desk row, {letters, cards})."""
+    extra: dict[str, dict[str, list]] = {}
+    desks: list[dict[str, Any]] = []
+    for r in rows:
+        part = str(r.get("part") or "")
+        if part == "desk":
+            desks.append(r)
+        elif part in ("letter", "card"):
+            extra.setdefault(str(r.get("desk") or ""), {"letter": [], "card": []})[part].append(r)
+    return [(d, extra.get(str(d.get("desk") or ""), {"letter": [], "card": []})) for d in desks]
+
+
+def _age(seconds: Any) -> str:
+    try:
+        s = max(0, int(seconds))
+    except (TypeError, ValueError):
+        return ""
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m"
+    if s < 86400:
+        return f"{s // 3600}h"
+    return f"{s // 86400}d"
+
+
+def _item(typ: Any, nid: Any) -> str | None:
+    return f"{typ}-{int(nid)}" if typ and nid is not None else None
+
+
+def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str, Any]:
     from agent_coord.lib.observe import heartbeat_flags
 
-    out = []
-    for rec in rec_join.select(c._cn, _stored(project)):
-        hb = rec.get("updated") or rec.get("lastUpdated")
-        alive, stale = heartbeat_flags(hb)
-        out.append(
-            {
-                "project_id": project,
-                "owner": _stored(rec.get("desk") or ""),
-                "doing": rec.get("doing") or "",
-                "heartbeat": hb,
-                "alive": alive,
-                "stale": stale,
-            }
-        )
+    who = _stored(r.get("desk") or "")
+    hb = r.get("heartbeat")
+    alive, stale = heartbeat_flags(hb)
+    text = str(r.get("text") or "")
+    on = _item(r.get("on_type"), r.get("on_id"))
+    ended = r.get("ended_at") is not None
+    out: dict[str, Any] = {"owner": who, "heartbeat": hb, "alive": alive, "stale": stale}
+    if roster:
+        out["project_id"] = roster
+    if text and not ended:
+        out.update({"doing": text, "on": on, "age": _age(r.get("age_s"))})
+        head = f'{who}: doing "{text}"' + (f" on {on}" if on else "") + f" ({out['age']})"
+    else:
+        out["doing"] = ""
+        if ended and r.get("now") is not None:
+            out["idle"] = _age((r["now"] - r["ended_at"]).total_seconds())
+        elif r.get("age_s") is not None:
+            out["idle"] = _age(r.get("age_s"))
+        last_text = str(r.get("last_text") or "")
+        if last_text:
+            out["last"] = {"doing": last_text, "on": _item(r.get("last_on_type"), r.get("last_on_id")),
+                           "age": _age(r.get("last_age_s")), "ended_by": r.get("ended_by")}
+        head = f"{who}: idle" + (f" {out['idle']}" if out.get("idle") else "")
+        if last_text:
+            head += f' (last: "{last_text}"' + (f" on {out['last']['on']}" if out["last"]["on"] else "") + ")"
+    letters = [
+        {"id": f"mail-{int(x['id'])}", "from": _stored(x.get("sender") or ""), "age": _age(x.get("age_s"))}
+        for x in by["letter"]
+    ]
+    cards = [
+        {"id": f"todo-{int(x['id'])}", "need": str(x.get("need") or ""), "roster": _stored(x.get("roster") or ""),
+         "watchers": [w for w in str(x.get("watchers") or "").split(",") if w], "age": _age(x.get("age_s"))}
+        for x in by["card"]
+    ]
+    n_letters = int(by["letter"][0].get("n") or 0) if by["letter"] else 0
+    n_cards = int(by["card"][0].get("n") or 0) if by["card"] else 0
+    out["waiting_on_it"] = {
+        "letters": {"n": n_letters, "newest": letters},
+        "cards": {"n": n_cards, "newest": cards},
+    }
+    bits = []
+    if n_letters:
+        x = letters[0]
+        bits.append(f"{n_letters} unanswered letter{'s' if n_letters != 1 else ''} (newest {x['id']} from {x['from']}, {x['age']})")
+    if n_cards:
+        x = cards[0]
+        bits.append(f"{n_cards} watched card{'s' if n_cards != 1 else ''} it claimed (newest {x['id']} {x['need']}, {x['age']})")
+    out["line"] = head + ". Waiting on it: " + ("; ".join(bits) if bits else "nothing") + "."
     return out
+
+
+def _doing_history(c: Book, body: dict[str, Any], desk: str, on: tuple[str, int] | None = None) -> dict[str, Any]:
+    """`mill connected --history`: past doing entries, newest first, 50 a page.
+    on keeps one item's entries (the Wall's card trail, GET /api/v1/doing/history?on=)."""
+    from datetime import datetime
+
+    from agent_coord.server.records import doing as rec_doing
+
+    since_raw = str(body.get("since") or "").strip()
+    since = None
+    if since_raw:
+        try:
+            since = datetime.fromisoformat(since_raw.replace("T", " "))
+        except ValueError:
+            raise CoordError(
+                f"connected --since: {since_raw[:40]} is not a date; say 2026-10-22 or '2026-10-22 18:00' (office clock)"
+            ) from None
+    page = _doing_page(body.get("page")) or 1
+    size = DOING_PAGE
+    rows = rec_doing.history(c._cn, desk, since.isoformat(sep=" ") if since else None, page, size,
+                             on[0] if on else "", on[1] if on else None)
+    total = int(rows[0].get("total") or 0) if rows else 0
+    if not rows and page > 1:
+        raise CoordError(f"connected --history --page {page}: past the last page")
+    of = max(1, -(-total // size))
+    block: dict[str, Any] = {"n": page, "of": of, "size": size, "entries": total}
+    if page < of:
+        block["next"] = f"--page {page + 1}"
+    entries = []
+    for r in rows:
+        # Whichever came first: its own event (reply, pass or done, drop),
+        # clock-out or reset (cleared), or a newer --doing.
+        ends = [(r.get("ended_at"), "finished"), (r.get("cleared_at"), "cleared"), (r.get("replaced_at"), "newer")]
+        hit = [(at, by) for at, by in ends if at is not None]
+        how = min(hit, key=lambda x: x[0])[1] if hit else None
+        entries.append({
+            "id": int(r["id"]),
+            "desk": _stored(r.get("desk") or ""),
+            "at": str(r.get("created") or "")[:19],
+            "doing": str(r.get("text") or ""),
+            "on": _item(r.get("on_type"), r.get("on_id")),
+            "roster": _stored(r.get("roster") or ""),
+            "ended": how is not None,
+            "ended_by": how,
+        })
+    return {"history": entries, "page": block}
+
+
+DOING_PAGE = 50
+# 50 a page: five million entries. The book's offset, (page - 1) * 50, is an INT.
+DOING_PAGE_MAX = 100000
+
+
+def _doing_page(raw: Any) -> int:
+    """The --history page: 0 when not given (None, "", or the CLI's 0), else an
+    int or a string of ASCII digits from 1 to DOING_PAGE_MAX. Anything else
+    (a bool, a float, "²" or "１" that str.isdigit() takes, a sign, an
+    overflow) is refused, so no page ever reaches the book out of range."""
+    if raw is None or raw == "" or (type(raw) is int and raw == 0):
+        return 0
+    n = -1
+    if type(raw) is int:
+        n = raw
+    elif isinstance(raw, str) and raw.isascii() and raw.isdigit() and len(raw) <= 6:
+        n = int(raw)
+    if not 1 <= n <= DOING_PAGE_MAX:
+        raise CoordError(f"connected --page: N is 1 to {DOING_PAGE_MAX}")
+    return n
+# #818 PR B: commands whose --doing writes a doing entry on the item they wrote.
+DOING_COMMANDS = frozenset(
+    {"send", "reply", "mark", "open", "claim", "unclaim", "assign", "pass", "note", "unpark", "hold", "drop", "score"}
+)
+
+
+def _doing_text(command: str, body: dict[str, Any]) -> str:
+    """The --doing text this call carries, checked before the command runs."""
+    if command not in DOING_COMMANDS:
+        return ""
+    raw = body.get("doing")
+    if raw is None:
+        return ""
+    text = " ".join(str(raw).replace("\x00", "").split())
+    if not text:
+        return ""
+    if len(text) > 512:
+        raise CoordError(f"{command}: --doing must be 1..512 characters; nothing stored")
+    return text
+
+
+def _first_need(raw: Any) -> str:
+    return slug(str(raw or "").split(",")[0].strip())
+
+
+def _doing_item(c: Book, command: str, body: dict[str, Any], out: Any, project: str) -> tuple[str, int] | None:
+    """(type, id) of the item this command wrote, or None."""
+    res = out if isinstance(out, dict) else {}
+    if command == "send":
+        return ("mail", int(res["id"])) if res.get("id") else None
+    if command == "reply":
+        mid = int(body.get("mail_id") or body.get("id") or body.get("parent_id") or 0)
+        return ("mail", mid) if mid else None
+    if command == "mark":
+        ids = res.get("ids") or []
+        return ("mail", int(ids[0])) if ids else None
+    if command in ("open", "claim", "unclaim", "assign", "pass", "note", "unpark"):
+        if command == "open" and res.get("id"):
+            return ("todo", int(res["id"]))
+        from agent_coord.server.records import todo as rec_todo
+
+        hit = rec_todo.find(c._cn, project, _first_need(body.get("need")))
+        return ("todo", int(hit["id"])) if hit else None
+    if command in ("hold", "drop"):
+        if command == "hold" and not res.get("held"):
+            return None
+        if res.get("id"):
+            return ("hold", int(res["id"]))
+        from agent_coord.helpers.bounds import resource_name
+        from agent_coord.server.records import hold as rec_hold
+
+        got = rec_hold.peek(c._cn, _stored(project), resource_name(str(body.get("resource") or "")))
+        return ("hold", int(got["id"])) if got.get("id") else None
+    if command == "score":
+        return ("score", int(res["id"])) if res.get("id") and not res.get("retired") else None
+    return None
+
+
+def _doing_finish(c: Book, command: str, body: dict[str, Any], out: Any, owner: str) -> None:
+    """A pass (ship) or pass --done of a card, or a drop that frees a hold, without
+    --doing ends the desk's own doing on that item. pass --back ends nothing.
+    The command already stands; a failure here is logged."""
+    from agent_coord.server.records import doing as rec_doing
+
+    res = out if isinstance(out, dict) else {}
+    if command == "pass":
+        if str(body.get("step") or "ship").strip().lower() not in ("ship", "done"):
+            return
+        on_type = "todo"
+        rows = res.get("results") if isinstance(res.get("results"), list) else [res]
+        ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("ok") and r.get("id")]
+    elif command == "drop":
+        on_type = "hold"
+        ids = [res.get("id")] if res.get("released") and res.get("id") else []
+    else:
+        return
+    for nid in ids:
+        try:
+            rec_doing.finish(c._cn, _stored(owner), on_type, int(nid))
+        except Exception as e:
+            try:
+                c._cn.rollback()
+            except Exception:
+                pass
+            _log.warning("%s: doing finish not recorded for %s-%s: %s", command, on_type, nid, type(e).__name__)
+
+
+def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project: str, owner: str | None, text: str) -> Any:
+    """The doing side of a command, inside the request that ran it.
+
+    Without --doing, a pass or drop may write its finish row (_doing_finish).
+    With --doing this runs inside _run_command's transaction: any refusal raises,
+    and the command rolls back with its doing row (#818).
+    """
+    if not owner:
+        return out
+    if not text:
+        if command in ("pass", "drop"):
+            _doing_finish(c, command, body, out, owner)
+        return out
+    from agent_coord.server.records import doing as rec_doing
+
+    res = out if isinstance(out, dict) else {}
+    rows = res.get("results") if isinstance(res.get("results"), list) else []
+    bad = [r for r in rows if isinstance(r, dict) and r.get("ok") is False]
+    if bad:
+        # A list command with --doing is all or nothing.
+        b = bad[0]
+        raise CoordError(f"{b.get('need') or 'an item'}: {str(b.get('error') or 'refused')[:160]}")
+    item = _doing_item(c, command, body, out, project)
+    if item is None:
+        raise CoordError("no item was written, so no doing can be recorded")
+    from agent_coord.server.records.db import retryable_db
+
+    try:
+        got = rec_doing.put(c._cn, _stored(owner), text, item[0], item[1])
+    except CoordError:
+        raise
+    except Exception as e:
+        if retryable_db(e):
+            raise  # a deadlock, lock wait or dropped connection: request_tx runs it again
+        raise CoordError(_sql_refusal(e) or "the doing could not be stored") from e
+    if isinstance(out, dict):
+        out = dict(out)
+        out["doing_entry"] = {"id": int(got.get("id") or 0), "on": f"{item[0]}-{item[1]}"}
+    if got.get("id"):
+        _poke(c, "doing", got.get("id"), "doing", owner=owner)  # waits for the commit
+    return out
+
+
+def _run_command(c: Book, fn: Any, command: str, body: dict[str, Any], project: str, owner: str | None, text: str) -> Any:
+    """Run a handler and its doing side.
+
+    With --doing (#818) the command and its doing row are one transaction: both
+    commit, or a refusal of either rolls both back and nothing is written; its
+    pokes, letters and webhooks go out only after the commit. A deadlock, lock
+    wait or dropped connection runs the whole request once more (request_tx);
+    if that fails too the reply is the same "--doing refused ... nothing was
+    changed".
+    """
+    if not (owner and text):
+        out = fn(c, body, project, owner)
+        return _doing_after(c, command, body, out, project, owner, text)
+    from agent_coord.server.records.db import RequestRolledBack, request_tx
+
+    def run() -> Any:
+        out = fn(c, body, project, owner)
+        return _doing_after(c, command, body, out, project, owner, text)
+
+    from agent_coord.server.records.db import TRANSIENT_ERRNO, retryable_db, transient_errno
+
+    try:
+        return request_tx(c._cn, run)
+    except RequestRolledBack as e:
+        errno = transient_errno(e.cause)
+        if errno is not None:
+            msg = f"the book was busy ({TRANSIENT_ERRNO[errno]} {errno}) twice; try again"
+        elif retryable_db(e.cause):
+            msg = "the book connection failed twice; try again"
+        else:
+            msg = _sql_refusal(e.cause) or str(e.cause).split(":", 1)[-1].strip() or type(e.cause).__name__
+        raise CoordError(f"{command} --doing refused: {msg[:160]}; nothing was changed") from e
+    except CoordError as e:
+        raise CoordError(f"{command} --doing refused: {e}; nothing was changed", sync=getattr(e, "sync", None)) from e
 
 
 def _h_project(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
@@ -1281,7 +1590,9 @@ def _ends_read(fn):
             return fn(c, *a, **k)
         finally:
             try:
-                c._cn.commit()
+                from agent_coord.server.records.db import commit as _db_commit
+
+                _db_commit(c._cn)  # #818: not inside a request transaction
             except Exception:
                 pass
 
@@ -1760,7 +2071,6 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
     payload = fields["payload"] or {
         "slug": fields["need_id"],
-        "doing": fields["doing"],
         "detail": fields["detail"],
     }
     if eta_at is not None:
@@ -1820,7 +2130,7 @@ def _h_open(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     from agent_coord.server.records import todo as rec_todo
 
     need = slug(str(body.get("need") or body.get("title") or ""))
-    doing = str(body.get("doing") or "")[:200]
+    # #818: --doing on create is the desk's doing (written after the call), not card text.
     # #188: same rule as an oversize note. Refuse. Do not keep a silent prefix.
     import json
 
@@ -1839,7 +2149,7 @@ def _h_open(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
         st = rec_todo.normalize_status(str(raw_status), default="")
         if st not in ("parked", "open"):
             raise CoordError("status must be parked or open")
-    body_s = json.dumps({"slug": need, "doing": doing, "detail": detail})
+    body_s = json.dumps({"slug": need, "detail": detail})
     if len(body_s) > rec_todo.BODY_MAX:
         # #292: a long detail is refused, never cut to its tail.
         raise CoordError(
@@ -1870,7 +2180,7 @@ def _h_open(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     else:
         rows = rec_todo.insert(c._cn, _stored(project), _stored(owner or ""), st, body_s)
         tid = int(rows[0]["id"]) if rows else 0
-    rec = {"project_id": project, "need_id": need, "id": tid, "status": st, "doing": doing, "detail": detail}
+    rec = {"project_id": project, "need_id": need, "id": tid, "status": st, "detail": detail}
     _poke(c, "todo", tid, "open", owner=owner)
     return rec
 
@@ -2064,7 +2374,7 @@ def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     if hit is None:
         raise CoordError(f"no such need: {project}/{need}")
     fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
-    payload = fields["payload"] or {"slug": fields["need_id"], "doing": fields["doing"], "detail": fields["detail"]}
+    payload = fields["payload"] or {"slug": fields["need_id"], "detail": fields["detail"]}
     before = dict(payload)
     note_s = str(body.get("note") or body.get("detail") or "").strip()
     # #102: positional text. A progress token (9/12, 75%, done, git <sha>) is
@@ -2373,6 +2683,12 @@ def _h_score(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
 
 def _poke_tree(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None:
     _poke(c, typ, nid, typ.upper(), owner=owner)
+    from agent_coord.server.records.db import after_commit
+
+    after_commit(c._cn, lambda: _poke_tree_rooms(c, typ, nid, owner=owner))
+
+
+def _poke_tree_rooms(c: Book, typ: str, nid: int, *, owner: str | None = None) -> None:
     try:
         from agent_coord.server.records import tree as rec_tree
         from agent_coord.server.records.name import by_id
@@ -2930,7 +3246,7 @@ def _h_trail(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             st = "deleted" if deleted else str(d.get("todo_status") or ("deleted" if not d else "open"))
             note = last_line(fields.get("detail") or "")
             idea = first_line(fields.get("detail") or "")
-            title = fields.get("doing") or fields.get("need_id") or ""
+            title = fields.get("need_id") or ""
             if idea and idea != note and idea != title:
                 title = f"{title}: {idea}"
             when = d.get("todo_updated_utc") or d.get("updated_utc")
@@ -3032,7 +3348,6 @@ HANDLERS = {
     "session": _h_session,
     "project": _h_project,
     "join": _h_here,
-    "doing": _h_doing,
     "label": _h_label_name,
     "label-add": _h_label,
     "label-remove": _h_label,
@@ -3140,8 +3455,9 @@ def dispatch(c: Book, body: dict[str, Any], *, token: str = "") -> Any:
 
     if command in WRITE_COMMANDS or canonical_command(command) in WRITE_COMMANDS:
         scrub_request_body(body)
+    doing_text = _doing_text(command, body)
     try:
-        out = fn(c, body, project, owner)
+        out = _run_command(c, fn, command, body, project, owner, doing_text)
         try:
             from agent_coord.server import wake_first
 
@@ -3311,7 +3627,8 @@ def dispatch_ws(
         else:
             owns_id = True
     try:
-        out = fn(c, body, project, owner)
+        doing_text = _doing_text(v, body)
+        out = _run_command(c, fn, v, body, project, owner, doing_text)
         try:
             from agent_coord.server import wake_first
 

@@ -244,7 +244,11 @@ def test_doing_pushes_default_then_custom_and_dispatch_ignores(cn) -> None:
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(push.HUB, "rooms", {desk(alice): {object()}, desk(bob): {object()}})
         mp.setattr(push.HUB, "notify", capture)
-        got = rpc._h_doing(Book(cn), {"doing": "chart"}, project, "alice")
+        # #818 PR B: --doing on a command writes the entry right after it.
+        from agent_coord.server.records import todo as rec_todo
+
+        tid = int(rec_todo.insert(cn, project, "alice", "open", '{"slug":"chart818"}')[0]["id"])
+        got = rpc._doing_after(Book(cn), "open", {}, {"id": tid}, project, "alice", "chart")["doing_entry"]
     assert notified, "doing did not push DOING"
     assert [room for room, _ in notified] == [desk(bob)]
     payload = notified[0][1]

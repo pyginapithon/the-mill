@@ -245,13 +245,17 @@ def test_b_seat_holds_state_and_behaves(cn, migrated):
 def test_c_doing_appends(cn, migrated):
     did = _desk_id(cn, "fx818-a")
     before = rows_done(cn, "SELECT id, text FROM doing WHERE desk_id = %s ORDER BY id", (did,))
-    one = rec_join.push_doing(cn, "fx818", "fx818-a", "pr open, waiting on ci")
-    two = rec_join.push_doing(cn, "fx818", "fx818-a", "done")
+    # #818 PR B: a doing is written by --doing on a command, linked to its item.
+    from agent_coord.server.records import doing as rec_doing
+    from agent_coord.server.records import todo as rec_todo
+
+    tid = int(rec_todo.insert(cn, "fx818", "fx818-a", "open", '{"slug":"c818"}')[0]["id"])
+    one = [rec_doing.put(cn, "fx818-a", "pr open, waiting on ci", "todo", tid)]
+    two = [rec_doing.put(cn, "fx818-a", "done", "todo", tid)]
     after = rows_done(cn, "SELECT id, text FROM doing WHERE desk_id = %s ORDER BY id", (did,))
     assert after[: len(before)] == before  # nothing overwritten
     assert [r["text"] for r in after[len(before):]] == ["pr open, waiting on ci", "done"]
     assert int(one[0]["id"]) < int(two[0]["id"])
-    assert two[0]["doing"] == "done"
     for r in after[len(before):]:
         assert scalar_done(cn, "SELECT COUNT(*) FROM activity WHERE type = 'doing' AND id = %s", (r["id"],)) == 1
     sel = {r["desk"]: r for r in rec_join.select(cn, "")}
@@ -517,3 +521,36 @@ def test_h_sql_state_flags_a_missing_or_changed_routine(cn):
     assert migrate.sql_state(cn)["ok"] is False
     migrate.ensure(cn)
     assert migrate.sql_state(cn)["ok"] is True
+
+
+def test_i_a_book_whose_routines_name_a_missing_definer_converges(cn):
+    """A dump restored on another server keeps DEFINER = a user that is not
+    there; calling the stamp then fails with 1449. ensure must read that as
+    unstamped and reload, not crash before the reload."""
+    from agent_coord.server.records import apply
+
+    apply(cn, wipe=True)
+    migrate.ensure(cn)
+    gone = "`gone_818`@`localhost`"
+    redefined = 0
+    for r in rows_done(cn, "SELECT ROUTINE_TYPE AS t, ROUTINE_NAME AS n FROM information_schema.ROUTINES"
+                           " WHERE ROUTINE_SCHEMA = DATABASE()"):
+        rtype, name = r["t"], r["n"]
+        ddl = rows_done(cn, f"SHOW CREATE {rtype} `{name}`")[0][f"Create {rtype.title()}"]
+        rest = ddl.partition(f" {rtype} ")[2]
+        try:
+            _x(cn, f"DROP {rtype} `{name}`")
+            _x(cn, f"CREATE DEFINER={gone} {rtype} {rest}")
+        except Exception as e:  # no SET_USER_ID here: the case cannot be built
+            if getattr(e, "errno", None) in (1227, 1044):
+                pytest.skip("this server user cannot create routines for another definer")
+            raise
+        redefined += 1
+    cn.commit()
+    assert redefined > 2
+    st = migrate.sql_state(cn)
+    assert st["ok"] is False
+    migrate.ensure(cn)
+    assert migrate.sql_state(cn)["ok"] is True
+    assert scalar_done(cn, "SELECT COUNT(*) FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = DATABASE()"
+                           " AND DEFINER = 'gone_818@localhost'") == 0
