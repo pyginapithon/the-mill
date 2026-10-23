@@ -837,26 +837,33 @@ def _doing_item(c: Book, command: str, body: dict[str, Any], out: Any, project: 
     return None
 
 
-def _doing_finish(c: Book, body: dict[str, Any], out: Any, owner: str) -> None:
-    """A pass (ship) or pass --done without --doing ends the desk's own doing on
-    that card. --back ends nothing. The pass already stands; a failure here is logged."""
+def _doing_finish(c: Book, command: str, body: dict[str, Any], out: Any, owner: str) -> None:
+    """A pass (ship) or pass --done of a card, or a drop that frees a hold, without
+    --doing ends the desk's own doing on that item. pass --back ends nothing.
+    The command already stands; a failure here is logged."""
     from agent_coord.server.records import doing as rec_doing
 
-    if str(body.get("step") or "ship").strip().lower() not in ("ship", "done"):
-        return
     res = out if isinstance(out, dict) else {}
-    rows = res.get("results") if isinstance(res.get("results"), list) else [res]
-    for r in rows:
-        if not (isinstance(r, dict) and r.get("ok") and r.get("id")):
-            continue
+    if command == "pass":
+        if str(body.get("step") or "ship").strip().lower() not in ("ship", "done"):
+            return
+        on_type = "todo"
+        rows = res.get("results") if isinstance(res.get("results"), list) else [res]
+        ids = [r.get("id") for r in rows if isinstance(r, dict) and r.get("ok") and r.get("id")]
+    elif command == "drop":
+        on_type = "hold"
+        ids = [res.get("id")] if res.get("released") and res.get("id") else []
+    else:
+        return
+    for nid in ids:
         try:
-            rec_doing.finish(c._cn, _stored(owner), "todo", int(r["id"]))
+            rec_doing.finish(c._cn, _stored(owner), on_type, int(nid))
         except Exception as e:
             try:
                 c._cn.rollback()
             except Exception:
                 pass
-            _log.warning("pass: doing finish not recorded for todo-%s: %s", r.get("id"), type(e).__name__)
+            _log.warning("%s: doing finish not recorded for %s-%s: %s", command, on_type, nid, type(e).__name__)
 
 
 def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project: str, owner: str | None, text: str) -> Any:
@@ -868,8 +875,8 @@ def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project:
     if not owner:
         return out
     if not text:
-        if command == "pass":
-            _doing_finish(c, body, out, owner)
+        if command in ("pass", "drop"):
+            _doing_finish(c, command, body, out, owner)
         return out
     from agent_coord.server.records import doing as rec_doing
 

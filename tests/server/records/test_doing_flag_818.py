@@ -18,8 +18,9 @@ only the /ws hop is replaced by dispatch_ws, as in the #238 matrix.
     undoes the command;
 (f) an entry ends on a real event only: clock-out or reset ends it (ended_by
     cleared, the empty row is never a doing); a pass or done by the desk ends
-    its card entry; a later note, another desk's done or a pass --back never
-    ends one or brings an ended one back.
+    its card entry, a drop by the desk its hold entry; a later note, another
+    desk's done, a pass --back or taking the hold again never ends one or
+    brings an ended one back; a drop --doing starts the next entry.
 """
 from __future__ import annotations
 

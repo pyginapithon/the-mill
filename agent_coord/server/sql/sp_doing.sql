@@ -2,14 +2,14 @@
 -- that command's item; `mill connected` reads what every desk is doing.
 -- Rows live in table doing (append-only, see sp_join.sql mill_doing_insert).
 -- An entry ends on a real event, derived on read from rows that never change:
---   finished: the desk replies under the letter; the desk drops the hold; the
---             desk passes (ships) or passes --done the card without --doing,
---             which appends an empty row on that card (mill_doing_finish);
+--   finished: the desk replies under the letter; the desk passes (ships) or
+--             passes --done the card, or drops the hold, without --doing,
+--             which appends an empty row on that item (mill_doing_finish);
 --   cleared:  clock-out, reset or retire appends an empty row with no item
 --             (mill_doing_clear);
 --   newer:    the desk writes another --doing entry.
--- A mark, a note, someone else's pass or a card stepped back never ends one
--- and never brings an ended one back. A score entry ends only as cleared or newer.
+-- A mark, a note, someone else's pass, a card stepped back or a hold taken
+-- again never ends one and never brings an ended one back. A score entry ends only as cleared or newer.
 
 DROP FUNCTION IF EXISTS mill_doing_end;
 DROP FUNCTION IF EXISTS mill_doing_cleared;
@@ -41,20 +41,13 @@ BEGIN
       JOIN mail r ON r.id = c.id
      WHERE t.type = 'mail' AND t.id = p_on_id
        AND r.desk_id = p_desk AND r.created >= p_created;
-  ELSEIF p_on_type = 'todo' THEN
-    -- The pass or done itself, not the card's state: a later note or a step
-    -- back changes the card, never this row.
+  ELSEIF p_on_type IN ('todo', 'hold') THEN
+    -- The pass, done or drop itself, not the item's live state: a later note,
+    -- a step back or a re-take changes the card or hold, never this row.
     SELECT MIN(f.created) INTO v_at
       FROM doing f
-     WHERE f.desk_id = p_desk AND f.text = '' AND f.on_type = 'todo' AND f.on_id = p_on_id
+     WHERE f.desk_id = p_desk AND f.text = '' AND f.on_type = p_on_type AND f.on_id = p_on_id
        AND (f.created > p_created OR (f.created = p_created AND f.id > p_id));
-  ELSEIF p_on_type = 'hold' THEN
-    SELECT h.updated INTO v_at
-      FROM hold h
-     WHERE h.id = p_on_id
-       AND h.updated >= p_created
-       AND (h.desk_id IS NULL OR h.desk_id <> p_desk)
-     LIMIT 1;
   END IF;
   RETURN v_at;
 END //
@@ -116,9 +109,9 @@ BEGIN
   SELECT v_id AS id, v_ts AS created, v_desk AS desk_id, v_roster AS roster_id;
 END //
 
--- A pass or done without --doing by the desk ends its current entry when that
--- entry is on this card: an empty row on the card marks the event. Nothing
--- happens when the desk's newest row is anything else.
+-- A pass or done of a card, or the drop of a hold, without --doing by the desk
+-- ends its current entry when that entry is on this item: an empty row on the
+-- item marks the event. Nothing happens when the desk's newest row is anything else.
 CREATE PROCEDURE mill_doing_finish(
   IN p_desk    VARCHAR(64),
   IN p_on_type VARCHAR(8),
