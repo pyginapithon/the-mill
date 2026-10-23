@@ -202,3 +202,20 @@ def test_a_run_killed_after_the_column_was_added_converges(w):
     assert "mail_to.asked_backfill" in out["applied"]
     assert _asked(w.cn, copy) == {PEER: 1, ME: 0}
     assert int(scalar_done(w.cn, "SELECT COUNT(*) FROM mail_to WHERE asked IS NULL")) == 0
+
+
+# (e) the Wall reads it -------------------------------------------------------------
+
+from tests.server.records.test_doing_routes_818 import _get, wall  # noqa: E402,F401
+
+
+def test_waiting_letters_carry_asked_in_connected_and_the_wall_route(w, wall):  # noqa: F811
+    mid = _send(w, [ME], desk=PEER)
+    letters = w.me(ME)["waiting_on_it"]["letters"]["newest"]
+    mine = [x for x in letters if x["id"] == f"mail-{mid}"]
+    assert mine and mine[0]["asked"] is True
+    assert all(x["asked"] is True for x in letters)  # a copy never waits, so every listed letter was asked
+    code, got = _get(wall, f"/api/v1/doing?desk={ME}")
+    assert code == 200, got
+    route = got[0]["waiting_on_it"]["letters"]["newest"]
+    assert route == letters and all(set(x) == {"id", "from", "age", "asked"} for x in route)
