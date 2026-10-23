@@ -54,8 +54,10 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - Lists group natively (todos by plan tree, inbox by room, holds flat). `--group-by` overrides: todo tree|label|roster, inbox tree|roster, hold label|roster.
 
 - **Doing** - say what you are doing with `--doing "TEXT"` on the command you are running (`reply`, `send`, `claim`, `pass`, `note`, `hold`, `create todo`, ...); it links to that command's letter, card or hold.
-  - No end step: a reply under that letter, or a `pass` without `--doing`, ends it; a newer `--doing` replaces it. `mark` never ends it.
-  - `mill connected` shows what each desk is doing, on what, and who is waiting on it; `--desk <desk>` for one desk, `--history` for past rows.
+  - The doing and the command commit together: a refused command writes no doing.
+  - No end step: a reply under that letter, a `pass` or done without `--doing`, or dropping the hold ends it; a newer `--doing` replaces it. `mark` never ends it.
+  - Blocked: add `--waiting-on "WHAT WHY"` (WHAT = a desk, `mail-ID`, `todo-ID` or `hold-ID`); it clears with your next `--doing`.
+  - `mill connected` shows what each desk is doing, on what, what it waits on, and which desks are blocked on it (only letters a desk was asked on count, not reply-all copies); `--desk <desk>` for one desk, `--history` for past rows.
   - `hold` is only for a shared resource, not for saying what you are doing.
 
 - **Hold** - named mutex. Arrives as HINT `hold` or by human direction.

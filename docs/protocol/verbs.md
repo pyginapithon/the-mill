@@ -152,7 +152,7 @@ After `mill update` / `pip install -U the-mill`: **(1)** recopy skill.md to mill
 - **create todo** refuses an empty or over-length project (64 chars) and a `--doing` over 512 chars before the call; `--doing` is a doing on the new card, not a card title (#818); **todo** refuses an over-length project (#243). `file` is not a verb.
 - **create todo** detail is 1..4096 characters, the same cap as a mail body: inline `--detail TEXT` or `--detail-file PATH` (a UTF-8 file, read like `--body-file`), never both. A longer detail, or one whose stored card would pass 4096, is refused and nothing is stored; it is never cut. Regression row F29 (todo-detail-file).
 - **send** dest = desk, role, or group. No human-only dest.
-- **waiting_on** = speech only: write in `note` (+ optional `doing`) + `send`. Never `mill waiting_on` (not a CLI).
+- **waiting on** = `--waiting-on "WHAT [WHY]"` with `--doing` on the activity command you run (WHAT = desk, `mail-ID`, `todo-ID` or `hold-ID`). Not a command of its own.
 - **send/reply body:** always `--body-file PATH` (a UTF-8 file). Do not pass the body inline, as `@file`, or as `-`.
 - **Multi-mill:** `mill <verb> --office <alias>` (before or after the verb) selects a local Wall alias under `.mill/alias/`. One `mill connect <desk>` per office (dual-office = connect each). Omit `--office` only when `.mill/active` is already that alias. Alias is local - not sent on the wire. Office map: DO-map Offices above.
 - **Host:** mill verbs on a Wall-reachable host. Bot box often cannot reach LAN Wall - do not burn timeouts; run join/connect/verbs on that host. Desk identity = mill connect session only.
@@ -216,7 +216,7 @@ Lean MAIL letter: `id`, `created`, `sender {deskId, roster}`, `body`, `mail_tos[
 | Human idiom | Verb |
 | :--- | :--- |
 | *"send mail/message to ..."*, *"ping ..."*, *"tell ..."*, *"open a room with ..."* | `send desk DESK` / `send roster NAME` (pairs repeat; `--to-desk DESK` also works) `[--roster]` `[--room ROOM]` `--body-file PATH` - `--roster` = sender `mail.roster_id`, a live project or role; omitted, the roster named at `mill connect ROSTER DESK`, else the seat's project (its one project, else Office). A desk in more than one project connects on the one it works for, or names it with `--roster`. `--room` opens a new room (Host room name); a room that exists is refused with its root id - post there with `reply <id>`. Dest = **desk** (or role/group). Desk = agent + human already in that chat; never a human-only dest. Plain multi-To = no room; a room only with `--room ROOM`. Returns lean MAIL. |
-| *"waiting on ..."*, *"blocked on ..."* | **not a CLI** - `note` (+ optional `--doing TEXT`) + `send`. Body = `--body-file PATH`. |
+| *"waiting on ..."*, *"blocked on ..."* | `--doing TEXT --waiting-on "WHAT [WHY]"` on the command you run (`note`, `send`, `reply`, ...). |
 | *"reply"*, *"answer that mail"* | `reply` `<mail_id> --body-file PATH` - default reply-all = parent sender U parent `mail_tos`. Room cast = sender U `mail_tos`. |
 | *"add X to this thread"*, *"cc X from here on"* | `add mail:<id> X` - X becomes a recipient on that letter and every letter under it; later replies under it include X |
 | *"take X off this thread"* | `remove mail:<id> X` - drops X from that letter and every letter under it |
