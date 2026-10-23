@@ -80,7 +80,7 @@ def _frames(cn, typ: str, nid: int) -> dict[str, dict]:
     assert rows, f"no watchers type={typ} id={nid}"
     notified: list[tuple[str, dict]] = []
 
-    def capture(room, payload):
+    def capture(room, payload, row=None):  # row: #832 settle key
         notified.append((str(room), dict(payload)))
 
     rooms = {desk(str(r.get("desk") or "")): {object()} for r in rows}
@@ -164,7 +164,7 @@ def test_label_create_does_not_push_a_name_hint(cn) -> None:
 
     notified: list[tuple[str, dict]] = []
 
-    def capture(desk, payload):
+    def capture(desk, payload, row=None):  # row: #832 settle key
         notified.append((str(desk), dict(payload)))
 
     with pytest.MonkeyPatch.context() as mp:
@@ -205,7 +205,7 @@ def test_label_retire_does_not_push_a_name_hint(cn) -> None:
     nid = int(name.get(cn, "chart2", "label"))
     notified: list[tuple[str, dict]] = []
 
-    def capture(desk, payload):
+    def capture(desk, payload, row=None):  # row: #832 settle key
         notified.append((str(desk), dict(payload)))
 
     with pytest.MonkeyPatch.context() as mp:
@@ -234,7 +234,7 @@ def test_doing_pushes_default_then_custom_and_dispatch_ignores(cn) -> None:
 
     notified: list[tuple[str, dict]] = []
 
-    def capture(desk, payload):
+    def capture(desk, payload, row=None):  # row: #832 settle key
         notified.append((str(desk), dict(payload)))
 
     # #280: alice's own doing does not hint alice; another watcher (bob) gets it.
@@ -277,7 +277,7 @@ def test_note_connect_pushes_doing(cn) -> None:
     watchers.put(cn, "doing", jid, _desk_id(cn, bob))
     notified: list[tuple[str, dict]] = []
 
-    def capture(room, payload):
+    def capture(room, payload, row=None):  # row: #832 settle key
         notified.append((str(room), dict(payload)))
 
     with pytest.MonkeyPatch.context() as mp:
