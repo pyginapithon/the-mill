@@ -1066,10 +1066,16 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                 if icon == "/mill/oidc/callback":
                     from urllib.parse import parse_qs as _parse_qs
 
-                    from agent_coord.server.admin.door import complete_login, set_cookie_header
+                    from agent_coord.server.admin.door import (
+                        clear_oidc_cookie_header,
+                        complete_login,
+                        set_cookie_header,
+                    )
 
-                    code = ((_parse_qs(urlparse(self.path).query).get("code") or [""])[0] or "").strip()
-                    got = complete_login(code)
+                    query = _parse_qs(urlparse(self.path).query)
+                    code = ((query.get("code") or [""])[0] or "").strip()
+                    state = ((query.get("state") or [""])[0] or "").strip()
+                    got = complete_login(code, state, self.headers.get("Cookie") or "")
                     if got:
                         from agent_coord.server.admin.human import seat
 
@@ -1079,15 +1085,24 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                                 302,
                                 b"",
                                 "text/plain; charset=utf-8",
-                                [("Location", "/"), ("Set-Cookie", set_cookie_header(bearer))],
+                                [
+                                    ("Location", "/"),
+                                    ("Set-Cookie", set_cookie_header(bearer)),
+                                    ("Set-Cookie", clear_oidc_cookie_header()),
+                                ],
                             )
                             return
                 if _is_nest_board_path(icon) and _wants_error_page(self):
                     from agent_coord.server.admin.door import login_redirect
 
-                    loc = login_redirect()
+                    loc, login_cookie = login_redirect()
                     if loc:
-                        self._send(302, b"", "text/plain; charset=utf-8", [("Location", loc)])
+                        self._send(
+                            302,
+                            b"",
+                            "text/plain; charset=utf-8",
+                            [("Location", loc), ("Set-Cookie", login_cookie)],
+                        )
                         return
                 if icon in ("/favicon.svg", "/favicon.ico"):
                     found = _safe_static("favicon.svg")

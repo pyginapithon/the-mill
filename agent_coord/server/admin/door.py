@@ -20,6 +20,8 @@ from __future__ import annotations
 
 
 
+import base64
+
 import hashlib
 
 import os
@@ -41,6 +43,8 @@ from urllib.parse import parse_qs, urlencode, urlparse
 COOKIE = "factory-door"
 
 COOKIE_KEY = "factory-door-key"
+
+COOKIE_OIDC = "factory-door-oidc"
 
 _MODES = ("path", "ip", "invite", "directory", "iam")
 
@@ -303,9 +307,35 @@ def _redirect_uri() -> str:
     return base + "/mill/oidc/callback"
 
 
-def login_redirect() -> str:
+def _oidc_cookie(cookie: str) -> tuple[str, str, str]:
 
-    """Browser location for a directory or iam office. Empty if the issuer is not armed."""
+    """State, nonce and PKCE verifier from the login cookie, or three empty strings."""
+
+    for part in (cookie or "").split(";"):
+
+        key, _, val = part.strip().partition("=")
+
+        if key == COOKIE_OIDC:
+
+            bits = val.strip().split(".")
+
+            if len(bits) == 3 and all(bits):
+
+                return bits[0], bits[1], bits[2]
+
+    return "", "", ""
+
+def clear_oidc_cookie_header() -> str:
+
+    return f"{COOKIE_OIDC}=; Path=/mill/oidc/callback; HttpOnly; SameSite=Lax; Max-Age=0"
+
+def login_redirect() -> tuple[str, str]:
+
+    """Browser location and login cookie for a directory or iam office. Empty if the issuer is not armed.
+
+    The cookie binds the callback to this browser for ten minutes: state, nonce and the PKCE verifier.
+
+    """
 
     issuer = (_setting("directory_issuer") or "").strip()
 
@@ -315,22 +345,34 @@ def login_redirect() -> str:
 
     if mode() not in ("directory", "iam") or not issuer or not client_id or not redirect_uri:
 
-        return ""
+        return "", ""
 
     from agent_coord.server.admin.oidc import authorize_url, discovery
 
+    state, nonce, verifier = (secrets.token_urlsafe(32) for _ in range(3))
+
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode("ascii")).digest()).rstrip(b"=").decode("ascii")
+
     try:
 
-        return authorize_url(discovery(issuer), client_id, redirect_uri)
+        loc = authorize_url(discovery(issuer), client_id, redirect_uri, state, nonce=nonce, code_challenge=challenge)
 
     except Exception:
 
-        return ""
+        return "", ""
+
+    cookie = f"{COOKIE_OIDC}={state}.{nonce}.{verifier}; Path=/mill/oidc/callback; HttpOnly; SameSite=Lax; Max-Age=600"
+
+    return loc, cookie
 
 
-def complete_login(code: str) -> str:
+def complete_login(code: str, state: str, cookie: str) -> str:
 
-    """Trade ?code= for the id token, or the access token when that is all the issuer returned."""
+    """Trade ?code= for the id token when ?state= matches the login cookie.
+
+    The PKCE verifier goes to the token endpoint, and the id token must carry the login nonce.
+
+    """
 
     issuer = (_setting("directory_issuer") or "").strip()
 
@@ -344,7 +386,13 @@ def complete_login(code: str) -> str:
 
         return ""
 
-    from agent_coord.server.admin.oidc import discovery, exchange_code
+    want, nonce, verifier = _oidc_cookie(cookie)
+
+    if not want or not secrets.compare_digest(want.encode(), (state or "").strip().encode()):
+
+        return ""
+
+    from agent_coord.server.admin.oidc import discovery, exchange_code, fetch_jwks, verify_token
 
     try:
 
@@ -360,13 +408,27 @@ def complete_login(code: str) -> str:
 
             redirect_uri=redirect_uri,
 
+            code_verifier=verifier,
+
         )
+
+        token = str(tokens.get("id_token") or "").strip()
+
+        jwks = _JWKS.get(issuer)
+
+        if jwks is None:
+
+            jwks = fetch_jwks(issuer)
+
+            _JWKS[issuer] = jwks
+
+        verify_token(token, issuer=issuer, audience=client_id, jwks=jwks, nonce=nonce)
 
     except Exception:
 
         return ""
 
-    return str(tokens.get("id_token") or tokens.get("access_token") or "").strip()
+    return token
 
 
 def _oidc_open(token: str) -> bool:
