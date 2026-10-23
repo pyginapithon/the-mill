@@ -134,6 +134,9 @@ CREATE TABLE IF NOT EXISTS mail_to (
   desk_id         BIGINT UNSIGNED NOT NULL,
   opened          DATETIME(6) NULL,
   receipt         TINYINT(1) NOT NULL DEFAULT 0,
+  -- #818 D1: 1 = asked (named on the letter), 0 = copied (reached only as a
+  -- room member on reply-all). Waiting on a desk counts asked rows only.
+  asked           TINYINT(1) NOT NULL DEFAULT 1,
   created         DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   PRIMARY KEY (type, id, desk_id),
   KEY idx_desk (desk_id, created),

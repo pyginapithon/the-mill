@@ -151,8 +151,9 @@ END //
 --           and its newest entry with text (the last thing it said). Only
 --           entries written by --doing count (they carry on); rows kept from
 --           before #818 (old join text, no on) are not shown as a doing.
---   letter: up to 3 per desk, newest first: letters to the desk it has not
---           handled and has not replied under (n = how many in all).
+--   letter: up to 3 per desk, newest first: letters the desk was asked on
+--           (not copied, #818 D1) that it has not handled and has not
+--           replied under (n = how many in all).
 --   card:   up to 3 per desk: cards it has claimed that another desk watches.
 -- Listed: p_desk alone when named; else every desk on p_roster when named;
 -- else every joined desk when p_all; else desks active in the last day.
@@ -218,14 +219,15 @@ BEGIN
     ) lst ON TRUE
    ORDER BY IFNULL(cur.created, '1970-01-01') DESC, d.name;
 
-  SELECT 'letter' AS part, x.desk, x.id, x.sender, x.age_s, x.n
+  SELECT 'letter' AS part, x.desk, x.id, x.sender, x.age_s, x.n, x.asked
     FROM (
-      SELECT d.name AS desk, m.id, sd.name AS sender,
+      SELECT d.name AS desk, m.id, sd.name AS sender, mt.asked,
              TIMESTAMPDIFF(SECOND, m.created, v_now) AS age_s,
              COUNT(*) OVER (PARTITION BY mt.desk_id) AS n,
              ROW_NUMBER() OVER (PARTITION BY mt.desk_id ORDER BY m.created DESC, m.id DESC) AS rn
         FROM tmp_doing_desk t
         JOIN mail_to mt ON mt.desk_id = t.desk_id AND mt.type = 'mail' AND mt.opened IS NULL
+                        AND mt.asked = 1
         JOIN mail m ON m.id = mt.id AND m.desk_id <> mt.desk_id
         JOIN name d ON d.id = mt.desk_id
         JOIN name sd ON sd.id = m.desk_id

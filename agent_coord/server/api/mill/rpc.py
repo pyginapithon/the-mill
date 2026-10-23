@@ -714,7 +714,8 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
         if last_text:
             head += f' (last: "{last_text}"' + (f" on {out['last']['on']}" if out["last"]["on"] else "") + ")"
     letters = [
-        {"id": f"mail-{int(x['id'])}", "from": _stored(x.get("sender") or ""), "age": _age(x.get("age_s"))}
+        {"id": f"mail-{int(x['id'])}", "from": _stored(x.get("sender") or ""), "age": _age(x.get("age_s")),
+         "asked": bool(x.get("asked"))}  # #820: always true here, a copy never waits
         for x in by["letter"]
     ]
     cards = [
@@ -1459,6 +1460,10 @@ def _h_send(
 
     if sender_roster:
         rec_mail.set_sender_roster(c._cn, mid, sender_roster)
+
+    if room_only:
+        # #818 D1: store the wake's split. A room member that is not named is copied.
+        rec_mail.to_copied(c._cn, mid, room_only)
 
     if rec_mail.dest_count(c._cn, mid) < 1:
         raise CoordError(f"send: mail {mid} has empty mail_to (orphan refused)")

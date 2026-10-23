@@ -75,7 +75,7 @@ def test_doing_all_is_the_connected_view(w, wall):
     view = mine[0]
     assert view["doing"] == "on the route" and view["on"] == f"mail-{mid}"
     assert set(view) >= {"owner", "alive", "stale", "doing", "on", "age", "waiting_on_it", "line"}
-    assert "asked" not in json.dumps(view) and "claimed_at" not in json.dumps(view)
+    assert "claimed_at" not in json.dumps(view)  # asked: #160 (test_mail_asked_818)
 
 
 def test_doing_one_desk_or_one_roster(w, wall):
