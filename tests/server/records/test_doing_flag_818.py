@@ -14,8 +14,8 @@ only the /ws hop is replaced by dispatch_ws, as in the #238 matrix.
     legacy stored key shows as the head of the detail;
 (e) there is no `mill doing` command; join and invite placeholders write no
     doing text; a missing or retired item is refused;
-    a refused or over-long --doing stores nothing; a failed doing write never
-    undoes the command;
+    a refused or over-long --doing stores nothing; a command and its doing
+    row commit or roll back together (one transaction, pokes after commit);
 (f) an entry ends on a real event only: clock-out or reset ends it (ended_by
     cleared, the empty row is never a doing); a pass or done by the desk ends
     its card entry, a drop by the desk its hold entry; a later note, another
@@ -298,14 +298,88 @@ def test_over_long_doing_is_refused_and_nothing_stored(w):
     assert len(w.entries(ME)) == before
 
 
-def test_a_failed_doing_write_never_undoes_the_command(w, monkeypatch):
+def _counts(w) -> dict:
+    return {t: scalar_done(w.cn, f"SELECT COUNT(*) FROM {t}")
+            for t in ("mail", "mail_to", "tree", "activity", "push_queue", "doing", "todo", "watcher")}
+
+
+def _spy_fanout(monkeypatch) -> list:
+    seen: list = []
+    import agent_coord.server.push as push
+
+    real = push.fanout
+
+    def spy(cn, type, id, hint, **k):
+        seen.append((type, int(id)))
+        return real(cn, type, id, hint, **k)
+
+    monkeypatch.setattr(push, "fanout", spy)
+    return seen
+
+
+def test_an_item_gone_at_the_doing_write_rolls_the_whole_command_back(w, monkeypatch):
+    """The item is retired between the command and the doing write: the doing
+    is refused in SQL, and the reply (five writes) is rolled back with it."""
+    from agent_coord.server.api.mill import rpc
+
+    mid = w.letter()
+    top = int(scalar_done(w.cn, "SELECT COALESCE(MAX(id), 0) FROM mail"))
+    monkeypatch.setattr(rpc, "_doing_item", lambda *a, **k: ("mail", top + 1000))
+    seen = _spy_fanout(monkeypatch)
+    before = _counts(w)
+    code, out, err = w.run(["reply", str(mid), "--body-file", str(w.body), "--doing", "x"])
+    assert code != 0 and "item is gone" in (err + out) and "nothing was changed" in (err + out)
+    assert _counts(w) == before
+    assert seen == []
+
+
+def test_a_failed_doing_write_rolls_the_command_back(w, monkeypatch):
     def boom(*a, **k):
-        raise RuntimeError("doing: the item is gone")
+        raise RuntimeError("lost the book")
 
     monkeypatch.setattr("agent_coord.server.records.doing.put", boom)
-    mid = w.letter()
-    res = w.ok(["reply", str(mid), "--body-file", str(w.body), "--doing", "x"])
-    assert res["id"] and "doing_error" in res and "stands" in res["doing_error"]
+    seen = _spy_fanout(monkeypatch)
+    before = _counts(w)
+    code, out, err = w.run(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", "x"])
+    assert code != 0 and "nothing was changed" in (err + out)
+    assert _counts(w) == before and seen == []
+
+
+def test_a_command_with_doing_commits_both_then_pokes(w, monkeypatch):
+    """Pokes go out after the commit: another connection already sees the row."""
+    import agent_coord.server.push as push
+    from agent_coord.server.records.db import connect
+
+    other = connect(w.cn.database)
+    seen: list = []
+    real = push.fanout
+
+    def spy(cn, type, id, hint, **k):
+        if type == "doing":
+            seen.append(scalar_done(other, "SELECT COUNT(*) FROM doing WHERE id = %s", (int(id),)))
+        return real(cn, type, id, hint, **k)
+
+    monkeypatch.setattr(push, "fanout", spy)
+    before = _counts(w)
+    res = w.ok(["send", "--to-desk", PEER, "--body-file", str(w.body), "--doing", "asking again"])
+    other.close()
+    assert "doing_error" not in res and res["doing_entry"]["on"] == f"mail-{int(res['id'])}"
+    after = _counts(w)
+    assert after["mail"] == before["mail"] + 1 and after["doing"] == before["doing"] + 1
+    assert seen == [1]
+
+
+def test_a_list_command_with_doing_is_all_or_nothing(w):
+    """pass a,b --doing: one card refused rolls back the other card too."""
+    from agent_coord.server.records import todo as rec_todo
+
+    need, tid = w.card()
+    w.ok(["claim", R, need])
+    before = _counts(w)
+    code, out, err = w.run(["pass", R, f"{need},n818-nosuch", "--doing", "both"])
+    assert code != 0 and "nothing was changed" in (err + out)
+    assert rec_todo.find(w.cn, R, need)["status"] == "claimed"
+    assert _counts(w) == before
 
 
 # (c) the read ------------------------------------------------------------------
