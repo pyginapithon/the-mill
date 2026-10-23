@@ -331,7 +331,32 @@ def test_connected_roster_is_optional_and_lists_active_desks(w):
     assert code != 0 and "no desk" in (err + out)
 
 
+def test_rows_from_before_818_are_not_a_doing(w):
+    from agent_coord.client.tokens import token_hash
+    from agent_coord.server.records import join as here
+
+    seed_names(w.cn, ("d818-old", "desk"))
+    here.upsert(w.cn, R, "d818-old", "builder", token_hash=token_hash("tok-old"), doing="todo | member | old text")
+    assert any(r["text"] for r in w.entries("d818-old"))
+    view = w.me("d818-old")
+    assert view["doing"] == "" and "last" not in view and view["line"].startswith("d818-old: idle.")
+    hist = w.ok(["connected", "--history", "--desk", "d818-old"])
+    assert hist["history"] == [] and hist["page"]["entries"] == 0
+
+
+def test_history_says_how_an_entry_ended(w):
+    need, tid = w.card()
+    w.ok(["claim", R, need, "--doing", "first"])
+    w.ok(["note", R, need, "--note", "x", "--doing", "second"])
+    w.ok(["pass", R, need])
+    rows = w.ok(["connected", "--history", "--desk", ME])["history"]
+    by = {r["doing"]: r for r in rows[:2]}
+    assert by["second"]["ended_by"] == "finished" and by["first"]["ended_by"] == "newer"
+
+
 def test_history_lists_entries_with_ended_and_pages(w):
+    need, _ = w.card()
+    w.ok(["claim", R, need, "--doing", "still on it"])
     got = w.ok(["connected", "--history", "--desk", ME])
     hist = got["history"]
     assert hist and all(e["desk"] == ME and e["doing"] for e in hist)

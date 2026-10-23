@@ -92,7 +92,9 @@ END //
 
 -- What desks are doing now. Three row kinds, told apart by part:
 --   desk:   one per listed desk: its newest entry, whether that has ended,
---           and its newest entry with text (the last thing it said).
+--           and its newest entry with text (the last thing it said). Only
+--           entries written by --doing count (they carry on); rows kept from
+--           before #818 (old join text, no on) are not shown as a doing.
 --   letter: up to 3 per desk, newest first: letters to the desk it has not
 --           handled and has not replied under (n = how many in all).
 --   card:   up to 3 per desk: cards it has claimed that another desk watches.
@@ -126,7 +128,7 @@ BEGIN
       OR (v_one IS NULL AND v_ros IS NULL AND (IFNULL(p_all, 0) = 1
           OR s.updated > v_now - INTERVAL 1 DAY
           OR EXISTS (SELECT 1 FROM activity a
-                      WHERE a.desk_id = s.desk_id AND a.updated > v_now - INTERVAL 1 DAY)));
+                      WHERE a.desk_id = s.desk_id AND a.created > v_now - INTERVAL 1 DAY)));
 
   SELECT 'desk' AS part, d.name AS desk,
          cur.id, cur.text, cur.on_type, cur.on_id, cur.waiting_type, cur.waiting_id,
@@ -140,12 +142,12 @@ BEGIN
     JOIN seat st ON st.desk_id = t.desk_id
     LEFT JOIN LATERAL (
       SELECT g.id, g.created, g.text, g.on_type, g.on_id, g.waiting_type, g.waiting_id
-        FROM doing g WHERE g.desk_id = t.desk_id
+        FROM doing g WHERE g.desk_id = t.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
        ORDER BY g.created DESC, g.id DESC LIMIT 1
     ) cur ON TRUE
     LEFT JOIN LATERAL (
       SELECT g.id, g.created, g.text, g.on_type, g.on_id
-        FROM doing g WHERE g.desk_id = t.desk_id AND g.text <> ''
+        FROM doing g WHERE g.desk_id = t.desk_id AND g.on_type IS NOT NULL AND g.text <> ''
        ORDER BY g.created DESC, g.id DESC LIMIT 1
     ) lst ON TRUE
    ORDER BY IFNULL(cur.created, '1970-01-01') DESC, d.name;
@@ -199,8 +201,9 @@ BEGIN
   DROP TEMPORARY TABLE IF EXISTS tmp_doing_desk;
 END //
 
--- Past entries with text, newest first, one page (p_page from 1). Each row says
--- whether it has ended. total counts every matching entry (adoption count).
+-- Past --doing entries (text and on), newest first, one page (p_page from 1).
+-- Each row says whether it has ended and whether a newer entry replaced it.
+-- total counts every matching entry (adoption count).
 CREATE PROCEDURE mill_doing_history(
   IN p_desk  VARCHAR(64),
   IN p_since DATETIME(6),
@@ -218,11 +221,14 @@ BEGIN
   SELECT g.id, d.name AS desk, g.created, g.text, g.on_type, g.on_id,
          g.waiting_type, g.waiting_id, ro.name AS roster,
          mill_doing_end(g.desk_id, g.on_type, g.on_id, g.created) AS ended_at,
+         (SELECT MIN(nx.created) FROM doing nx
+           WHERE nx.desk_id = g.desk_id AND nx.on_type IS NOT NULL AND nx.text <> ''
+             AND (nx.created > g.created OR (nx.created = g.created AND nx.id > g.id))) AS replaced_at,
          COUNT(*) OVER () AS total
     FROM doing g
     JOIN name d ON d.id = g.desk_id
     JOIN name ro ON ro.id = g.roster_id
-   WHERE g.text <> ''
+   WHERE g.text <> '' AND g.on_type IS NOT NULL
      AND (v_one IS NULL OR g.desk_id = v_one)
      AND (p_since IS NULL OR g.created >= p_since)
    ORDER BY g.created DESC, g.id DESC
