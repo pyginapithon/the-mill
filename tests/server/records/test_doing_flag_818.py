@@ -187,7 +187,8 @@ def test_reply_doing_links_the_letter_replied_to_and_a_plain_reply_ends_it(w):
     w.ok(["reply", str(mid), "--body-file", str(w.body)])
     view = w.me()
     assert view["doing"] == "" and "idle" in view
-    assert view["last"] == {"doing": "answering the ask", "on": f"mail-{mid}", "age": view["last"]["age"]}
+    assert view["last"] == {"doing": "answering the ask", "on": f"mail-{mid}", "age": view["last"]["age"],
+                            "ended_by": "finished"}
 
 
 def test_mark_never_ends_a_doing(w):
@@ -233,7 +234,7 @@ def test_legacy_doing_key_is_shown_as_detail():
     from agent_coord.server.records.todo import unpack
 
     got = unpack(json.dumps({"slug": "old", "doing": "old title", "detail": "notes"}), 1)
-    assert got["detail"] == "old title\nnotes" and got["doing"] == ""
+    assert got["detail"] == "old title\nnotes" and "doing" not in got
     again = unpack(json.dumps({"slug": "old", "doing": "old title", "detail": "old title\nnotes"}), 1)
     assert again["detail"] == "old title\nnotes"
 
