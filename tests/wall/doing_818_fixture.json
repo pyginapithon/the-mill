@@ -1,5 +1,5 @@
 {
- "_about": "#818 PR C glass fixture. Shapes copy PR #159's server views: 'doing' is the list _desk_view returns (GET /api/v1/doing), 'history' is _doing_history's entries (GET /api/v1/doing/history). Proposed and not yet on the server: last.ended_by. Synthetic desks, no real data.",
+ "_about": "#818 PR C glass fixture. Shapes copy PR #159's server views: 'doing' is the list _desk_view returns (GET /api/v1/doing), 'history' is _doing_history's entries (GET /api/v1/doing/history). The doing view's last.ended_by comes from the server too. Synthetic desks, no real data.",
  "doing": [
   {
    "owner": "builder",
