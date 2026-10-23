@@ -17,6 +17,7 @@ import html
 import re
 import json
 import os
+import secrets
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -296,6 +297,23 @@ _STATIC_TYPES = {
 _PIN_RE = re.compile(r"[A-Za-z0-9._-]{1,64}")
 STATIC_CACHE_PINNED = "public, max-age=31536000, immutable"
 STATIC_CACHE_SHORT = "public, max-age=60"
+# The board page sits behind the door: browser cache only, keyed on the session cookie.
+BOARD_CACHE = "private, max-age=60"
+
+# Sent on every response. The Wall has one inline onload handler and inline
+# style attributes, so script-src and style-src keep 'unsafe-inline' until
+# those move into files; everything else is same-origin only.
+WALL_CSP = (
+    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; "
+    "form-action 'self'; frame-ancestors 'none'"
+)
+SECURITY_HEADERS = (
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Referrer-Policy", "same-origin"),
+    ("Content-Security-Policy", WALL_CSP),
+)
 
 
 def _static_cache_control(path_with_query: str, _ctype: str) -> str:
@@ -492,15 +510,33 @@ def _send_not_found(handler: BaseHTTPRequestHandler, *, closed: bool) -> None:
     handler._send(404, b"not found\n", "text/plain; charset=utf-8")
 
 
-def _fail_closed(handler: BaseHTTPRequestHandler, exc: BaseException) -> None:
-    """One bad route must fail that request closed - never kill the 18765 listener."""
+def error_id(exc: BaseException, where: str) -> str:
+    """Log the exception under a fresh opaque id and return the id for the client."""
+    eid = secrets.token_hex(6)
     try:
-        body = _json({"error": "mill API error", "detail": str(exc)[:240]})
+        from agent_coord.server.push import api_log
+
+        api_log(f"500 error_id={eid} {where} {type(exc).__name__}: {exc}")
+    except Exception:
+        pass
+    return eid
+
+
+def _fail_closed(handler: BaseHTTPRequestHandler, exc: BaseException) -> None:
+    """One bad route must fail that request closed - never kill the 18765 listener.
+
+    The client gets a fixed message and an error id; the text stays in the server log.
+    """
+    try:
+        where = f"{getattr(handler, 'command', '') or ''} {urlparse(getattr(handler, 'path', '') or '').path}"
+        body = _json({"error": "mill API error", "error_id": error_id(exc, where.strip())})
         if not getattr(handler, "headers_sent", False) and not handler.wfile.closed:
             handler.send_response(500)
             handler.send_header("Content-Type", "application/json; charset=utf-8")
             handler.send_header("Content-Length", str(len(body)))
             handler.send_header("Cache-Control", "no-store")
+            for key, val in SECURITY_HEADERS:
+                handler.send_header(key, val)
             handler.end_headers()
             handler.wfile.write(body)
     except Exception:
@@ -927,6 +963,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                 self.send_header("X-Mill-Version", package_version())
             except Exception:
                 pass
+            have = {str(k).lower() for k, _ in extra}
+            extra.extend((k, v) for k, v in SECURITY_HEADERS if k.lower() not in have)
             for key, val in extra:
                 self.send_header(key, val)
             self.end_headers()
@@ -1164,7 +1202,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                         b"",
                         "text/html; charset=utf-8",
                         extra=[
-                            ("Cache-Control", "public, max-age=60"),
+                            ("Cache-Control", BOARD_CACHE),
+                            ("Vary", "Cookie"),
                             ("ETag", etag),
                         ],
                     )
@@ -1174,7 +1213,8 @@ def make_handler(roots: dict[str, Path], *, api_only: bool = False):
                     html_txt.encode("utf-8"),
                     "text/html; charset=utf-8",
                     extra=[
-                        ("Cache-Control", "public, max-age=60"),
+                        ("Cache-Control", BOARD_CACHE),
+                        ("Vary", "Cookie"),
                         ("ETag", etag),
                     ],
                 )
