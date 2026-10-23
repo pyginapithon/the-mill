@@ -177,8 +177,58 @@ def expire(cn) -> dict[str, Any]:
     return {"deleted": int(row.get("deleted") or 0), "cut": str(row.get("cut") or "")}
 
 
+class Held(list):
+    """Sync items read without deleting their rows. ids are the push_queue rows behind
+    them; ack(cn, ids) deletes those rows once the frame that carries them is sent (#831)."""
+
+    ids: tuple = ()
+
+
+# #831: the same rows mill_push_take hands out, read without deleting them.
+_PEEK_SQL = (
+    "SELECT p.id, p.kind, p.payload, p.outcome, p.created FROM push_queue p"
+    " WHERE p.desk_id = MILL_NAME_GET('desk', %s)"
+    " AND (p.kind = 'expired' OR p.created >= CURRENT_TIMESTAMP(6) - INTERVAL 30 DAY)"
+    " ORDER BY p.id"
+)
+
+
+def peek(cn, desk: str) -> Held:
+    """#831: the desk's sync items, rows left in place. A frame that is never sent
+    (the socket was superseded or closed) leaves them for the next sync."""
+    from .db import rows_done
+
+    rows = rows_done(cn, _PEEK_SQL, (str(desk or "").strip(),))
+    out = Held(_items(rows))
+    out.ids = tuple(int(r["id"]) for r in rows if r.get("id") is not None)
+    return out
+
+
+def ack(cn, ids) -> int:
+    """#831: delete the rows a sent frame carried. Only those ids: a row put after the
+    read stays queued. A second ack of the same ids deletes nothing."""
+    keep = [int(i) for i in ids or () if int(i) > 0]
+    if not keep:
+        return 0
+    from .db import commit
+
+    marks = ", ".join(["%s"] * len(keep))
+    delete_sent = "DELETE FROM push_queue WHERE id IN (" + marks + ")"
+    cur = cn.cursor()
+    try:
+        cur.execute(delete_sent, tuple(keep))
+        n = int(cur.rowcount or 0)
+    finally:
+        cur.close()
+    commit(cn)
+    return n
+
+
 def take(cn, desk: str) -> list[dict]:
-    rows = call(cn, "mill_push_take", [desk])
+    return _items(call(cn, "mill_push_take", [desk]))
+
+
+def _items(rows) -> list[dict]:
     out: list[dict] = []
     for row in rows or []:
         payload = row.get("payload")

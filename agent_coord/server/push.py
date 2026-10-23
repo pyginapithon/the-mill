@@ -619,23 +619,45 @@ def expire_sweep() -> dict[str, Any]:
                 pass
 
 
-def take_sync(cn, desk: str) -> list[dict]:
-    """Rows pushed since this desk's last mill sync. Deletes them."""
+def take_sync(cn, desk: str, *, hold: bool = False) -> list[dict]:
+    """Rows pushed since this desk's last mill sync. Deletes them.
+
+    hold=True (#831) reads them without deleting: the list carries .ids, and the
+    caller deletes them with ack_sync once the frame that carries them is sent.
+    """
     from agent_coord.server.records import push as rec_push
 
     try:
-        return rec_push.take(cn, desk)
+        return rec_push.peek(cn, desk) if hold else rec_push.take(cn, desk)
     except Exception as e:
         _bc_log(f"push take err desk={desk} err={e}")
         return []
 
 
-def connect_sync_frame(cn, desk: str) -> dict:
+def sync_ids(items) -> list[int]:
+    """#831: the queue rows behind a held sync list ([] for a plain list)."""
+    return [int(i) for i in getattr(items, "ids", ()) or ()]
+
+
+def ack_sync(cn, desk: str, ids) -> int:
+    """#831: delete the rows a sent frame carried. Logs and returns 0 on error; the
+    rows then stay queued and the next sync hands them over again."""
+    from agent_coord.server.records import push as rec_push
+
+    try:
+        return rec_push.ack(cn, ids)
+    except Exception as e:
+        _bc_log(f"push ack err desk={desk} err={e}")
+        return 0
+
+
+def connect_sync_frame(cn, desk: str, *, hold: bool = False) -> dict:
     """Connect sync plus this desk's holds. Holds are not queue items.
 
     An empty push queue stays an empty list. If the hold read fails, holds is [].
+    hold=True (#831): the queue rows stay until ack_sync after the frame is sent.
     """
-    sync = take_sync(cn, desk)
+    sync = take_sync(cn, desk, hold=hold)
     holds: list = []
     try:
         from agent_coord.server.records import hold as rec_hold
