@@ -1,22 +1,26 @@
 -- #818 PR B: --doing on an activity command writes one doing entry linked to
 -- that command's item; `mill connected` reads what every desk is doing.
 -- Rows live in table doing (append-only, see sp_join.sql mill_doing_insert).
--- No end step: an entry on a letter ends when its desk replies under that
--- letter; on a card when its desk passes it (ships it as the volunteer) or the
--- card is done; on a hold when the desk drops it. Marking a letter never ends
--- it. A score entry does not end on its own (score semantics are open).
--- Clock-out, reset and retire end it too (cleared): they append an empty row
--- with no item (mill_doing_clear), read by mill_doing_cleared.
+-- An entry ends on a real event, derived on read from rows that never change:
+--   finished: the desk replies under the letter; the desk drops the hold; the
+--             desk passes (ships) or passes --done the card without --doing,
+--             which appends an empty row on that card (mill_doing_finish);
+--   cleared:  clock-out, reset or retire appends an empty row with no item
+--             (mill_doing_clear);
+--   newer:    the desk writes another --doing entry.
+-- A mark, a note, someone else's pass or a card stepped back never ends one
+-- and never brings an ended one back. A score entry ends only as cleared or newer.
 
 DROP FUNCTION IF EXISTS mill_doing_end;
 DROP FUNCTION IF EXISTS mill_doing_cleared;
 DROP PROCEDURE IF EXISTS mill_doing_put;
+DROP PROCEDURE IF EXISTS mill_doing_finish;
 DROP PROCEDURE IF EXISTS mill_doing_now;
 DROP PROCEDURE IF EXISTS mill_doing_history;
 
 DELIMITER //
 
--- When the entry ended by its own event, or NULL while it is current. Derived, never stored.
+-- When the entry was finished by its own event, or NULL. Derived, never stored.
 CREATE FUNCTION mill_doing_end(
   p_desk    BIGINT UNSIGNED,
   p_id      BIGINT UNSIGNED,
@@ -38,12 +42,12 @@ BEGIN
      WHERE t.type = 'mail' AND t.id = p_on_id
        AND r.desk_id = p_desk AND r.created >= p_created;
   ELSEIF p_on_type = 'todo' THEN
-    SELECT td.updated INTO v_at
-      FROM todo td
-     WHERE td.id = p_on_id
-       AND td.updated >= p_created
-       AND (td.status = 'done' OR (td.status = 'shipped' AND td.assigned_id = p_desk))
-     LIMIT 1;
+    -- The pass or done itself, not the card's state: a later note or a step
+    -- back changes the card, never this row.
+    SELECT MIN(f.created) INTO v_at
+      FROM doing f
+     WHERE f.desk_id = p_desk AND f.text = '' AND f.on_type = 'todo' AND f.on_id = p_on_id
+       AND (f.created > p_created OR (f.created = p_created AND f.id > p_id));
   ELSEIF p_on_type = 'hold' THEN
     SELECT h.updated INTO v_at
       FROM hold h
@@ -110,6 +114,43 @@ BEGIN
   CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
   COMMIT;
   SELECT v_id AS id, v_ts AS created, v_desk AS desk_id, v_roster AS roster_id;
+END //
+
+-- A pass or done without --doing by the desk ends its current entry when that
+-- entry is on this card: an empty row on the card marks the event. Nothing
+-- happens when the desk's newest row is anything else.
+CREATE PROCEDURE mill_doing_finish(
+  IN p_desk    VARCHAR(64),
+  IN p_on_type VARCHAR(8),
+  IN p_on_id   BIGINT UNSIGNED
+)
+BEGIN
+  DECLARE v_ts DATETIME(6);
+  DECLARE v_desk BIGINT UNSIGNED;
+  DECLARE v_cur BIGINT UNSIGNED;
+  DECLARE v_text VARCHAR(512);
+  DECLARE v_type VARCHAR(8);
+  DECLARE v_on BIGINT UNSIGNED;
+  DECLARE v_roster BIGINT UNSIGNED;
+  DECLARE v_id BIGINT UNSIGNED;
+  DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_cur = NULL;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION
+  BEGIN
+    ROLLBACK;
+    RESIGNAL;
+  END;
+  SET v_desk = MILL_NAME_GET('desk', p_desk);
+  START TRANSACTION;
+  SET v_cur = NULL;
+  SELECT id, text, on_type, on_id, roster_id INTO v_cur, v_text, v_type, v_on, v_roster
+    FROM doing WHERE desk_id = v_desk ORDER BY created DESC, id DESC LIMIT 1 FOR UPDATE;
+  IF v_cur IS NOT NULL AND v_text <> '' AND v_type = p_on_type AND v_on = p_on_id THEN
+    SET v_ts = MILL_NOW();
+    CALL mill_doing_insert(v_desk, v_roster, '', v_ts, v_id);
+    UPDATE doing SET on_type = p_on_type, on_id = p_on_id WHERE id = v_id;
+    CALL mill_activity_put('doing', v_id, v_ts, v_desk, v_roster, MILL_WEIGHT('doing'), NULL);
+  END IF;
+  COMMIT;
 END //
 
 -- What desks are doing now. Three row kinds, told apart by part:

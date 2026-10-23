@@ -760,7 +760,7 @@ def _doing_history(c: Book, body: dict[str, Any], desk: str) -> dict[str, Any]:
         block["next"] = f"--page {page + 1}"
     entries = []
     for r in rows:
-        # Whichever came first: its own event (reply, pass, drop),
+        # Whichever came first: its own event (reply, pass or done, drop),
         # clock-out or reset (cleared), or a newer --doing.
         ends = [(r.get("ended_at"), "finished"), (r.get("cleared_at"), "cleared"), (r.get("replaced_at"), "newer")]
         hit = [(at, by) for at, by in ends if at is not None]
@@ -837,13 +837,39 @@ def _doing_item(c: Book, command: str, body: dict[str, Any], out: Any, project: 
     return None
 
 
+def _doing_finish(c: Book, body: dict[str, Any], out: Any, owner: str) -> None:
+    """A pass (ship) or pass --done without --doing ends the desk's own doing on
+    that card. --back ends nothing. The pass already stands; a failure here is logged."""
+    from agent_coord.server.records import doing as rec_doing
+
+    if str(body.get("step") or "ship").strip().lower() not in ("ship", "done"):
+        return
+    res = out if isinstance(out, dict) else {}
+    rows = res.get("results") if isinstance(res.get("results"), list) else [res]
+    for r in rows:
+        if not (isinstance(r, dict) and r.get("ok") and r.get("id")):
+            continue
+        try:
+            rec_doing.finish(c._cn, _stored(owner), "todo", int(r["id"]))
+        except Exception as e:
+            try:
+                c._cn.rollback()
+            except Exception:
+                pass
+            _log.warning("pass: doing finish not recorded for todo-%s: %s", r.get("id"), type(e).__name__)
+
+
 def _doing_after(c: Book, command: str, body: dict[str, Any], out: Any, project: str, owner: str | None, text: str) -> Any:
     """Write the doing entry right after the command, in the same request.
 
     The command already stands. A doing that cannot be written is said in the
     reply (doing_error) and never undoes the command.
     """
-    if not text or not owner:
+    if not owner:
+        return out
+    if not text:
+        if command == "pass":
+            _doing_finish(c, body, out, owner)
         return out
     from agent_coord.server.records import doing as rec_doing
 

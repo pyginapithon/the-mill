@@ -2,10 +2,11 @@
 the reads behind `mill connected` (what each desk is doing, and its history).
 
 Writes: one entry per command, linked to the item that command wrote. The
-newest entry is the desk's current doing. There is no end step: the entry
-ends on its own when the desk replies under the letter, passes the card (or
-the card is done), or drops the hold (see mill_doing_end), and when the desk
-clocks out or is reset (an empty row with no item, see mill_doing_cleared).
+newest entry is the desk's current doing. It ends on a real event, derived on
+read (see sp_doing.sql): a reply by the desk under the letter, the drop of the
+hold, a pass or done of the card by the desk without --doing (finish appends
+an empty row on the card), clock-out or reset (an empty row with no item), or
+a newer entry.
 """
 
 from __future__ import annotations
@@ -25,6 +26,13 @@ def put(cn, desk: str, text: str, on_type: str, on_id: int) -> dict[str, Any]:
 
     rows = call(cn, "mill_doing_put", [bare(desk, CONST_DESK), text[:TEXT_MAX], on_type, int(on_id)])
     return rows[0] if rows else {}
+
+
+def finish(cn, desk: str, on_type: str, on_id: int) -> None:
+    """A pass or done by the desk without --doing: end its entry on this item."""
+    from agent_coord.server.records.name import bare
+
+    call(cn, "mill_doing_finish", [bare(desk, CONST_DESK), on_type, int(on_id)])
 
 
 def now(cn, desk: str = "", roster: str = "", all_desks: bool = False) -> list[dict[str, Any]]:
