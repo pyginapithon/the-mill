@@ -244,7 +244,7 @@ BEGIN
    WHERE x.rn <= 3
    ORDER BY x.desk, x.rn;
 
-  SELECT 'card' AS part, x.desk, x.id, x.need, x.roster, x.watchers, x.age_s, x.n
+  SELECT 'card' AS part, x.desk, x.id, x.need, x.roster, x.watchers, x.age_s, x.n, x.claimed_at
     FROM (
       SELECT d.name AS desk, td.id,
              JSON_UNQUOTE(JSON_EXTRACT(td.body, '$.slug')) AS need,
@@ -253,6 +253,7 @@ BEGIN
                 FROM watcher w JOIN name wn ON wn.id = w.desk_id
                WHERE w.type = 'todo' AND w.id = td.id AND w.desk_id <> td.assigned_id) AS watchers,
              TIMESTAMPDIFF(SECOND, td.claimed_at, v_now) AS age_s,
+             td.claimed_at,
              COUNT(*) OVER (PARTITION BY td.assigned_id) AS n,
              ROW_NUMBER() OVER (PARTITION BY td.assigned_id ORDER BY td.claimed_at DESC, td.id DESC) AS rn
         FROM tmp_doing_desk t

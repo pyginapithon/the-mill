@@ -720,7 +720,9 @@ def _desk_view(r: dict[str, Any], roster: str, by: dict[str, list]) -> dict[str,
     ]
     cards = [
         {"id": f"todo-{int(x['id'])}", "need": str(x.get("need") or ""), "roster": _stored(x.get("roster") or ""),
-         "watchers": [w for w in str(x.get("watchers") or "").split(",") if w], "age": _age(x.get("age_s"))}
+         "watchers": [w for w in str(x.get("watchers") or "").split(",") if w], "age": _age(x.get("age_s")),
+         # #821: when it was claimed, office clock, like the history's at
+         "claimed_at": str(x["claimed_at"])[:19] if x.get("claimed_at") is not None else None}
         for x in by["card"]
     ]
     n_letters = int(by["letter"][0].get("n") or 0) if by["letter"] else 0
