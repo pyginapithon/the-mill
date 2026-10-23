@@ -96,6 +96,9 @@ person or host leaks:
    disabled to save AI credits). Builder may request one on a PR by hand;
    its comments are advisory, the author addresses or answers each one, and
    Builder still merges.
+   A Copilot review never holds a merge: when it fails (quota, error, no
+   review) nothing waits on it, and no workflow runs on a review event, so a
+   bot review cannot start a run that needs a maintainer's approval (F122).
 
    A card can also go to the Copilot coding agent (desk `github-pilot`):
    Builder files it as an issue and assigns Copilot, which opens the PR.
