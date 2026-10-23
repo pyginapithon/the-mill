@@ -63,6 +63,7 @@ DROP PROCEDURE IF EXISTS mill_label_put;
 DROP PROCEDURE IF EXISTS mill_label_delete;
 DROP PROCEDURE IF EXISTS mill_label_select;
 DROP PROCEDURE IF EXISTS mill_mail_to_put;
+DROP PROCEDURE IF EXISTS mill_mail_to_copied;
 DROP PROCEDURE IF EXISTS mill_mail_insert;
 DROP PROCEDURE IF EXISTS mill_mail_update;
 DROP PROCEDURE IF EXISTS mill_mail_delete;
