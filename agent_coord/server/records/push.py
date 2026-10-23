@@ -288,6 +288,62 @@ def fold_hints(items: list[dict]) -> list[dict]:
     return out
 
 
+# #832: emit and fanout put a row as missed before the live send; a send that
+# reached a socket marks it sent. A row already taken by a sync is left alone.
+_MARK_SQL = "UPDATE push_queue SET outcome = %s WHERE id = %s AND outcome = 'missed'"
+
+# #832: the newest hint or letter this desk has not had live (receipts never ring).
+_WAITING_SQL = (
+    "SELECT p.id, p.kind, p.payload FROM push_queue p"
+    " WHERE p.desk_id = MILL_NAME_GET('desk', %s)"
+    " AND p.outcome IN ('missed', 'error') AND p.kind IN ('hint', 'mail')"
+    " ORDER BY p.id DESC LIMIT 1"
+)
+
+
+def row_id(got) -> int:
+    """The id put() returned (0 when unknown)."""
+    try:
+        return int(((got or [{}])[0] or {}).get("id") or 0)
+    except (TypeError, ValueError, IndexError, AttributeError):
+        return 0
+
+
+def mark(cn, rid: int, outcome: str) -> int:
+    """#832: set a missed row's outcome (sent or error). 0 when the row is gone."""
+    if int(rid or 0) <= 0 or outcome not in ("sent", "error"):
+        return 0
+    from .db import commit
+
+    cur = cn.cursor()
+    try:
+        cur.execute(_MARK_SQL, (outcome, int(rid)))
+        n = int(cur.rowcount or 0)
+    finally:
+        cur.close()
+    commit(cn)
+    return n
+
+
+def waiting(cn, desk: str) -> dict | None:
+    """#832: the newest hint or letter row not handed over live, or None."""
+    from .db import rows_done
+
+    rows = rows_done(cn, _WAITING_SQL, (str(desk or "").strip(),))
+    if not rows:
+        return None
+    row = rows[0]
+    payload = row.get("payload")
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except json.JSONDecodeError:
+            payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    return {"id": int(row.get("id") or 0), "kind": row.get("kind"), "payload": payload}
+
+
 def pending(cn, desk: str) -> int:
     """How many push rows wait for this desk's next sync (#618 wake body). 0 on error."""
     cur = cn.cursor()

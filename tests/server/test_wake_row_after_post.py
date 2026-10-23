@@ -12,6 +12,9 @@ until something else connects the desk.
 Wanted: the letter reaches the woken desk, or the desk is rung again. The
 receiver answers 2xx and starts the desk's real connect; a barrier holds the
 row write until that connect has its sync, so the order is forced, not timed.
+
+Fixed: the row is put first, as missed, and a live send that reaches a socket marks
+it sent; the last socket leaving with rows still missed rings the desk again.
 """
 from __future__ import annotations
 
@@ -252,3 +255,73 @@ def test_woken_desk_gets_a_letter_whose_row_lands_after_its_sync(wall, book, mon
         )
 
     asyncio.run(scenario())
+
+
+def test_desk_that_leaves_before_its_live_frame_is_rung(wall, book, monkeypatch) -> None:
+    """#832 ring on leave (spin W14): emit saw the desk sitting, the desk left before
+    the live frame went out. The row is queued as missed, so the last socket leaving
+    (or the frame finding no socket) rings the armed desk. A barrier holds the live
+    send until the desk has left."""
+    port = wall
+    monkeypatch.setenv("AGENT_COORD_WAKE_HOSTS", "hooks.example.test/automations/webhook/")
+    monkeypatch.setattr(wake, "public_host", lambda host: True)
+    rec_join.wake_arm(book, D1, HOOK_URL, HOOK_KEY)
+    book.commit()
+    posts: list[dict] = []
+    left, at_send = threading.Event(), threading.Event()
+
+    def receiver(req, timeout):  # answers 2xx; nothing connects
+        posts.append(json.loads(req.data))
+        return _Resp()
+
+    orig_notify = push._notify_rooms
+
+    def hold_send(rooms, frame, *a, **k):
+        if frame.get("kind") == "mail" and not left.is_set():
+            at_send.set()
+            left.wait(15)  # emit read the desk as sitting; the send waits for it to leave
+        return orig_notify(rooms, frame, *a, **k)
+
+    monkeypatch.setattr(wake, "_open", receiver)
+    monkeypatch.setattr(push, "_notify_rooms", hold_send)
+
+    async def scenario() -> None:
+        d1 = await Desk(port, D1).up()
+        await d1.synced()
+        d2 = await Desk(port, D2).up()
+        await d2.synced()
+        task = asyncio.create_task(
+            d2.rpc("832-leave", "send", {"mail_tos": [D1], "body": "a letter for d1"})
+        )
+        assert await asyncio.to_thread(at_send.wait, 10), "emit never reached the live send"
+        await d1.down()
+        left.set()
+        sent = await task
+        mid = int(sent["result"]["id"])
+        await asyncio.sleep(1.5)
+        await d2.down()
+        assert not d1.got(mid)
+        assert queued(D1) == [mid], "the letter's row is not waiting for D1's next sync"
+        assert posts, "D1 left before its live frame went out and was never rung"
+        assert posts[0]["idem"] == f"letter:{mid}:{D1}"
+
+    asyncio.run(scenario())
+
+
+def test_mark_and_waiting(book) -> None:
+    """#832: a row goes in missed; mark sets sent or error once; waiting names the
+    newest hint or letter not had live (receipts never ring)."""
+    rid = rec_push.row_id(rec_push.put(book, D1, "mail", {"kind": "mail", "id": 801}, "missed"))
+    book.commit()
+    assert rid > 0 and rec_push.waiting(book, D1)["payload"]["id"] == 801
+    assert rec_push.mark(book, rid, "sent") == 1
+    assert rec_push.waiting(book, D1) is None
+    assert rec_push.mark(book, rid, "error") == 0  # only a missed row changes
+    rec_push.put(book, D1, "receipt", {"kind": "receipt", "id": 802}, "missed")
+    book.commit()
+    assert rec_push.waiting(book, D1) is None
+    rid = rec_push.row_id(rec_push.put(book, D1, "hint", {"kind": "hint", "type": "todo", "id": 9}, "missed"))
+    book.commit()
+    assert rec_push.mark(book, rid, "error") == 1
+    assert rec_push.waiting(book, D1)["id"] == rid  # a raised live send still waits
+

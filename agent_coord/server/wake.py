@@ -590,8 +590,13 @@ def post_desk(
     reason: str = ADDRESSED,
     room: str | None = None,
     trailing: bool = False,
+    ring: str = "",
 ) -> str:
     """Wake an armed desk that is not sitting. sent | coalesced | skipped | error | off.
+
+    ring (#832): why a wake with no new item went out (leave: the last socket left
+    with rows it never got live; unsent: a live frame found no socket). The log
+    line ends reason=RING.
 
     trailing (#669): the window-end POST for items this window held back; every
     item is already in the queue, so pending is the queue size, and the log line
@@ -639,15 +644,15 @@ def post_desk(
         return "coalesced"
     from agent_coord.server.records import push as rec_push
 
-    # A live item is queued after this call; a trailing POST's items are all queued.
-    pending = rec_push.pending(cn, desk) + (0 if trailing else 1)
+    # #832: every item is queued before this call, so pending is the queue size.
+    pending = rec_push.pending(cn, desk)
     # #627: a coalesced burst is addressed when any waiting item is addressed.
     if reason != ADDRESSED and rec_push.pending_addressed(cn, desk):
         reason = ADDRESSED
     body = wake_body(desk, frame, pending=pending, roster=desk_roster(cn, desk), reason=reason, room=room)
     status, err = _fire(url, body,
                         timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id, quiet=True)
-    tag = " reason=trailing" if trailing else ""
+    tag = " reason=trailing" if trailing else (f" reason={ring}" if ring else "")
     if status is not None and 200 <= status <= 299:
         _wake_log(desk, frame, hint_id, f"sent status={status}{tag}")
         return "sent"
