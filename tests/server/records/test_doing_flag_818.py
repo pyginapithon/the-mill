@@ -439,3 +439,29 @@ def test_done_by_the_desk_itself_ends_its_card_doing(w):
     w.ok(["pass", R, need, "--done"])
     assert w.me()["doing"] == ""
     assert _hist(w, ME)[0]["ended_by"] == "finished"
+
+
+def test_retaking_a_dropped_hold_never_brings_back_its_doing(w):
+    res_name = "r818-" + uuid.uuid4().hex[:6]
+    res = w.ok(["hold", res_name, "--doing", "editing the file"])
+    hid = res["doing_entry"]["on"]
+    w.ok(["drop", res_name])
+    assert w.me()["doing"] == ""
+    w.ok(["hold", res_name])
+    view = w.me()
+    assert view["doing"] == "" and view["last"]["on"] == hid
+    row = _hist(w, ME)[0]
+    assert row["doing"] == "editing the file" and row["ended_by"] == "finished"
+
+
+def test_drop_doing_replaces_the_hold_doing_and_stays_current(w):
+    res_name = "r818-" + uuid.uuid4().hex[:6]
+    res = w.ok(["hold", res_name, "--doing", "editing the file"])
+    hid = res["doing_entry"]["on"]
+    got = w.ok(["drop", res_name, "--doing", "handing the file over"])
+    assert got["doing_entry"]["on"] == hid
+    view = w.me()
+    assert view["doing"] == "handing the file over" and view["on"] == hid
+    rows = _hist(w, ME)
+    assert rows[0]["doing"] == "handing the file over" and rows[0]["ended"] is False
+    assert rows[1]["doing"] == "editing the file" and rows[1]["ended_by"] == "newer"
