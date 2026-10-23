@@ -28,10 +28,20 @@
  *   RETRIES      how many backoff retries card 827 makes (each is one _fire)
  *   RECEIPT      1 = item 0 is a receipt: queued, never rings (push.py:573)
  *   RESTART      1 = the wall may restart once: windows and timers (memory) are lost
- *   PUTFIRST     1 = proposal: rec_push.put before the sitting read and the doorbell
- *   RING_ON_LEAVE 1 = proposal: when the last socket of D leaves (Hub.discard) and
- *                rows still wait, ring the webhook as for a new item
+ *   PUTFIRST     1 = fix for card 832: rec_push.put (as missed) before the sitting
+ *                read and the doorbell; a live frame that reached a socket marks
+ *                its row sent afterwards (_broadcast -> _settle_row, a later step)
+ *   RING_ON_LEAVE 1 = fix for card 832: when the last socket of D leaves
+ *                (Hub.discard), or a live frame found no socket (_settle_row), and
+ *                a missed row that rings waits, ring the webhook (ring_waiting)
+ *   ACK_AFTER_SEND 1 = fix for card 831: a sync reads the rows without deleting
+ *                them and deletes exactly those after its frame is sent
+ *                (connect_sync_frame(hold=True), ack_sync); an unsent frame
+ *                deletes nothing
  *   MUT_SPLIT_GATE  mutation: _gate_take is a peek then a separate set (must fail)
+ *   MUT_SENT_EARLY  mutation of the 832 fix: mark the row sent when the frame is
+ *                handed to the loop, not when a socket took it, and no ring when
+ *                the frame finds no socket (must fail)
  */
 
 #ifndef N
@@ -67,6 +77,9 @@
 #ifndef RING_ON_LEAVE
 #define RING_ON_LEAVE 0
 #endif
+#ifndef ACK_AFTER_SEND
+#define ACK_AFTER_SEND 0
+#endif
 #ifndef MAXRUNS
 #define MAXRUNS 2
 #endif
@@ -74,6 +87,11 @@
 #define ALL ((1 << N) - 1)
 #define BIT(i) (1 << (i))
 #define RINGS(i) (!(RECEIPT && (i) == 0))
+#if RECEIPT
+#define RINGMASK (ALL & ~1)
+#else
+#define RINGMASK ALL
+#endif
 
 /* push_queue rows for D: one bit per item (sp_push.sql). */
 byte queued = 0;
@@ -82,6 +100,7 @@ byte dlv = 0;
 /* items taken off the queue by a sync whose reply never reached the desk. */
 byte lost = 0;
 byte created = 0;      /* bitmask of items whose emit finished */
+byte sent = 0;         /* rows marked sent (a live frame reached a socket), 832 fix */
 
 /* wake.py _GATE / _TRAIL, kept in wall memory. */
 byte gate_ep = 0;      /* the window's start time, as an epoch number; 0 = none */
@@ -183,9 +202,18 @@ coal:
   fi
 }
 
+/* 832 fix, push.py ring_waiting: not sitting and a missed row that rings
+   waits -> post_desk (window, wake_on and checks as for any wake). */
+inline ring_waiting(ok, took) {
+  if
+  :: atomic { !SITTING && (queued & ~sent & RINGMASK) != 0 -> skip }; post_desk(ok, took)
+  :: else -> skip
+  fi
+}
+
 /* One letter or hint for D (push.py emit / fanout, outside a request tx). */
 proctype Emitter(byte i) {
-  bool s, ok, took;
+  bool s, ok, took, got;
 #if ATOMIC_EMIT
   atomic {
 #endif
@@ -197,7 +225,19 @@ proctype Emitter(byte i) {
   :: s ->
      /* _notify_rooms -> Hub.notify -> _broadcast later on the loop: the frame
         reaches whoever sits in the room at send time (176-200). */
-     atomic { if :: SITTING -> dlv = dlv | BIT(i) :: else -> skip fi }
+#ifdef MUT_SENT_EARLY
+     atomic { sent = sent | (queued & BIT(i)) };
+#endif
+     atomic { if :: SITTING -> dlv = dlv | BIT(i); got = true :: else -> got = false fi };
+#if PUTFIRST && RING_ON_LEAVE && !defined(MUT_SENT_EARLY)
+     /* _settle_row, off the loop: mark the row sent, or ring when no socket took it */
+     if
+     :: got -> atomic { sent = sent | (queued & BIT(i)) }
+     :: !got -> ring_waiting(ok, took)
+     fi
+#else
+     skip
+#endif
   :: !s && RINGS(i) -> post_desk(ok, took)        /* 573-581 / 470-481 */
   :: !s && !RINGS(i) -> skip                       /* a receipt never rings */
   fi;
@@ -272,12 +312,23 @@ proctype Restart() {
 inline deliver(s) {
   atomic {
     if
+#if ACK_AFTER_SEND
+    :: !closed[s] -> dlv = dlv | infl[s]; queued = queued & ~infl[s]   /* sent, then ack */
+    :: else -> skip                                 /* not sent: rows stay queued */
+#else
     :: !closed[s] -> dlv = dlv | infl[s]
     :: else -> lost = lost | (infl[s] & ~dlv)      /* rows already deleted */
+#endif
     fi;
     infl[s] = 0
   }
 }
+
+#if ACK_AFTER_SEND
+#define TAKE(s) infl[s] = queued                  /* peek: read, no delete */
+#else
+#define TAKE(s) infl[s] = queued; queued = 0      /* mill_push_take */
+#endif
 
 proctype Session(byte s) {
   byte o;
@@ -299,8 +350,9 @@ end_s:
           od
        fi
      };
-     /* connect_sync_frame: mill_push_take selects and deletes the rows */
-     atomic { infl[s] = queued; queued = 0 };
+     /* connect_sync_frame: mill_push_take selects and deletes the rows
+        (ACK_AFTER_SEND: reads them; deliver deletes them after the send) */
+     atomic { TAKE(s) };
      /* gate_clear: a new hint may ring again */
      atomic { gate_ep = 0; gate_exp = false; trail = 0; since_ok = true;
 #if RETRY827
@@ -311,15 +363,12 @@ end_s:
      deliver(s);
      /* up: it may run commands (each one takes and replies), then it exits */
      do
-     :: atomic { !closed[s] -> infl[s] = queued; queued = 0 }; deliver(s)
+     :: atomic { !closed[s] -> TAKE(s) }; deliver(s)
      :: break
      od;
      atomic { seat[s] = false; closed[s] = false };                 /* Hub.discard */
 #if RING_ON_LEAVE
-     if
-     :: atomic { !SITTING && queued != 0 -> skip }; post_desk(ok, took)
-     :: else -> skip
-     fi;
+     ring_waiting(ok, took);                                        /* 832: last leave */
 #endif
 refused:
      skip
