@@ -231,11 +231,12 @@ def test_pass_and_unclaim_hand_the_guard_to_the_sp():
     c._cn = MagicMock()
     seen = []
 
-    def fake_sp(book, proc, args):
-        seen.append((proc, list(args)))
+    def fake_sp(book, proc, args, roster, need):
+        desk = args[0]
+        seen.append((proc, [desk.sql, *desk.params, *args[1:], roster, need]))
         if proc == "cmd_unclaim":
             raise CoordError("who-may: unclaim is the volunteer")
-        return {"card": 63, "status": "done", "was": "shipped"}
+        return {"card": 63, "status": "done", "was": "shipped", "evidence": args[3]}
 
     with patch("agent_coord.server.records.todo.find", return_value=_named_hit("shipped")), patch(
         "agent_coord.server.api.mill.rpc._card_sp", side_effect=fake_sp
@@ -245,8 +246,8 @@ def test_pass_and_unclaim_hand_the_guard_to_the_sp():
         assert out["evidence"] == "PR 1"
         with pytest.raises(CoordError, match="who-may: unclaim is the volunteer"):
             rpc._h_yield(c, {"need": "63"}, "office", "intruder")
-    assert seen[0] == ("cmd_pass", ["ask", 63, "done", "PR 1", "office", "63"])
-    assert seen[1][0] == "cmd_unclaim" and seen[1][1][:2] == ["intruder", 63]
+    assert seen[0] == ("cmd_pass", ["MILL_DESK_ID(%s)", "ask", 63, "done", "PR 1", "office", "63"])
+    assert seen[1][0] == "cmd_unclaim" and seen[1][1][1:3] == ["intruder", 63]
 
 
 def test_desk_slug_picks_requested_role():

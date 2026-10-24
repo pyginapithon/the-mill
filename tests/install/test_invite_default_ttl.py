@@ -122,8 +122,7 @@ def test_set_key_ttl_still_allows_never(monkeypatch) -> None:
     assert out["ttl_seconds"] is None
     assert out["expires_at"] is None
     assert seen["args"][0] == "abcd1234"
-    assert seen["args"][1] is None  # cmd_invite_ttl(key, ttl_seconds, expires_at)
-    assert seen["args"][2] is None
+    assert seen["args"] == ("abcd1234", None)  # cmd_invite_ttl(key, ttl): NULL never expires
 
 
 def test_default_invite_ttl_const() -> None:

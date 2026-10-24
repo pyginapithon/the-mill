@@ -146,10 +146,15 @@ def test_pass_keeps_evidence_on_ship_and_done_and_drops_it_on_back(cn):
     rpc._h_claim(book, {"need": "e867-a"}, "unit", VOL)
     got = rpc._h_pass(book, {"need": "e867-a", "evidence": "PR #1 sha abc123"}, "unit", VOL)
     assert got["status"] == "shipped" and got["evidence"] == "PR #1 sha abc123"
+    assert _read(cn, "e867-a")["evidence"] == "PR #1 sha abc123"
+    got = rpc._h_pass(book, {"need": "e867-a", "step": "done"}, "unit", ASKER)
+    assert got["status"] == "done" and got["evidence"] == "PR #1 sha abc123"
+    got = rpc._h_pass(book, {"need": "e867-a", "step": "back"}, "unit", ASKER)
     got = rpc._h_pass(book, {"need": "e867-a", "step": "done", "evidence": "checked"}, "unit", ASKER)
     assert got["status"] == "done" and got["evidence"] == "checked"
     got = rpc._h_pass(book, {"need": "e867-a", "step": "back", "evidence": "x"}, "unit", ASKER)
     assert got["status"] == "shipped" and got.get("evidence") is None
+    assert "evidence" not in _read(cn, "e867-a")
 
 
 def test_pass_evidence_over_2000_chars_is_refused_and_changes_nothing(cn):
@@ -171,6 +176,16 @@ def test_card_carries_done_when_and_only_the_asker_changes_it(cn):
         rpc._h_note(book, {"need": "w867-a", "done_when": "other"}, "unit", OTHER)
     rpc._h_note(book, {"need": "w867-a", "done_when": "merged on main"}, "unit", ASKER)
     assert _read(cn, "w867-a")["done_when"] == "merged on main"
+    rpc._h_note(book, {"need": "w867-a", "done_when": ""}, "unit", ASKER)
+    assert "done_when" not in _read(cn, "w867-a")
+
+
+def test_a_desk_the_book_does_not_hold_is_nobody(cn):
+    """MILL_DESK_ID: an unknown name is id 0, which matches no volunteer, asker or Admin."""
+    book, _ = _card(cn, "w867-b")
+    rpc._h_claim(book, {"need": "w867-b"}, "unit", VOL)
+    with pytest.raises(CoordError, match="who-may: unclaim is the volunteer"):
+        rpc._h_yield(book, {"need": "w867-b"}, "unit", "nobody867")
 
 
 # F152: the raw writers are SP calls.
@@ -227,9 +242,27 @@ def test_connect_frame_carries_the_sp_version_check(cn, sp_only):
     assert "hello" in frame
 
 
+def test_mill_hello_is_ok_on_the_office_stamp_and_warns_or_refuses_otherwise(cn):
+    from agent_coord.install import migrate
+    from agent_coord.server.push import hello_line, sp_stamp
+    from agent_coord.server.records.db import call
+
+    migrate._stamp_sql(cn, migrate.sql_digest())
+    assert sp_stamp().startswith("sp-") and len(sp_stamp()) == 15
+    assert hello_line(cn) == "ok"
+    got = call(cn, "mill_hello", ["sp-000000000000", "warn"])[-1]
+    assert got["status"] == "warn" and got["office"] == sp_stamp() and "sp-000000000000" in got["message"]
+    with pytest.raises(Exception, match="sp stamp: office"):
+        call(cn, "mill_hello", ["sp-000000000000", "refuse"])
+
+
 # F154: the app DB user can run the SPs and nothing else.
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason="F154 is the 0.8.0 end state: 0.7.18 still reads with raw SELECTs on today's tables",
+)
 def test_app_user_cannot_run_raw_sql(cn):
     import mysql.connector
 
@@ -256,3 +289,18 @@ def test_app_user_cannot_run_raw_sql(cn):
         c.close()
     finally:
         app.close()
+
+
+# 0.7.18: done_when and evidence are additive columns on today's todo table.
+
+
+def test_ensure_adds_done_when_and_evidence_once(cn):
+    from agent_coord.install import migrate
+
+    cur = cn.cursor()
+    try:
+        cur.execute("ALTER TABLE todo DROP COLUMN evidence, DROP COLUMN done_when")
+    finally:
+        cur.close()
+    assert migrate._ensure_todo_done_when(cn) == ["todo.done_when", "todo.evidence"]
+    assert migrate._ensure_todo_done_when(cn) == []

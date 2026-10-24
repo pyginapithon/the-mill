@@ -488,9 +488,11 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
         "tree": _stored(r.get("tree") or "") or None,
         "labels": _json_names(r.get("labels")),
     }
-    # #867: the acceptance line, when the asker set one.
+    # #867: the acceptance line and the last ship/done evidence, when set.
     if r.get("done_when"):
         card["done_when"] = str(r["done_when"])
+    if r.get("evidence"):
+        card["evidence"] = str(r["evidence"])
     # #330: notes land in detail. A progress token that was never set is left
     # out, so no field in the reply is always empty. #818: cards have no title.
     if not card["progress"]:
@@ -2204,8 +2206,17 @@ def _card_refusal(code: str, roster: str, need: str) -> str:
     return texts.get(kind, f"{kind}: refused")
 
 
-def _card_sp(c: Book, proc: str, args: list) -> dict[str, Any]:
-    """Call a card SP. Its last two args are the roster and need the refusal names."""
+def _desk_arg(owner: str | None) -> Any:
+    """The desk id arg of a card SP: MILL_DESK_ID(name) in the same CALL (#867).
+    NULL for no desk (no who-may check), 0 for a name the book does not hold."""
+    from agent_coord.server.records.db import Inline
+    from agent_coord.server.records.name import bare
+
+    return Inline("MILL_DESK_ID(%s)", bare(_stored(owner or ""), CONST_DESK))
+
+
+def _card_sp(c: Book, proc: str, args: list, roster: str, need: str) -> dict[str, Any]:
+    """Call a card SP; a `card:<code>` refusal is written out for this roster and need."""
     from agent_coord.server.records.db import call
 
     try:
@@ -2215,7 +2226,7 @@ def _card_sp(c: Book, proc: str, args: list) -> dict[str, Any]:
     except Exception as e:
         msg = _sql_refusal(e)
         if msg and msg.startswith("card:"):
-            raise CoordError(_card_refusal(msg[5:], str(args[-2]), str(args[-1]))) from e
+            raise CoordError(_card_refusal(msg[5:], roster, need)) from e
         if msg:
             raise CoordError(msg) from e
         raise
@@ -2234,7 +2245,6 @@ def _card_hit(c: Book, project: str, need: str) -> dict[str, Any]:
 
 def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import todo as rec_todo
-    from agent_coord.server.records.name import bare
 
     need = slug(str(body.get("need") or ""))
     hit = _card_hit(c, project, need)
@@ -2277,7 +2287,7 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             raise CoordError(refusal)
     body_s = rec_todo.stored_body(payload) if (eta_at is not None or lines) else None
     got = _card_sp(
-        c, "cmd_claim", [bare(who, CONST_DESK), int(hit["id"]), 1 if take_over else 0, body_s, project, need]
+        c, "cmd_claim", [_desk_arg(owner), int(hit["id"]), 1 if take_over else 0, body_s], project, need
     )
     rec = {"ok": True, "need_id": need, "id": int(hit["id"]), "status": "claimed", "volunteer": owner}
     prior = _stored(str(got.get("prior_volunteer") or ""))
@@ -2445,11 +2455,10 @@ def _desk_slug(cn, hit: dict[str, Any], *keys: str) -> str:
 
 
 def _h_yield(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
-    from agent_coord.server.records.name import bare
 
     need = slug(str(body.get("need") or ""))
     hit = _card_hit(c, project, need)
-    _card_sp(c, "cmd_unclaim", [bare(_stored(owner or ""), CONST_DESK), int(hit["id"]), project, need])
+    _card_sp(c, "cmd_unclaim", [_desk_arg(owner), int(hit["id"])], project, need)
     rec = {"ok": True, "need": need, "status": "open"}
     _poke(c, "todo", int(hit["id"]), "unclaim", owner=owner)
     return rec
@@ -2498,33 +2507,34 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
 def _pass_one(
     c: Book, raw_need: str, step: str, project: str, owner: str | None, evidence: str = ""
 ) -> dict[str, Any]:
-    from agent_coord.server.records.name import bare
 
     need = slug(str(raw_need or ""))
     hit = _card_hit(c, project, need)
     got = _card_sp(
         c,
         "cmd_pass",
-        [bare(_stored(owner or ""), CONST_DESK), int(hit["id"]), step, evidence or None, project, need],
+        [_desk_arg(owner), int(hit["id"]), step, evidence or None],
+        project,
+        need,
     )
     nxt = str(got.get("status") or "")
     rec = {"ok": True, "need": need, "status": nxt, "was": str(got.get("was") or ""), "id": int(hit["id"])}
-    if evidence and step != "back":
-        rec["evidence"] = evidence
+    # #867: the card's evidence after the step (a done keeps the ship's; a back step clears it).
+    if got.get("evidence"):
+        rec["evidence"] = str(got["evidence"])
     _poke(c, "todo", rec["id"], "pass", owner=owner)
     return rec
 
 
 def _done_when(c: Book, card_id: int, project: str, need: str, raw: Any, owner: str | None) -> dict[str, Any]:
     """Set or clear the card's acceptance line (#867). The SP checks asker or Admin and not done."""
-    from agent_coord.server.records.name import bare
 
     text = str(raw or "").strip()
     if len(text) > DONE_WHEN_MAX:
         raise CoordError(
             "done-when would be %s chars (max %s); refused, nothing changed" % (len(text), DONE_WHEN_MAX)
         )
-    got = _card_sp(c, "cmd_card_accept", [bare(_stored(owner or ""), CONST_DESK), card_id, text, project, need])
+    got = _card_sp(c, "cmd_card_accept", [_desk_arg(owner), card_id, text], project, need)
     return {"ok": True, "need": need, "id": card_id, "done_when": got.get("done_when")}
 
 

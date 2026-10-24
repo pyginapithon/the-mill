@@ -774,14 +774,13 @@ def connect_sync_frame(cn, desk: str, *, hold: bool = False) -> dict:
 
 
 def sp_stamp() -> str:
-    """The SP stamp this pack ships: sp-<sha256[:12]> of its SP file (beta_sp.sql)."""
-    import hashlib
-    from pathlib import Path
-
-    f = Path(__file__).resolve().parent / "sql" / "beta_sp.sql"
+    """The SP stamp this pack ships: sp-<first 12 hex of its SQL digest> (#614, #867).
+    The book's mill_sp_version() reads the same digest from MILL_SQL_STAMP."""
     try:
-        return "sp-" + hashlib.sha256(f.read_bytes()).hexdigest()[:12]
-    except OSError:
+        from agent_coord.install.migrate import sql_digest
+
+        return "sp-" + sql_digest()[:12]
+    except Exception:
         return ""
 
 
@@ -795,7 +794,10 @@ def hello_line(cn) -> str:
     except Exception as e:
         _bc_log(f"mill_hello err={type(e).__name__}")
         return "check failed"
-    return str((rows[0].get("status") if rows else "") or "").strip() or "check failed"
+    row = rows[-1] if rows else {}
+    if str(row.get("status") or "") == "ok":
+        return "ok"
+    return str(row.get("message") or row.get("status") or "").strip() or "check failed"
 
 
 def wake_line(cn, desk: str) -> str:

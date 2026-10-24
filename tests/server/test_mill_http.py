@@ -219,7 +219,7 @@ def test_dispatch_unpark_and_unclaim(monkeypatch):
 
     monkeypatch.setattr("agent_coord.server.records.todo.update", update)
 
-    def card_sp(book, proc, args):  # #867: unclaim is one cmd_unclaim call
+    def card_sp(book, proc, args, roster, need):  # #867: unclaim is one cmd_unclaim call
         calls.append((proc, args[1]))
         return {"card": args[1], "status": "open"}
 

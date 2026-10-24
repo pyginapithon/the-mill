@@ -779,7 +779,7 @@ def mint_key(
 
         try:
 
-            _invite_sp(cur, "cmd_invite_create", (key_id, digest, lab, by, ttl_s, expires))
+            _invite_sp(cur, "cmd_invite_create", (key_id, digest, lab, by, ttl_s))
 
             cn.commit()
 
@@ -865,7 +865,7 @@ def enable_key(key_id: str) -> dict[str, Any]:
 
         try:
 
-            n = _invite_sp(cur, "cmd_invite_enable", (kid, _now()))
+            n = _invite_sp(cur, "cmd_invite_enable", (kid,))
 
             cn.commit()
 
@@ -1122,7 +1122,7 @@ def set_key_ttl(key_id: str, ttl: str | int | None) -> dict[str, Any]:
 
         try:
 
-            n = _invite_sp(cur, "cmd_invite_ttl", (kid, ttl_s, expires))
+            n = _invite_sp(cur, "cmd_invite_ttl", (kid, ttl_s))
 
             cn.commit()
 
@@ -1188,7 +1188,7 @@ def revoke_key(key_id: str) -> dict[str, Any]:
 
         try:
 
-            n = _invite_sp(cur, "cmd_invite_revoke", (kid, _now()))
+            n = _invite_sp(cur, "cmd_invite_revoke", (kid,))
 
             cur.execute(
 

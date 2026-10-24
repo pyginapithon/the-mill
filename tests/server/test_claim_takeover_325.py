@@ -24,11 +24,12 @@ def _card(monkeypatch, volunteer: str, detail: str = "seed"):
     def fake_find(cn, project, need):
         return dict(state["row"])
 
-    def fake_card_sp(c, proc, args):
+    def fake_card_sp(c, proc, args, roster, need):
         # Stands in for cmd_claim (#867: the guard runs in the SP; the SQL suite
-        # test_claim_takeover_sql_325 checks the real one). args: desk, card, take_over, body, roster, need.
+        # test_claim_takeover_sql_325 checks the real one). args: MILL_DESK_ID(desk), card, take_over, body.
         assert proc == "cmd_claim"
-        desk, tid, take_over, body, roster, need = args
+        desk_arg, tid, take_over, body = args
+        desk = desk_arg.params[0]
         prior = state["row"]["assigned"]
         if prior and prior != desk and not take_over:
             raise CoordError(

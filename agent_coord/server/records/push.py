@@ -7,7 +7,7 @@ from typing import Any
 
 from agent_coord.const import CONST_DESK
 
-from .db import call
+from .db import Inline, call
 
 
 # #627: a stored row carries this key only when it reached the desk as a room
@@ -59,7 +59,7 @@ def _put_back(cn, row_id: int, raw_payload: Any, idem: str) -> None:
     payload = _payload_dict(raw_payload)
     if idem and not str(payload.get("idem") or "").strip():
         payload["idem"] = idem
-    call(cn, "cmd_push_missed", [int(row_id), json.dumps(payload, default=str)])
+    call(cn, "cmd_push_put_back", [int(row_id), json.dumps(payload, default=str)])
 
 
 def note_drop(cn, desk: str, frame: dict) -> str:
@@ -202,7 +202,7 @@ def ack(cn, desk: str, ids) -> int:
     keep = [int(i) for i in ids or () if int(i) > 0]
     if not keep:
         return 0
-    rows = call(cn, "cmd_push_sent", [bare(desk, CONST_DESK), json.dumps(keep)])
+    rows = call(cn, "cmd_push_sent", [Inline("MILL_DESK_ID(%s)", bare(desk, CONST_DESK)), json.dumps(keep)])
     return int((rows[0].get("sent") if rows else 0) or 0)
 
 

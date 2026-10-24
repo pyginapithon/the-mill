@@ -40,7 +40,7 @@ def _card(monkeypatch, detail: str, **hit) -> dict:
     monkeypatch.setattr("agent_coord.server.records.todo.find", fake_find)
     monkeypatch.setattr("agent_coord.server.records.todo.update", fake_update)
 
-    def fake_card_sp(c, proc, args):  # #867: claim writes the body in cmd_claim
+    def fake_card_sp(c, proc, args, roster, need):  # #867: claim writes the body in cmd_claim
         if args[3] is not None:
             stored["body"] = args[3]
         return {"card": args[1], "status": "claimed"}
