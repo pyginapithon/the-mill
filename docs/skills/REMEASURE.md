@@ -31,7 +31,7 @@ A TOY with one desk talking to itself is **not** a Pass. Name real mill desks in
 
 Score on mill SoR: mail **src!=dst** (Asker/Handoff) + Producer `activity` in t0-t1 (writer desk). Self-only `send` = Fail. Do not require Asker's desk_id on activity (recipients do not write activity rows).
 
-HYPOS / TOY.md must list **Cast:** Asker=... Producer=... Handoff=... (omit handoff only if product has none).
+TOY.md must list **Cast:** Asker=... Producer=... Handoff=... (omit handoff only if product has none).
 
 ## Run identity (required - activity join)
 
