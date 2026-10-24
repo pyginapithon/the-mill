@@ -19,7 +19,13 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+from pathlib import Path
 from typing import Any
+
+# The repo root, so the command runs from a checkout without the pack installed.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Drift seen on the cloud office book after ensure at 0.7.16. Reported, not
 # dropped, in 0.7.17: removing it changes the data format (normalization batch).
