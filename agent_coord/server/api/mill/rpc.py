@@ -492,15 +492,9 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
     # out, so no field in the reply is always empty. #818: cards have no title.
     if not card["progress"]:
         del card["progress"]
-    # Card 866: done_when. The column wins when the row has it; until that
-    # column is on the book, the card body carries it. NULL means none set.
-    dw = r.get("done_when")
-    if dw is None:
-        payload = fields.get("payload") if isinstance(fields.get("payload"), dict) else None
-        if payload is not None:
-            dw = payload.get("done_when")
-    if dw:
-        card["done_when"] = str(dw)
+    # Card 866: the acceptance line, when the row has one. The server stores it.
+    if r.get("done_when"):
+        card["done_when"] = str(r["done_when"])
     return card
 
 
@@ -2431,12 +2425,10 @@ def _h_pass(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     step = str(body.get("step") or "ship").strip().lower()
     if step not in ("ship", "done", "back"):
         raise CoordError("pass: step is ship, done or back")
-    return _each_need(body.get("need"), lambda n: _pass_one(c, n, step, project, owner, body))
+    return _each_need(body.get("need"), lambda n: _pass_one(c, n, step, project, owner))
 
 
-def _pass_one(
-    c: Book, raw_need: str, step: str, project: str, owner: str | None, body: dict[str, Any]
-) -> dict[str, Any]:
+def _pass_one(c: Book, raw_need: str, step: str, project: str, owner: str | None) -> dict[str, Any]:
     from agent_coord.server.admin.guard import is_role_admin
     from agent_coord.server.records import todo as rec_todo
 
@@ -2493,69 +2485,10 @@ def _pass_one(
                 else "who-may: pass --back is the asker or the volunteer; the card's asker does not resolve, so only the volunteer may"
             )
         nxt = "shipped" if st == "done" else ("claimed" if vol else "open")
-    _pass_store(c, hit, owner, nxt, step, body)
+    rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=nxt)
     rec = {"ok": True, "need": need, "status": nxt, "was": st, "id": int(hit["id"])}
     _poke(c, "todo", rec["id"], "pass", owner=owner)
     return rec
-
-
-def _pass_store(c: Book, hit: dict, owner: str | None, status: str, step: str, body: dict[str, Any]) -> None:
-    """Write the status. Evidence is kept on the card body until card_event exists.
-
-    --back drops it. A ship or done with no evidence leaves whatever was stored.
-    """
-    from agent_coord.server.beta_client import evidence_for_pass
-    from agent_coord.server.records import todo as rec_todo
-
-    fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
-    payload = dict(fields["payload"] or {"slug": fields["need_id"], "detail": fields["detail"]})
-    before = dict(payload)
-    if step == "back":
-        payload.pop("evidence", None)
-    elif "evidence" in body:
-        ev = evidence_for_pass(step, body.get("evidence"))
-        if ev is not None:
-            payload["evidence"] = ev
-    if payload == before:
-        rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=status)
-        return
-    refusal = rec_todo.over_budget(before, payload, "pass")
-    if refusal:
-        raise CoordError(refusal)
-    rec_todo.update(
-        c._cn, int(hit["id"]), _stored(owner or ""), status=status, body=rec_todo.stored_body(payload)
-    )
-
-
-def _h_accept(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
-    """Set or clear done_when. Asker or Admin. A done or missing card is refused."""
-    from agent_coord.server.admin.guard import is_role_admin
-    from agent_coord.server.beta_client import check_accept, done_when_text
-    from agent_coord.server.records import todo as rec_todo
-
-    need = slug(str(body.get("need") or ""))
-    hit = rec_todo.find(c._cn, project, need)
-    if hit is None or (hit.get("status") or "") == "done":
-        raise CoordError("accept: card is done or gone")
-    who = _stored(owner or "")
-    ask = _desk_slug(c._cn, hit, "asker", "creator")
-    check_accept(str(hit.get("status") or ""), who, ask, bool(who) and is_role_admin(c._cn, who))
-    text = done_when_text(body.get("done_when"))
-    fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
-    payload = dict(fields["payload"] or {"slug": fields["need_id"], "detail": fields["detail"]})
-    before = dict(payload)
-    if text is None:
-        payload.pop("done_when", None)
-    else:
-        payload["done_when"] = text
-    if payload != before:
-        refusal = rec_todo.over_budget(before, payload, "accept")
-        if refusal:
-            raise CoordError(refusal)
-        rec_todo.update(
-            c._cn, int(hit["id"]), who, body=rec_todo.stored_body(payload)
-        )
-    return {"card": int(hit["id"]), "done_when": text}
 
 
 def _h_glance(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
@@ -3568,7 +3501,6 @@ HANDLERS = {
     "unpark": _h_unpark,
     "unclaim": _h_yield,
     "pass": _h_pass,
-    "accept": _h_accept,
     "glance": _h_glance,
     "note": _h_note,
     "hold": _h_hold,

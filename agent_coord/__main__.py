@@ -1099,6 +1099,12 @@ def _build_parser() -> MillArgumentParser:
             dest="parent_id",
             help="optional TREE parent id (attach on create)",
         )
+        p.add_argument(
+            "--done-when",
+            default=None,
+            dest="done_when",
+            help="acceptance line, 0..1000 chars; the asker or Admin",
+        )
 
     cr = sub.add_parser(
         "create",
@@ -1199,6 +1205,12 @@ def _build_parser() -> MillArgumentParser:
         action="store_true",
         help="reply with the card's whole detail (default: detail_chars and the last line)",
     )
+    pg.add_argument(
+        "--done-when",
+        default=None,
+        dest="done_when",
+        help="set or clear the acceptance line (asker or Admin); a blank value clears it",
+    )
 
     vo = sub.add_parser("claim", help="claim a card")
     vo.add_argument("project")
@@ -1259,18 +1271,6 @@ def _build_parser() -> MillArgumentParser:
         "--evidence",
         default="",
         help="text stored with a ship or a done step (0..2000 chars); --back stores none",
-    )
-    ac = sub.add_parser(
-        "accept",
-        help="set or clear the card's done_when line (asker or Admin)",
-    )
-    ac.add_argument("project")
-    ac.add_argument("need")
-    ac.add_argument(
-        "--done-when",
-        default=None,
-        dest="done_when",
-        help="acceptance line, 0..1000 chars; a blank value clears it",
     )
     sub.add_parser(
         "glance",

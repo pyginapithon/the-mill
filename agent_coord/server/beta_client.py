@@ -1,8 +1,7 @@
 """Client-lane rules for card 866.
 
-done_when and pass evidence are stored on the card body until the beta
-book's card.done_when column and card_event.evidence column are the book.
-The cached glance is two result sets from uc_a6_glance_cached.
+done_when and pass evidence are stored by the server. This module shapes the
+cached glance, which stays a clean refusal until that read is installed.
 """
 from __future__ import annotations
 
@@ -10,8 +9,6 @@ from typing import Any
 
 from agent_coord.helpers.errors import CoordError
 
-EVIDENCE_MAX = 2000
-DONE_WHEN_MAX = 1000
 ACTIVITY_CAP = 30
 
 # The pasted glance row. open_votes is kept when the row has it (beta DDL).
@@ -34,36 +31,6 @@ _CACHE_KEYS = (
 )
 _ACTIVITY_KEYS = ("seq", "at", "kind", "ref", "desk")
 _KINDS = frozenset({"letter", "card", "doing", "hold", "score"})
-
-
-def evidence_for_pass(step: str, text: Any) -> str | None:
-    """Evidence stored on ship or done. --back stores none. Blank stores none."""
-    if step == "back":
-        return None
-    s = "" if text is None else str(text).strip()
-    if not s:
-        return None
-    if len(s) > EVIDENCE_MAX:
-        raise CoordError("pass: evidence must be 0..%d chars" % EVIDENCE_MAX)
-    return s
-
-
-def done_when_text(text: Any) -> str | None:
-    """Blank clears done_when. A longer line is refused."""
-    s = "" if text is None else str(text).strip()
-    if not s:
-        return None
-    if len(s) > DONE_WHEN_MAX:
-        raise CoordError("accept: done-when must be 0..%d chars" % DONE_WHEN_MAX)
-    return s
-
-
-def check_accept(status: str, who: str, asker: str, is_admin: bool) -> None:
-    """Asker or Admin, and the card is not done. A missing card is 'gone'."""
-    if not status or status in ("done", "gone"):
-        raise CoordError("accept: card is done or gone")
-    if who and who != asker and not is_admin:
-        raise CoordError("who-may: done-when is the asker or Admin")
 
 
 def shape_glance(cache_rows: list[dict] | None, activity_rows: list[dict] | None) -> dict[str, Any]:
