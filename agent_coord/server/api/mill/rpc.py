@@ -393,7 +393,7 @@ def _h_inbox(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     unread_only = not bool(body.get("all"))
 
     # The page is cut and ordered in SQL from mail_to idx_desk_unread: unread is
-    # the oldest `lim` unread, oldest first; --all is the newest `lim`, newest
+    # the newest `lim` unread, newest first (card 846); --all is the newest `lim`, newest
     # first. Bodies come on the same rows.
     page = max(1, lim or 100)
     kept = rec_mail.inbox(c._cn, _stored(desk), all_mail=not unread_only, limit=page)

@@ -480,12 +480,12 @@ BEGIN
            affn.name AS sender_roster, affn.type AS sender_roster_type
       FROM (SELECT id, desk_id, receipt, opened FROM mail_to
              WHERE type = 'mail' AND desk_id = v_desk AND opened IS NULL
-             ORDER BY id LIMIT v_lim) t
+             ORDER BY id DESC LIMIT v_lim) t
       JOIN mail m ON m.type = 'mail' AND m.id = t.id
       LEFT JOIN name srcn ON srcn.id = m.desk_id
       LEFT JOIN name dstn ON dstn.id = t.desk_id
       LEFT JOIN name affn ON affn.id = m.roster_id
-     ORDER BY t.id;
+     ORDER BY t.id DESC;
   ELSE
     SELECT m.type, m.id, m.created, m.created AS updated, m.desk_id,
            m.roster_id AS sender_roster_id,
