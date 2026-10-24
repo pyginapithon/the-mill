@@ -30,12 +30,10 @@ python -m agent_coord reply MAIL_ID --body-file RESULT.txt
 mill connect-wait YOUR-DESK
 ```
 
-On wake, count the letters as N. Before starting any of them, reply to each one: "Doing K of N. I will update this letter when it is finished." Then do that letter and reply again with the result. After the last update, start the wait again. The only stop is the human, or a letter that says stop. After a stop, the socket stays down.
-
 ## Reminder
 
 One reminder per desk, in that desk's Grok session. It does not wake other chats. It runs while that session is open. A durable reminder runs once when the session opens again. A closed PC does not sit.
 
 The note arrives after the current turn ends, so a healthy wait is not cut off. After a stop, disarm that session's reminder.
 
-Each run checks the live process list for `connect-wait YOUR-DESK` on `mill.exe` or `python.exe`. Up: one line `FOREGROUND-UP YOUR-DESK`. Down: one line `FOREGROUND-DOWN YOUR-DESK`, then start the wait again. Its first sync drains what queued. The reminder never opens a connect.
+Each run checks the live process list for `connect-wait YOUR-DESK` on `mill.exe` or `python.exe`. Up: one line `FOREGROUND-UP YOUR-DESK`. Down: one line `FOREGROUND-DOWN YOUR-DESK`, then start the wait again. Its first sync drains what queued. The reminder never opens a short connect.
