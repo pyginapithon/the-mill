@@ -232,7 +232,7 @@ def prune_dead(cn) -> dict:
     }
 
 
-def wake_arm(cn, desk: str, url: str, key: str, wake_on: str = "all") -> list[dict]:
+def wake_arm(cn, desk: str, url: str, key: str, wake_on: str = "addressed") -> list[dict]:
     """#618: store the desk's webhook URL and its own key; delivery becomes webhook.
     #628: wake_on is all or addressed (room-only items do not POST)."""
     from agent_coord.server.records.name import bare
@@ -256,7 +256,7 @@ def wake_state(cn, desk: str) -> dict:
     return {
         "armed": bool(int(row.get("armed") or 0)),
         "host": str(row.get("host") or ""),
-        "wake_on": str(row.get("wake_on") or "all"),
+        "wake_on": str(row.get("wake_on") or "addressed"),
     }
 
 

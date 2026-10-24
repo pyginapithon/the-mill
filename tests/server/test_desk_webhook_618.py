@@ -167,8 +167,8 @@ class _Join:
         from agent_coord.server.records import join as rec_join
 
         monkeypatch.setattr(rec_join, "wake_target", lambda cn, desk: self.row)
-        monkeypatch.setattr(rec_join, "wake_arm", lambda cn, desk, url, key, wake_on="all": (self.calls.append("arm"), setattr(self, "row", (url, key))))
-        monkeypatch.setattr(rec_join, "wake_state", lambda cn, desk: {"armed": bool(self.row), "host": "", "wake_on": "all"})
+        monkeypatch.setattr(rec_join, "wake_arm", lambda cn, desk, url, key, wake_on="addressed": (self.calls.append("arm"), setattr(self, "row", (url, key))))
+        monkeypatch.setattr(rec_join, "wake_state", lambda cn, desk: {"armed": bool(self.row), "host": "", "wake_on": "addressed"})
         monkeypatch.setattr(rec_join, "wake_off", lambda cn, desk: (self.calls.append("off"), setattr(self, "row", None)))
 
 
@@ -191,8 +191,8 @@ def test_join_arms_once_and_a_repeat_is_a_no_op(monkeypatch) -> None:
     with patch("agent_coord.server.wake._open", ok):
         first = _deliver({"mode": "webhook", "url": HOOK_URL, "key": "Bearer " + HOOK_KEY})
         again = _deliver({"mode": "webhook", "url": HOOK_URL, "key": HOOK_KEY})
-    assert first == {"webhook": "armed", "host": HOOK_HOST, "test": 200, "wake_on": "all"}
-    assert again == {"webhook": "armed", "host": HOOK_HOST, "test": "unchanged", "wake_on": "all"}
+    assert first == {"webhook": "armed", "host": HOOK_HOST, "test": 200, "wake_on": "addressed"}
+    assert again == {"webhook": "armed", "host": HOOK_HOST, "test": "unchanged", "wake_on": "addressed"}
     assert len(posts) == 1 and posts[0]["kind"] == "wake-test"
     assert j.calls == ["arm"] and j.row == (HOOK_URL, HOOK_KEY)
 

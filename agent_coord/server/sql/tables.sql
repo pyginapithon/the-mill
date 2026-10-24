@@ -198,7 +198,8 @@ CREATE TABLE IF NOT EXISTS seat (
   -- #618: the desk's own webhook key. Only mill_join_wake_target reads it (POST time).
   endpoint_key    VARCHAR(512) CHARACTER SET ascii COLLATE ascii_bin NULL,
   -- #628: which items POST: all, or addressed only (room-only items wait for the next connect).
-  wake_on         ENUM('all','addressed') NOT NULL DEFAULT 'all',
+  -- Card 836: addressed is the default, so a room copy wakes no one.
+  wake_on         ENUM('all','addressed') NOT NULL DEFAULT 'addressed',
   lan_ip          VARCHAR(45) CHARACTER SET ascii COLLATE ascii_bin NULL,
   time_connect    DATETIME(6) NULL,
   time_disconnect DATETIME(6) NULL,

@@ -383,14 +383,14 @@ BEGIN
   IF v_desk IS NULL OR NOT EXISTS (SELECT 1 FROM seat WHERE desk_id = v_desk) THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake: desk has not joined';
   END IF;
-  IF IFNULL(p_wake_on, 'all') NOT IN ('all', 'addressed') THEN
+  IF IFNULL(p_wake_on, 'addressed') NOT IN ('all', 'addressed') THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'wake arm: wake_on is all or addressed';
   END IF;
   UPDATE seat
      SET delivery_mode = 'webhook', endpoint_url = p_url, endpoint_key = p_key,
-         wake_on = IFNULL(p_wake_on, 'all'), updated = updated
+         wake_on = IFNULL(p_wake_on, 'addressed'), updated = updated
    WHERE desk_id = v_desk;
-  SELECT TRIM(p_desk) AS desk, 'webhook' AS delivery_mode, IFNULL(p_wake_on, 'all') AS wake_on;
+  SELECT TRIM(p_desk) AS desk, 'webhook' AS delivery_mode, IFNULL(p_wake_on, 'addressed') AS wake_on;
 END //
 
 CREATE PROCEDURE mill_join_wake_off(
@@ -404,7 +404,7 @@ BEGIN
   END IF;
   UPDATE seat
      SET delivery_mode = IF(delivery_mode = 'webhook', 'websocket', delivery_mode),
-         endpoint_url = NULL, endpoint_key = NULL, wake_on = 'all', updated = updated
+         endpoint_url = NULL, endpoint_key = NULL, wake_on = 'addressed', updated = updated
    WHERE desk_id = v_desk;
   SELECT TRIM(p_desk) AS desk, 'off' AS wake;
 END //

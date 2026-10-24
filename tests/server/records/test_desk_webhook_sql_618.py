@@ -37,18 +37,18 @@ def _updated(cn, desk: str):
 
 def test_arm_then_off_and_reads_never_carry_the_key(cn):
     _seat(cn, "fx618-d1")
-    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": False, "host": "", "wake_on": "all"}
+    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": False, "host": "", "wake_on": "addressed"}
     assert rec_join.wake_target(cn, "fx618-d1") is None
     before = _updated(cn, "fx618-d1")
     rec_join.wake_arm(cn, "fx618-d1", URL, KEY)
     assert _updated(cn, "fx618-d1") == before  # arming is not a heartbeat
-    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": True, "host": "hooks.example.test", "wake_on": "all"}
+    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": True, "host": "hooks.example.test", "wake_on": "addressed"}
     assert rec_join.wake_target(cn, "fx618-d1") == (URL, KEY)
     seats = [r for r in rec_join.select(cn, "fx618") if r.get("desk") == "fx618-d1"]
     assert seats and seats[0]["delivery_mode"] == "webhook"
     assert "endpoint_key" not in seats[0] and KEY not in repr(seats[0])
     rec_join.wake_off(cn, "fx618-d1")
-    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": False, "host": "", "wake_on": "all"}
+    assert rec_join.wake_state(cn, "fx618-d1") == {"armed": False, "host": "", "wake_on": "addressed"}
     assert rec_join.wake_target(cn, "fx618-d1") is None
     mode = scalar_done(
         cn,

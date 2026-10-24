@@ -647,6 +647,37 @@ def _ensure_join_endpoint_key(cn) -> list[str]:
     return applied
 
 
+def _ensure_seat_wake_on_default(cn, *, moved_818: bool = False) -> list[str]:
+    """Card 836: seat.wake_on defaults to addressed, so a room copy wakes no one.
+
+    Once per book: while the column default is still 'all', move it to 'addressed'
+    and move every seat on 'all' with it. The new default is the marker, so a
+    second run changes nothing and a desk that picks --wake-on all later keeps it.
+    moved_818: this ensure just copied join rows into seat (a resumed run may have
+    created seat with the new default already), so move the copied 'all' rows too.
+    """
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        if _table_exists(cur, "seat") and _column_exists(cur, "seat", "wake_on"):
+            cur.execute(
+                "SELECT COLUMN_DEFAULT FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'seat' AND COLUMN_NAME = 'wake_on'"
+            )
+            row = cur.fetchone()
+            if (row and str(row[0] or "").strip("'") == "all") or moved_818:
+                cur.execute("ALTER TABLE seat ALTER COLUMN wake_on SET DEFAULT 'addressed'")
+                cur.execute("UPDATE seat SET wake_on = 'addressed', updated = updated WHERE wake_on = 'all'")
+                applied.append("seat.wake_on.default.addressed")
+        cn.commit()
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 def _ensure_join_wake_on(cn) -> list[str]:
     """#628: join.wake_on, the desk's choice of which items POST (all or addressed)."""
     applied: list[str] = []
@@ -1293,6 +1324,7 @@ def _ensure_steps(cn) -> dict[str, Any]:
             # #818 after the join column steps (the seat copy reads them).
             did_818 = apply_doing_818(cn)
             applied.extend(did_818)
+            applied.extend(_ensure_seat_wake_on_default(cn, moved_818=bool(did_818)))
             # #822 columns before the routine reload (mill_doing_put names waiting_why).
             applied.extend(_ensure_doing_waiting(cn))
             if did_818 or not current:
