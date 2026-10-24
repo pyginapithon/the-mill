@@ -1,6 +1,6 @@
--- 21 tables. Wipe then apply.
+-- 22 tables. Wipe then apply.
 -- name, member, activity, label, tree, watcher,
--- mail, mail_to, todo, seat, doing, hold, score, score_point, score_evidence,
+-- mail, mail_to, tree_read, todo, seat, doing, hold, score, score_point, score_evidence,
 -- human, human_desk, human_member, mill_invite, mill_invite_join, push_queue.
 -- Platform follows the payloads. label and tree reference activity, so they sit under it.
 -- charset: utf8mb4 names/prose; ascii_bin hashes and invite keys.
