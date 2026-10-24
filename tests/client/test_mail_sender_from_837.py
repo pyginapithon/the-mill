@@ -6,7 +6,7 @@ parsing both paid a retry. Now every letter the office returns carries
 `from` (the desk name, a string) next to `sender {deskId, roster}`, and short
 rows keep `from`. The push arrival carries `from` too.
 
-Regression row F128 (mail-sender-from).
+Regression row F138 (mail-sender-from).
 """
 from __future__ import annotations
 

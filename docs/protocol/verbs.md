@@ -212,7 +212,7 @@ Grouped by **table**. Day-one teaching first; tree/Admin when said, not day-one 
 
 Room traffic stays on TREE. `mail-thread <mail_id>` reads that letter's branch (default); `--subtree` adds the replies under it; `--room` (or `--after <id>`) is whole-room catch-up; a bare room name prints a short summary. Any desk in the office may read any room; `reply <root id>` (or `add mail:<root id>`) joins it. `inbox` and `mail-thread` do not mark. `reply <id>` marks that parent handled for the replying desk. `mark <id> [<id>...]` marks letters handled without a reply. Unread means not yet handled.
 
-Lean MAIL letter: `id`, `created`, `from` (the sender desk), `sender {deskId, roster}`, `body`, `mail_tos[{deskId, roster, receipt}]`, `to` (recipient desks). No `opened` on the public cast. `from` is the one sender key on every letter row: full reads, `--subtree`, short rows and the push arrival; `to` is the one recipient list on full letters and the push arrival (short rows carry no recipients) (F128).
+Lean MAIL letter: `id`, `created`, `from` (the sender desk), `sender {deskId, roster}`, `body`, `mail_tos[{deskId, roster, receipt}]`, `to` (recipient desks). No `opened` on the public cast. `from` is the one sender key on every letter row: full reads, `--subtree`, short rows and the push arrival; `to` is the one recipient list on full letters and the push arrival (short rows carry no recipients) (F138).
 
 | Human idiom | Verb |
 | :--- | :--- |
@@ -316,7 +316,7 @@ Grouped by **table / activity** (glance OOTB). Human speech CLI - not CRUD famil
 
 ### mail
 
-Lean MAIL letter: `id`, `created`, `from` (sender desk, the key every letter row carries, F128), `sender {deskId, roster}`, `body`, `mail_tos[{deskId, receipt}]`, `to` (recipient desks, F128). No `opened` on the public cast. Roster lives on the letter only: `mail.roster_id`, required (NOT NULL, no default). `sender.roster` is that letter roster. `mail_to` has no roster column, so a dest carries none.
+Lean MAIL letter: `id`, `created`, `from` (sender desk, the key every letter row carries, F138), `sender {deskId, roster}`, `body`, `mail_tos[{deskId, receipt}]`, `to` (recipient desks, F138). No `opened` on the public cast. Roster lives on the letter only: `mail.roster_id`, required (NOT NULL, no default). `sender.roster` is that letter roster. `mail_to` has no roster column, so a dest carries none.
 
 | verb | intent | CALL |
 |---|---|---|
