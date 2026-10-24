@@ -62,7 +62,7 @@ def test_subtree_marks_every_letter_it_prints_for_the_reader_only(cn, book) -> N
     out = rpc._h_mail_thread(book, {"mail_id": root, "scope": "subtree"}, "unit", "b")
     assert out["marked"] == [root, r1, r2]
     assert not ({root, r1, r2} & _unread(book, "b"))
-    assert _open(cn, r1, "c") is False  # c's own rows stay unread
+    assert _open(cn, root, "c") is False  # c's own rows stay unread
 
 
 def test_room_previews_and_summary_do_not_mark_but_after_does(cn, book) -> None:

@@ -1,4 +1,4 @@
-"""A mail-thread read does not mark handled (#195)."""
+"""mail-thread marks only through _mark_shown, for a desk with a name row (#195, card 843 F129)."""
 from __future__ import annotations
 
 from unittest.mock import MagicMock
