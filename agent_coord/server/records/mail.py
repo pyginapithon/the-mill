@@ -348,7 +348,8 @@ def set_sender_roster(
     cur = cn.cursor()
     try:
         cur.execute(
-            "UPDATE mail m JOIN activity a ON a.type = 'mail' AND a.id = m.id"
+            # LEFT JOIN: a letter with no activity row is still tagged.
+            "UPDATE mail m LEFT JOIN activity a ON a.type = 'mail' AND a.id = m.id"
             " SET m.roster_id = %s, a.roster_id = %s, a.updated = a.updated"
             " WHERE m.type = 'mail' AND m.id = %s",
             (aff_id, aff_id, int(mail_id)),
