@@ -66,6 +66,8 @@ WALL = COMMANDS | SIT | PROBE | frozenset(
         "invite",
         "invite-seat",
         "trust",
+        "accept",
+        "glance",
     }
 )
 
@@ -327,6 +329,22 @@ def body_from_args(args: Any) -> dict[str, Any]:
     if command == "pass":
         # #615: the step is named; a repeat never moves a card on by itself.
         body["step"] = "done" if getattr(args, "done", False) else ("back" if getattr(args, "back", False) else "ship")
+        # Card 866: evidence rides the pass. Blank is omitted. --back still
+        # sends it; the server stores none.
+        ev = str(getattr(args, "evidence", "") or "").strip()
+        if ev:
+            if len(ev) > 2000:
+                raise CoordError("pass: evidence must be 0..2000 chars")
+            body["evidence"] = ev
+    if command == "accept":
+        if getattr(args, "done_when", None) is None:
+            raise CoordError("accept: --done-when is required")
+        dw = str(args.done_when).strip()
+        if len(dw) > 1000:
+            raise CoordError("accept: done-when must be 0..1000 chars")
+        body["done_when"] = dw
+    if command == "glance":
+        body.pop("project", None)
     if bool(getattr(args, "yes", False)):
         body["yes"] = True
     if command == "claim" and bool(getattr(args, "take_over", False)):
