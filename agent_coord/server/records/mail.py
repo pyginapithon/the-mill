@@ -61,7 +61,7 @@ def select(cn, desk: str) -> list[dict]:
 
 
 def inbox(cn, desk: str, *, all_mail: bool = False, limit: int = 100) -> list[dict]:
-    """Inbox page cut in SQL. Unread: oldest `limit` unread, oldest first.
+    """Inbox page cut in SQL. Unread: newest `limit` unread, newest first (card 846).
     all_mail: newest `limit` letters, newest first. Same rows as select()."""
     from agent_coord.server.records.name import bare
 

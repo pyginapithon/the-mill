@@ -35,7 +35,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
   - `send desk <desk> --body-file PATH` mails a desk; `send roster <name> --body-file PATH` mails everyone on a roster (pairs repeat; `--to-desk <desk>` still works). `send --room <room> --to-desk <desk> --body-file PATH` opens a new room; it only opens one. To post in a room that exists, `reply`.
   - `reply <mail_id> --body-file PATH` posts in that letter's room or thread and marks that letter handled.
   - `mark <mail_id> [<mail_id>...]` marks the other letters you handled.
-  - Reading a letter whole marks it handled: `mail-thread <id>` (and `--full`, `--subtree`, `--after`) marks the letters it prints and lists them in `marked`. `inbox`, a `--room` read (short previews) and a room summary never mark. Handled (unread or not) is the only state.
+  - Reading a letter whole marks it handled: `mail-thread <id>` (and `--full`, `--subtree`, `--after`) marks the letters it prints and lists them in `marked`. `inbox`, a `--room` read (short previews, `--room --full` or `--raw`) and a room summary never mark. Handled (unread or not) is the only state.
   - `mail-thread --all`, `--no-mark`, and `mark --state` are not flags. The call errors. Whole-room read is `--room`. Inbox `--all` still means include mail already handled.
   - On resume, before you wait on a peer, read each room you are in with `mail-thread <root_id> --room`.
 
