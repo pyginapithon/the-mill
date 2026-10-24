@@ -32,7 +32,7 @@ def wake_url() -> str:
         return (os.environ.get("AGENT_COORD_WAKE_URL") or "").strip()
 
 
-def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None, exc_type: str = "") -> None:
+def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None, exc_type: str = "", why: str = "") -> None:
     """One failure line. Desk and hint id when the caller has them. Never the endpoint URL."""
     parts = ["webhook fail"]
     if desk:
@@ -41,6 +41,8 @@ def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None,
         parts.append(f"id={hint_id}")
     if status is not None:
         parts.append(f"status={int(status)}")
+        if why:
+            parts.append(f'why="{why}"')
     else:
         parts.append(f"err={exc_type or 'Exception'}")
     line = " ".join(parts)
@@ -50,6 +52,47 @@ def _log_hook_fail(desk: str, hint_id: int | None, *, status: int | None = None,
         _bc_log(line)
     except Exception:
         return
+
+
+_WHY_KEYS = ("error", "message", "detail", "reason")
+WHY_MAX = 120
+
+
+def _why(raw: bytes, *, url: str = "", key: str | None = None) -> str:
+    """#838: the receiver's short reason for a non-2xx answer, safe for a log line or
+    a letter: the error/message/detail/reason field of a JSON body, else the text;
+    one line, at most WHY_MAX chars, no URL, no key, no quotes."""
+    import re
+
+    try:
+        text = (raw or b"").decode("utf-8", "replace")
+    except Exception:
+        return ""
+    try:
+        got = json.loads(text)
+        while isinstance(got, dict):
+            nxt = next((got[k] for k in _WHY_KEYS if got.get(k) not in (None, "")), None)
+            if nxt is None:
+                break
+            got = nxt
+        if isinstance(got, (str, int, float)):
+            text = str(got)
+    except ValueError:
+        pass
+    secret = (key or "").strip()
+    if secret:
+        text = text.replace(secret, "<key>")
+    if url:
+        text = text.replace(url, "<url>")
+    text = re.sub(r"https?://\S+", "<url>", text)
+    try:
+        from agent_coord.server.redact import redact_secrets
+
+        text = redact_secrets(text)
+    except Exception:
+        pass
+    text = " ".join(text.replace('"', "'").split())
+    return text[:WHY_MAX]
 
 
 def _open(req, timeout: float):
@@ -95,18 +138,26 @@ def _post_status(
         if secret and mangled in req.headers:
             req.headers["X-Automation-Key"] = req.headers.pop(mangled)
         with _open(req, timeout) as resp:
-            resp.read(256)
+            got = resp.read(256)
             status = getattr(resp, "status", None)
             if status is None:
                 status = getattr(resp, "code", None)
             status = 200 if status is None else int(status)
-            if not 200 <= status <= 299 and not quiet:
-                _log_hook_fail(desk, hint_id, status=status)
-            return status, ""
+            if 200 <= status <= 299:
+                return status, ""
+            why = _why(got if isinstance(got, bytes) else b"", url=u, key=secret)
+            if not quiet:
+                _log_hook_fail(desk, hint_id, status=status, why=why)
+            return status, why
     except urllib.error.HTTPError as e:
+        # #838: keep the receiver's reason (it was dropped, so 168 x 400 said nothing).
+        try:
+            why = _why(e.read(512) or b"", url=u, key=(key or "").strip())
+        except Exception:
+            why = ""
         if not quiet:
-            _log_hook_fail(desk, hint_id, status=int(e.code))
-        return int(e.code), ""
+            _log_hook_fail(desk, hint_id, status=int(e.code), why=why)
+        return int(e.code), why
     except Exception as e:
         if not quiet:
             _log_hook_fail(desk, hint_id, exc_type=type(e).__name__)
@@ -582,6 +633,73 @@ def _wake_log(desk: str, frame: dict[str, Any], hint_id: int | None, outcome: st
         return
 
 
+# #838: desk -> its current run of failed wakes {n, since, status, why, host}.
+# Server memory only: a restart forgets it, and the next failing wake starts again.
+_FAILS: dict[str, dict[str, Any]] = {}
+_FAILS_LOCK = threading.Lock()
+FAIL_ALERT_N = 3
+
+
+def _fail_run(cn, desk: str, status: int | None, err: str, host: str) -> None:
+    """Count one failed wake. At FAIL_ALERT_N in a row: one Admin letter for this run."""
+    import datetime as _dt
+
+    now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    with _FAILS_LOCK:
+        run = _FAILS.setdefault(desk, {"n": 0, "since": now})
+        run["n"] += 1
+        run.update(status=status, err=err)
+        n = run["n"]
+        since = run["since"]
+    if n != FAIL_ALERT_N:
+        return
+    answer = _answer(status, err)
+    _bc_log_safe(f"webhook desk={desk} failing n={n} since={since.replace(' ', 'T')}")
+    try:
+        from agent_coord.server.push import mill_admin_alert
+
+        mill_admin_alert(
+            cn,
+            f"Webhook wakes for desk {desk} are failing: {n} in a row since {since}, last answer {answer}. "
+            f"Its letters stay queued and reach it on its next mill connect. {_fix_for(status, err, host)}.",
+            command="wake",
+        )
+    except Exception:
+        return
+
+
+def _answer(status: int | None, err: str) -> str:
+    """'400 (reason)' for an HTTP answer, else the error type."""
+    if status is None:
+        return err or "error"
+    return f"{status} ({err})" if err else f"{status}"
+
+
+def _fail_clear(desk: str) -> None:
+    with _FAILS_LOCK:
+        _FAILS.pop(desk, None)
+
+
+def fail_note(desk: str) -> str:
+    """'' or the desk's failing run, for its connect sync wake line (#838)."""
+    with _FAILS_LOCK:
+        run = dict(_FAILS.get(str(desk or "").strip()) or {})
+    if not run:
+        return ""
+    last = _answer(run.get("status"), str(run.get("err") or ""))
+    return (f"failing: {run['n']} wakes in a row since {run['since']}, last {last}; "
+            "letters wait for mill connect")
+
+
+def _bc_log_safe(line: str) -> None:
+    try:
+        from agent_coord.server.push import _bc_log
+
+        _bc_log(line)
+    except Exception:
+        return
+
+
 def post_desk(
     cn,
     desk: str,
@@ -655,8 +773,12 @@ def post_desk(
                         timeout=WAKE_TIMEOUT_S, key=key, desk=desk, hint_id=hint_id, quiet=True)
     tag = " reason=trailing" if trailing else (f" reason={ring}" if ring else "")
     if status is not None and 200 <= status <= 299:
+        _fail_clear(desk)
         _wake_log(desk, frame, hint_id, f"sent status={status}{tag}")
         return "sent"
     why = f"status={status}" if status is not None else f"err={err or 'Exception'}"
+    if status is not None and err:
+        why += f' why="{err}"'
     _wake_log(desk, frame, hint_id, f"fail {why}{tag}")
+    _fail_run(cn, desk, status, err, host)
     return "error"

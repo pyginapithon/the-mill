@@ -784,7 +784,14 @@ def wake_line(cn, desk: str) -> str:
         return "unknown"
     if st.get("armed"):
         on = ", wake on addressed" if st.get("wake_on") == "addressed" else ""
-        return f"webhook armed (host {st.get('host') or '?'}{on})"
+        line = f"webhook armed (host {st.get('host') or '?'}{on})"
+        try:
+            from agent_coord.server.wake import fail_note
+
+            note = fail_note(desk)
+        except Exception:
+            note = ""
+        return f"{line}; {note}" if note else line
     return "off"
 
 
