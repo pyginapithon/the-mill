@@ -769,6 +769,37 @@ def _ensure_mail_to_unread(cn) -> list[str]:
     return applied
 
 
+def _ensure_activity_roster(cn) -> list[str]:
+    """Card 841: a mail or todo activity row carries its payload's roster.
+
+    Older write paths left the activity row on another roster: a send that
+    re-tagged only the letter, and the parent touch when a tree is rooted
+    (Office, id 1). The payload is the truth. `updated` is kept. A book with
+    no drift changes nothing, so a second run is a no-op."""
+    applied: list[str] = []
+    cur = cn.cursor()
+    try:
+        n = 0
+        for typ in ("mail", "todo"):
+            if not _table_exists(cur, typ):
+                continue
+            cur.execute(
+                f"UPDATE activity a JOIN {typ} p ON a.type = '{typ}' AND a.id = p.id"
+                " SET a.roster_id = p.roster_id, a.updated = a.updated"
+                " WHERE a.roster_id <> p.roster_id"
+            )
+            n += int(cur.rowcount or 0)
+        cn.commit()
+        if n:
+            applied.append("activity.roster_from_payload")
+    except Exception:
+        cn.rollback()
+        raise
+    finally:
+        cur.close()
+    return applied
+
+
 _SCORE_POINT_SQL = (
     "CREATE TABLE IF NOT EXISTS score_point ("
     " score_id BIGINT UNSIGNED NOT NULL,"
@@ -1341,6 +1372,7 @@ def _ensure_steps(cn) -> dict[str, Any]:
             applied.extend(_ensure_join_token_hash(cn))
             applied.extend(_ensure_tree_read(cn))
             applied.extend(_ensure_mail_to_unread(cn))
+            applied.extend(_ensure_activity_roster(cn))
             # After the routine reload: retire goes through mill_score_delete.
             applied.extend(_ensure_score_one_name(cn))
             return {"version": 1, "applied": applied, "book": "activity"}
