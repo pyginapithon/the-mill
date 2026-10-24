@@ -5,7 +5,7 @@ desk with a backlog never saw the letter that had just woken it (dogfood letters
 2751 and 2754). Now unread is the newest `--limit` unread, newest first, the same
 order as `--all`.
 
-Regression row F133 (inbox-newest-first).
+Regression row F137 (inbox-newest-first).
 """
 from __future__ import annotations
 
