@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import urllib.error
 from unittest.mock import MagicMock, patch
 
@@ -116,3 +117,55 @@ def test_other_desks_are_not_marked(world) -> None:
             _wake(8430 + n, desk="away")
     assert "failing" in push.wake_line(MagicMock(), "away")
     assert "failing" not in push.wake_line(MagicMock(), "other")
+
+
+def test_an_echoed_path_and_query_are_removed_and_the_reason_is_capped(world) -> None:
+    lines, _ = world
+    path = "/automations/webhook/fixture-routine"
+    said = json.dumps({"error": {"message": f"unknown routine {path}?k={HOOK_KEY} " + "x" * 400}}).encode()
+    with patch("agent_coord.server.wake._open", _answer(400, said)):
+        _wake(8440)
+    fail = [x for x in lines if "wake=fail" in x][0]
+    why = fail.split('why="', 1)[1].rsplit('"', 1)[0]
+    assert "unknown routine" in why and len(why) <= wake.WHY_MAX
+    assert path not in fail and HOOK_KEY not in fail and "fixture-routine" not in fail
+
+
+def test_a_non_raising_non_2xx_answer_keeps_its_reason(world) -> None:
+    lines, _ = world
+
+    class _Refused(_Ok):
+        status = 409
+
+        def read(self, _n: int = 0) -> bytes:
+            return b'{"detail": "run already active"}'
+
+    with patch("agent_coord.server.wake._open", lambda req, timeout=0: _Refused()):
+        assert _wake(8450) == "error"
+    fail = [x for x in lines if "wake=fail" in x][0]
+    assert "status=409" in fail and 'why="run already active"' in fail
+
+
+def test_no_answer_counts_toward_the_run(world) -> None:
+    _, alerts = world
+
+    def down(req, timeout=0):
+        raise urllib.error.URLError("timed out")
+
+    with patch("agent_coord.server.wake._open", down):
+        for n in range(wake.FAIL_ALERT_N):
+            _wake(8460 + n)
+    assert len(alerts) == 1 and "URLError" in alerts[0]
+    line = push.wake_line(MagicMock(), "away")
+    assert f"failing: {wake.FAIL_ALERT_N} wakes in a row" in line and "last URLError" in line
+
+
+def test_one_failed_wake_reads_singular_and_since_is_clean(world) -> None:
+    lines, _ = world
+    with patch("agent_coord.server.wake._open", _answer(400, b"no")):
+        for n in range(wake.FAIL_ALERT_N):
+            _wake(8470 + n)
+    run = [x for x in lines if "failing n=" in x][0]
+    assert re.search(r"since=\d{4}-\d\d-\d\dT\d\d:\d\dZ$", run)
+    wake._FAILS["away"]["n"] = 1
+    assert "failing: 1 wake in a row" in push.wake_line(MagicMock(), "away")

@@ -84,6 +84,12 @@ def _why(raw: bytes, *, url: str = "", key: str | None = None) -> str:
         text = text.replace(secret, "<key>")
     if url:
         text = text.replace(url, "<url>")
+        # A receiver may echo only the path (with its query): drop that too.
+        from urllib.parse import urlsplit
+
+        path = urlsplit(url).path
+        if len(path) > 1:
+            text = re.sub(re.escape(path) + r"\S*", "<path>", text)
     text = re.sub(r"https?://\S+", "<url>", text)
     try:
         from agent_coord.server.redact import redact_secrets
@@ -644,7 +650,7 @@ def _fail_run(cn, desk: str, status: int | None, err: str, host: str) -> None:
     """Count one failed wake. At FAIL_ALERT_N in a row: one Admin letter for this run."""
     import datetime as _dt
 
-    now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
     with _FAILS_LOCK:
         run = _FAILS.setdefault(desk, {"n": 0, "since": now})
         run["n"] += 1
@@ -654,7 +660,7 @@ def _fail_run(cn, desk: str, status: int | None, err: str, host: str) -> None:
     if n != FAIL_ALERT_N:
         return
     answer = _answer(status, err)
-    _bc_log_safe(f"webhook desk={desk} failing n={n} since={since.replace(' ', 'T')}")
+    _bc_log_safe(f"webhook desk={desk} failing n={n} since={since}")
     try:
         from agent_coord.server.push import mill_admin_alert
 
@@ -687,7 +693,8 @@ def fail_note(desk: str) -> str:
     if not run:
         return ""
     last = _answer(run.get("status"), str(run.get("err") or ""))
-    return (f"failing: {run['n']} wakes in a row since {run['since']}, last {last}; "
+    n = int(run["n"])
+    return (f"failing: {n} wake{'' if n == 1 else 's'} in a row since {run['since']}, last {last}; "
             "letters wait for mill connect")
 
 
