@@ -1175,87 +1175,9 @@ def set_key_ttl(key_id: str, ttl: str | int | None) -> dict[str, Any]:
 
 
 
-def _purge_humans(humans: list[str]) -> list[str]:
+def revoke_key(key_id: str) -> dict[str, Any]:
 
-    """Drop badge rows for cohort humans (admin key-revoke path; no presence guard)."""
-
-    gone: list[str] = []
-
-    cn = _db()
-
-    if cn is None:
-
-        return gone
-
-    try:
-
-        cur = cn.cursor()
-
-        try:
-
-            for h in humans:
-
-                name = (h or "").strip()
-
-                if not name:
-
-                    continue
-
-                cur.execute("DELETE FROM agent_human WHERE human=%s", (name,))
-
-                if cur.rowcount:
-
-                    gone.append(name)
-
-                for sql, args in (
-
-                    ("DELETE FROM agent_human_device WHERE human=%s", (name,)),
-
-                    ("DELETE FROM agent_human_collect WHERE human=%s", (name,)),
-
-                    ("DELETE FROM agent_grant WHERE human=%s OR granted_by=%s", (name, name)),
-
-                    ("DELETE FROM agent_vouch WHERE human=%s OR by_human=%s", (name, name)),
-
-                ):
-
-                    try:
-
-                        cur.execute(sql, args)
-
-                    except Exception:
-
-                        pass
-
-            cn.commit()
-
-        except Exception:
-
-            cn.rollback()
-
-        finally:
-
-            cur.close()
-
-    finally:
-
-        try:
-
-            cn.close()
-
-        except Exception:
-
-            pass
-
-    return gone
-
-
-
-
-
-def revoke_key(key_id: str, *, revoke_cohort: bool = True) -> dict[str, Any]:
-
-    """Revoke a key. Optionally revoke humans who joined via that key."""
+    """Revoke a key and list the parties that joined via it."""
 
     kid = (key_id or "").strip().lower()
 
@@ -1329,12 +1251,6 @@ def revoke_key(key_id: str, *, revoke_cohort: bool = True) -> dict[str, Any]:
 
         raise ValueError(f"key {kid} not found or already revoked")
 
-    revoked_humans: list[str] = []
-
-    if revoke_cohort and humans:
-
-        revoked_humans = _purge_humans(humans)
-
     return {
 
         "ok": True,
@@ -1347,9 +1263,7 @@ def revoke_key(key_id: str, *, revoke_cohort: bool = True) -> dict[str, Any]:
 
         "cohort_agents": agents,
 
-        "revoked_humans": revoked_humans,
-
-        "note": "TTL expire is enforced on door check; revoke drops the key and cohort humans.",
+        "note": "TTL expire is enforced on door check; revoke drops the key.",
 
     }
 
@@ -1396,24 +1310,6 @@ def record_join(key_id: str, party: str, party_id: str) -> bool:
                 (kid, kind, who),
 
             )
-
-            if kind == "human":
-
-                try:
-
-                    cur.execute(
-
-                        "UPDATE agent_human SET invite_key_id=%s "
-
-                        "WHERE human=%s AND (invite_key_id='' OR invite_key_id IS NULL)",
-
-                        (kid, who),
-
-                    )
-
-                except Exception:
-
-                    pass
 
             cn.commit()
 

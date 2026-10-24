@@ -26,7 +26,7 @@ class _Book:
 
 
 def _open(cn, mid: int, desk: str) -> bool:
-    return any(int(r.get("mail_id") or 0) == int(mid) for r in opened.select(cn, mid, desk))
+    return int(mid) in opened.read_ids(cn, [mid], desk)
 
 
 def _unread(book, desk: str) -> set[int]:

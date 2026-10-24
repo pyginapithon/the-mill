@@ -35,9 +35,7 @@ def test_inbox_self_dst_ok_calls_select():
     c = MagicMock(spec=Book)
     c._cn = MagicMock()
     body = {"dst": "desk-a", "no_mark": True, "limit": 5}
-    with patch("agent_coord.server.records.mail.inbox", return_value=[]) as sel, patch(
-        "agent_coord.server.records.opened.select", return_value=[]
-    ):
+    with patch("agent_coord.server.records.mail.inbox", return_value=[]) as sel:
         out = rpc._h_inbox(c, body, "office", "desk-a")
     assert out == []
     sel.assert_called_once()
