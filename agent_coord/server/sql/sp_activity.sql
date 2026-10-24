@@ -2,6 +2,7 @@
 -- mill_activity_put upserts that row: first write n=1, later writes n=n+1.
 -- p_id = payload id (mail.id, todo.id, ...). No AUTO_INCREMENT on activity.
 -- p_bytes = last payload UTF-8 byte length (mail/todo body); NULL if none.
+-- p_project NULL keeps the row's roster: a tree parent touch passes NULL (card 841).
 -- Outer SP owns the transaction.
 
 DROP PROCEDURE IF EXISTS mill_activity_put;

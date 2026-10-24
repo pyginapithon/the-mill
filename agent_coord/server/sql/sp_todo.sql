@@ -106,7 +106,7 @@ BEGIN
   END IF;
   IF v_name IS NULL THEN
     SET v_name = MILL_NAME_PUT('tree', LOWER(HEX(RANDOM_BYTES(5))));
-    CALL mill_activity_put(p_parent_type, p_parent_id, v_ts, 1, 1, MILL_WEIGHT(p_parent_type), NULL);
+    CALL mill_activity_put(p_parent_type, p_parent_id, v_ts, 1, NULL, MILL_WEIGHT(p_parent_type), NULL);
     INSERT INTO tree (name_id, type, id, lft, rgt)
     VALUES (v_name, p_parent_type, p_parent_id, 1, 2);
   END IF;
@@ -119,7 +119,7 @@ BEGIN
     IF EXISTS (SELECT 1 FROM tree WHERE name_id = v_name LIMIT 1) THEN
       SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'tree parent not found';
     END IF;
-    CALL mill_activity_put(p_parent_type, p_parent_id, v_ts, 1, 1, MILL_WEIGHT(p_parent_type), NULL);
+    CALL mill_activity_put(p_parent_type, p_parent_id, v_ts, 1, NULL, MILL_WEIGHT(p_parent_type), NULL);
     INSERT INTO tree (name_id, type, id, lft, rgt)
     VALUES (v_name, p_parent_type, p_parent_id, 1, 2);
     SELECT rgt INTO v_r FROM tree

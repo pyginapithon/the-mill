@@ -334,7 +334,8 @@ def set_sender_roster(
     roster: str | None,
     kind: str = CONST_ROSTER,
 ) -> None:
-    """Tag the letter (mail.roster_id). Required; empty/unresolved refuses."""
+    """Tag the letter (mail.roster_id) and its activity row in one statement,
+    so the two never disagree (card 841). Required; empty/unresolved refuses."""
     from agent_coord.helpers.errors import CoordError
     from agent_coord.server.records import name as rec_name
 
@@ -347,8 +348,11 @@ def set_sender_roster(
     cur = cn.cursor()
     try:
         cur.execute(
-            "UPDATE mail SET roster_id = %s WHERE type = 'mail' AND id = %s",
-            (aff_id, int(mail_id)),
+            # LEFT JOIN: a letter with no activity row is still tagged.
+            "UPDATE mail m LEFT JOIN activity a ON a.type = 'mail' AND a.id = m.id"
+            " SET m.roster_id = %s, a.roster_id = %s, a.updated = a.updated"
+            " WHERE m.type = 'mail' AND m.id = %s",
+            (aff_id, aff_id, int(mail_id)),
         )
         _db_commit(cn)  # #818: not inside a request transaction
     finally:
