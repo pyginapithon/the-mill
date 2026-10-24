@@ -2430,7 +2430,10 @@ def _pass_one(c: Book, raw_need: str, step: str, project: str, owner: str | None
         # #655: an asker that does not resolve is not a pass for everyone;
         # only the volunteer may still finish the card. #19: Admin closes a card
         # whose asker is gone or idle; the refusal names the asker.
-        if who and ask != who and vol != who and not is_role_admin(c._cn, who):
+        # Card 789: with an asker that resolves, the volunteer does not accept
+        # its own work; the asker or Admin does.
+        may = who == ask or (not ask and who == vol)
+        if who and not may and not is_role_admin(c._cn, who):
             raise CoordError(
                 f"who-may: pass shipped->done is the asker ({ask}) or Admin"
                 if ask

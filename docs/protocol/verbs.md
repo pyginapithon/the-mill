@@ -340,7 +340,7 @@ CLI `<roster>` = activity **roster_id** - one project name or one role name. Lab
 | **`assign`** | staff dest onto card (not claim/hold). Trust: high any desk if unassigned; limited Admin only if unassigned. Nobody overwrites - assignee unclaims first. Chart: [admin.md](../requirements/admin.md) | `mill_todo_update` claimed |
 | **`unclaim`** | Drop claim -> `open`. An unknown need is refused. | `mill_todo_update` open |
 | **`note`** | Update card body (diary; not mail). Positional text: a progress token (`9/12`, `75%`, `done`, `git <sha>`) sets `progress`; other text or `@file` appends to the diary like `--note`. Progress and a diary line in one call: token positional plus `--note TEXT`. `--eta` sets `eta_at`; `--started` sets `started_at`. Nothing to write is an error. A note that changes nothing does not wake watchers (`changed: false`). The reply and `todo` carry `progress` only once a token set it. | `mill_todo_update` |
-| **`pass`** | claimed -> `shipped` (volunteer); `--done`: `shipped` -> `done` (asker); `--back`: `done` -> `shipped`, `shipped` -> `claimed` (asker or volunteer). A plain `pass` on a shipped or done card is refused naming the form to use; nothing changes (F67). An unknown need is refused. | `mill_todo_update` |
+| **`pass`** | claimed -> `shipped` (volunteer); `--done`: `shipped` -> `done` (the asker or Admin; the volunteer only when the card's asker does not resolve, F99, F132); `--back`: `done` -> `shipped`, `shipped` -> `claimed` (asker or volunteer). A plain `pass` on a shipped or done card is refused naming the form to use; nothing changes (F67). An unknown need is refused. | `mill_todo_update` |
 
 ### hold (one lock per resource)
 
