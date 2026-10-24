@@ -47,6 +47,7 @@ def compact_mail(letter: dict, dest_rows: list[dict], for_desk: str) -> dict:
         "from": _nm(letter.get("desk") or letter.get("sender")),
         "sender": _nm(letter.get("desk") or letter.get("sender")),
         "mail_tos": tos,
+        "to": list(tos),
         "roster_id": letter.get("sender_roster"),
         "opened": mine.get("opened"),
         "receipt": int(mine.get("receipt") or 0),

@@ -590,6 +590,12 @@ def lean_body(text: str | None, n: int = MAIL_BODY_LIST_MAX) -> tuple[str, bool]
     return body[:limit], True
 
 
+def _to_desk(t) -> str:
+    if isinstance(t, dict):
+        return str(t.get("deskId") or t.get("desk") or "").strip()
+    return str(t or "").strip()
+
+
 def public_mail(
     row: dict,
     dest_rows: list[dict] | None = None,
@@ -602,6 +608,7 @@ def public_mail(
 
     `from` is the sender desk name, the one key every letter row carries
     (short rows and push arrivals too, card 837); `sender` adds its roster.
+    `to` is the recipient desk names on every full letter and push arrival.
 
     lean=True (list/poll): truncate body to lean_n and set body_trunc when clipped.
     """
@@ -636,6 +643,8 @@ def public_mail(
         "sender": sender,
         "body": body,
         "mail_tos": mail_tos,
+        # The plain recipient list, as `from` is the plain sender (card 837).
+        "to": [d for d in (_to_desk(t) for t in mail_tos) if d],
     }
     if trunc:
         out["body_trunc"] = True
