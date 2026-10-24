@@ -72,7 +72,7 @@ Every hypo / TOY row that counts toward **Pass rate** must be **COLD**:
 
 **Scripted command smoke** (pre-written create/claim/send/pass) is **not** COLD. Keep it as optional plumbing check; **do not** count it in Pass rate / Inputs / Command / STOP gates.
 
-Batch size for a scored cold run: one cold turn per scenario the batch names, each cold. A batch that leaves out scenarios it names is a pilot - label `pilot`, not Pass rate.
+Batch size for a scored cold run: one cold turn per hypo the batch names, each cold. Smaller batches are pilots - label `pilot`, not Pass rate.
 
 ## Report gates (cold-run / TOY batch)
 
