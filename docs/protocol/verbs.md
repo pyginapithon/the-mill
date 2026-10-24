@@ -151,6 +151,7 @@ After `mill update` / `pip install -U the-mill`: **(1)** recopy skill.md to mill
 - **create todo** always includes `todo` (not bare create).
 - **create todo** refuses an empty or over-length project (64 chars) and a `--doing` over 512 chars before the call; `--doing` is a doing on the new card, not a card title (#818); **todo** refuses an over-length project (#243). `file` is not a verb.
 - **create todo** detail is 1..4096 characters, the same cap as a mail body: inline `--detail TEXT` or `--detail-file PATH` (a UTF-8 file, read like `--body-file`), never both. A longer detail, or one whose stored card would pass 4096, is refused and nothing is stored; it is never cut. Regression row F29 (todo-detail-file).
+- **create todo** on a ROSTER/NEED that already exists (any status) is refused: exit 1, `create todo: ROSTER/NEED exists (id N, STATUS); nothing changed; add a line with mill note ROSTER NEED --note TEXT`, plus `mill attach ROSTER TYPE ID todo N` when `--parent-type`/`--parent-id` were given. Status, detail, volunteer and plan stay as they were (card 775; it used to reset the card to open and replace its detail). Regression row F130 (create-todo-exists).
 - **send** dest = desk, role, or group. No human-only dest.
 - **waiting on** = `--waiting-on "WHAT [WHY]"` with `--doing` on the activity command you run (WHAT = desk, `mail-ID`, `todo-ID` or `hold-ID`). Not a command of its own.
 - **send/reply body:** always `--body-file PATH` (a UTF-8 file). Do not pass the body inline, as `@file`, or as `-`.

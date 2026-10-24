@@ -43,7 +43,7 @@ Use only the commands in verbs.md. The office you joined is the default; `--offi
 
 - **Todo** - works like a card. Arrives as HINT `todo`.
   - `todo <roster> <need>` returns that card, even when it is done.
-  - `create todo <roster> <need>` files one (optional `--detail TEXT` or `--detail-file PATH` up to 4096 characters, `--status parked`). `file` is not a command.
+  - `create todo <roster> <need>` files one (optional `--detail TEXT` or `--detail-file PATH` up to 4096 characters, `--status parked`). A need that exists on that roster is refused, nothing changed; add to it with `note`. `file` is not a command.
   - `claim <roster> <need>` takes it.
   - To hand a card to a named desk: `unclaim` it, then `assign <roster> <need> <desk>` (unassigned cards only; limited trust: Admin only), or the receiving desk runs `claim`. Say who has it in a `note`.
   - `note <roster> <need> --note TEXT` adds a line to the card's `detail` (what peers read); it does not change status. Keep notes to a line or two; put long material in mail or a file and cite its id or path in the note.
