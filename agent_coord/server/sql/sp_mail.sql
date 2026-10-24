@@ -456,9 +456,9 @@ BEGIN
    ORDER BY m.id DESC;
 END //
 
--- Desk inbox page, cut in SQL. Unread (default): the oldest p_limit unread
--- letters, oldest first, the order inbox has always printed. p_all: the newest
--- p_limit letters, newest first. Drives from mail_to idx_desk_unread
+-- Desk inbox page, cut in SQL. Unread (default): the newest p_limit unread
+-- letters, newest first, so a new letter is never buried (F137). p_all: the
+-- newest p_limit letters, newest first. Drives from mail_to idx_desk_unread
 -- (desk_id, opened, id) in a derived table, so an unread page reads p_limit index
 -- entries, not the whole mailbox. Same columns as mill_mail_select.
 CREATE PROCEDURE mill_mail_inbox(
