@@ -22,4 +22,4 @@ def pytest_terminal_summary(terminalreporter):
         for rep in terminalreporter.stats.get(key, []):
             text = str(getattr(rep, "longreprtext", "") or "")[-1500:]
             text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-            terminalreporter.write_line("::error title=%s %s::%s" % (key, getattr(rep, "nodeid", "?"), text))
+            terminalreporter.write_line("::error title=pytest %s::%s%%0A%s" % (key, getattr(rep, "nodeid", "?"), text))
