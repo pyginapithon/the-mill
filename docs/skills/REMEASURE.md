@@ -80,7 +80,7 @@ Write the batch gates on #50 (or child) + `COLD-RUN-RESULTS.md`.
 
 | Gate | Definition |
 |---|---|
-| **Pass rate** | % scenarios where every gate in this table is Pass (no partial credit) |
+| **Pass rate** | % scenarios where every per-run gate below (Inputs, Collab, Joinable trail, Command hygiene, STOP) passes; no partial credit |
 | **Inputs gate** | % gap runs that `send` Asker / waiting_on before produce |
 | **Collab** | % runs with mail **src!=dst** (Producer->Asker/Handoff); activity.desk_id is writer-only |
 | **Joinable trail** | % runs with unique Producer desk_id **or** recorded t0-t1 + cast |
