@@ -2187,6 +2187,7 @@ def _card_refusal(code: str, roster: str, need: str) -> str:
         f"mill unclaim {roster} {need}, or run mill claim {roster} {need} "
         "--take-over to take it (the card records the prior volunteer)",
         "who_may_unclaim": "who-may: unclaim is the volunteer",
+        "stale_prior": f"claim: {roster}/{need} changed volunteer while claiming; nothing changed; run it again",
         "already_shipped": f"pass: {need} is already shipped; the asker accepts it with {form} --done",
         "already_done": f"pass: {need} is already done; {form} --back steps it back to shipped",
         "not_shippable": f"pass: {need} is {arg}; only a claimed card ships",
@@ -2243,11 +2244,34 @@ def _card_hit(c: Book, project: str, need: str) -> dict[str, Any]:
     return hit
 
 
+CLAIM_TRIES = 3
+
+
 def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
+    """Claim a card. Refusals come in main's order on the row already read: status,
+    msg cap, eta, #325 claimed-by, card budget (Validator letter 2944). cmd_claim is
+    the authority: it checks status and volunteer again under the row lock, and
+    refuses a take-over whose body names a prior that no longer holds the card
+    (then the card is read again and the line rewritten)."""
+    need = slug(str(body.get("need") or ""))
+    for _ in range(CLAIM_TRIES):
+        hit = _card_hit(c, project, need)
+        try:
+            return _claim_once(c, body, project, need, hit, owner)
+        except _StalePrior:
+            continue
+    raise CoordError(f"claim: {project}/{need} changed volunteer while claiming; nothing changed; run it again")
+
+
+class _StalePrior(Exception):
+    """cmd_claim read another volunteer under the lock than the take-over line names."""
+
+
+def _claim_once(c: Book, body: dict[str, Any], project: str, need: str, hit: dict[str, Any], owner: str | None) -> Any:
     from agent_coord.server.records import todo as rec_todo
 
-    need = slug(str(body.get("need") or ""))
-    hit = _card_hit(c, project, need)
+    # Read-only pre-check, main's order (cmd_claim checks the same under the lock).
+    _card_moves(c, hit, "claim", project, need)
     # --eta and --msg are stored. A bad eta or an oversize msg refuses
     # before the claim is written (#232).
     eta_raw = str(body.get("eta") or "").strip()
@@ -2262,11 +2286,13 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
             raise CoordError("claim: %s" % e) from e
     take_over = bool(body.get("take_over"))
     who = _stored(owner or "")
-    # #325: the prior volunteer names the take-over line; cmd_claim refuses a card
-    # another desk holds unless take_over is set (the guard runs under the row lock).
-    prior = _stored(str(hit.get("assigned") or ""))
-    if prior in ("-", who) or not take_over:
+    # #325: a card another desk holds is not taken silently. --take-over takes it
+    # and the card records the prior volunteer.
+    prior = _desk_slug(c._cn, hit, "volunteer", "assigned")
+    if prior == "-" or prior == who:
         prior = ""
+    if prior and not take_over:
+        raise CoordError(_card_refusal("claimed_by:" + prior, project, need))
     fields = rec_todo.unpack(hit.get("body") or "", hit.get("id"))
     payload = fields["payload"] or {
         "slug": fields["need_id"],
@@ -2286,9 +2312,18 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
         if refusal:
             raise CoordError(refusal)
     body_s = rec_todo.stored_body(payload) if (eta_at is not None or lines) else None
-    got = _card_sp(
-        c, "cmd_claim", [_desk_arg(owner), int(hit["id"]), 1 if take_over else 0, body_s], project, need
-    )
+    try:
+        got = _card_sp(
+            c,
+            "cmd_claim",
+            [_desk_arg(owner), int(hit["id"]), 1 if take_over else 0, prior, body_s],
+            project,
+            need,
+        )
+    except CoordError as e:
+        if str(e) == _card_refusal("stale_prior", project, need):
+            raise _StalePrior() from e
+        raise
     rec = {"ok": True, "need_id": need, "id": int(hit["id"]), "status": "claimed", "volunteer": owner}
     prior = _stored(str(got.get("prior_volunteer") or ""))
     if prior:

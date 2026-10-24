@@ -104,18 +104,23 @@ BEGIN
 END //
 
 -- L1: cmd_claim(p_desk, p_card). #325 kept (owner decision, v3 pending): p_take_over
--- takes a card another desk holds; p_body is the composed body (eta, msg, the
--- took-over line) or NULL. Result: card, status, prior_volunteer.
+-- takes a card another desk holds; p_prior is the volunteer the caller's take-over
+-- line names ('' for none) and p_body the composed body (eta, msg, that line) or
+-- NULL. The volunteer is read under the row lock: a take-over whose p_prior is not
+-- the volunteer now is refused (card:stale_prior), so the line never names a
+-- stale prior. Result: card, status, prior_volunteer.
 CREATE PROCEDURE cmd_claim(
   IN p_desk      BIGINT UNSIGNED,
   IN p_card      BIGINT UNSIGNED,
   IN p_take_over TINYINT,
+  IN p_prior     VARCHAR(64),
   IN p_body      VARCHAR(4096)
 )
 BEGIN
   DECLARE v_st VARCHAR(8);
   DECLARE v_vol BIGINT UNSIGNED;
   DECLARE v_vname VARCHAR(64);
+  DECLARE v_held VARCHAR(64);
   DECLARE v_msg VARCHAR(128);
   SELECT t.status, t.assigned_id, n.name INTO v_st, v_vol, v_vname
     FROM todo t LEFT JOIN name n ON n.id = t.assigned_id
@@ -123,16 +128,20 @@ BEGIN
   IF v_st IS NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'claim: no such card';
   END IF;
+  -- Another desk's volunteer, or '' (none, or this desk).
+  SET v_held = IF(v_vol IS NOT NULL AND NOT (v_vol <=> p_desk), v_vname, '');
   SET v_msg = MILL_CARD_MOVES('claim', v_st, p_card);
-  IF v_msg IS NULL AND v_vol IS NOT NULL AND NOT (v_vol <=> p_desk) AND NOT IFNULL(p_take_over, 0) THEN
-    SET v_msg = CONCAT('card:claimed_by:', v_vname);
+  IF v_msg IS NULL AND v_held <> '' AND NOT IFNULL(p_take_over, 0) THEN
+    SET v_msg = CONCAT('card:claimed_by:', v_held);
+  END IF;
+  IF v_msg IS NULL AND IFNULL(p_take_over, 0) AND NOT (v_held <=> IFNULL(p_prior, '')) THEN
+    SET v_msg = 'card:stale_prior';
   END IF;
   IF v_msg IS NOT NULL THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = v_msg;
   END IF;
   CALL mill_card_write(p_card, p_desk, 'claimed', '=', p_body);
-  SELECT p_card AS card, 'claimed' AS status,
-         IF(v_vol IS NOT NULL AND NOT (v_vol <=> p_desk), v_vname, NULL) AS prior_volunteer;
+  SELECT p_card AS card, 'claimed' AS status, NULLIF(v_held, '') AS prior_volunteer;
 END //
 
 -- L1: cmd_unclaim(p_desk, p_card). The volunteer releases; the card is open again.

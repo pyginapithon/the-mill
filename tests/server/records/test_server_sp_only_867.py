@@ -261,34 +261,46 @@ def test_mill_hello_is_ok_on_the_office_stamp_and_warns_or_refuses_otherwise(cn)
 
 @pytest.mark.xfail(
     strict=True,
-    reason="F154 is the 0.8.0 end state: 0.7.18 still reads with raw SELECTs on today's tables",
+    raises=AssertionError,
+    reason="F154 is the 0.8.0 end state: in 0.7.18 the app user still runs raw SQL on today's tables",
 )
 def test_app_user_cannot_run_raw_sql(cn):
+    """The app DB user runs the SPs and nothing else. 0.8.0 creates it with
+    migrate.grant_app_user; until then the app user is the configured one
+    (conn_kwargs), which may run raw SQL, so the assert below is the failure."""
     import mysql.connector
 
+    from agent_coord.install import migrate
     from agent_coord.server.records.db import conn_kwargs
 
     cur = cn.cursor()
     cur.execute("SELECT DATABASE()")
     db = cur.fetchone()[0]
     cur.close()
-    from agent_coord.install import migrate
-
-    user, pw = "mill_app_t867", "t867-only-for-this-test"
-    migrate.grant_app_user(cn, db, user, pw, host="%")
     kw = conn_kwargs()
-    kw.update(user=user, password=pw, database=db)
+    kw.update(database=db)
+    grant = getattr(migrate, "grant_app_user", None)
+    if grant is not None:
+        user, pw = "mill_app_t867", "t867-only-for-this-test"
+        grant(cn, db, user, pw, host="%")
+        kw.update(user=user, password=pw)
     app = mysql.connector.connect(**kw)
+    ran = []
     try:
         c = app.cursor()
-        for sql in ("SELECT 1 FROM todo LIMIT 1", "DELETE FROM push_queue", "CREATE TABLE t867 (i INT)"):
-            with pytest.raises(mysql.connector.Error) as e:
+        for sql in ("SELECT 1 FROM todo LIMIT 1", "DELETE FROM push_queue WHERE id = 0", "CREATE TEMPORARY TABLE t867 (i INT)"):
+            try:
                 c.execute(sql)
-                c.fetchall()
-            assert e.value.errno in (1142, 1044, 1146), sql
+                if c.with_rows:
+                    c.fetchall()
+                ran.append(sql)
+            except mysql.connector.Error as e:
+                assert e.errno in (1142, 1044, 1146), (sql, e.errno)
         c.close()
+        app.rollback()
     finally:
         app.close()
+    assert not ran, "raw SQL ran as the app user: %s" % ran
 
 
 # 0.7.18: done_when and evidence are additive columns on today's todo table.

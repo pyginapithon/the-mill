@@ -26,9 +26,9 @@ def _card(monkeypatch, volunteer: str, detail: str = "seed"):
 
     def fake_card_sp(c, proc, args, roster, need):
         # Stands in for cmd_claim (#867: the guard runs in the SP; the SQL suite
-        # test_claim_takeover_sql_325 checks the real one). args: MILL_DESK_ID(desk), card, take_over, body.
+        # test_claim_takeover_sql_325 checks the real one). args: MILL_DESK_ID(desk), card, take_over, prior, body.
         assert proc == "cmd_claim"
-        desk_arg, tid, take_over, body = args
+        desk_arg, tid, take_over, _prior, body = args
         desk = desk_arg.params[0]
         prior = state["row"]["assigned"]
         if prior and prior != desk and not take_over:
