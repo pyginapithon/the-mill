@@ -311,7 +311,7 @@ Grouped by **table / activity** (glance OOTB). Human speech CLI - not CRUD famil
 |---|---|---|
 | **`join`** | HTTP only: tokenhash + cert; point at one Wall via config. Not a `/ws` RPC verb | `mill_join_upsert` |
 | **`connect`** | Establish desk id + sit Hub `/ws`. Leave running. Actor for all later verbs | Hub |
-| **`reset`** | Admin: clear `` `join`.token_hash `` (and stamp `time_disconnect`) so mill connect can clock in again; works on a retired desk too (F65). `--dead` only counts seats with no token; it deletes nothing (#96) | `mill_join_reset` |
+| **`reset`** | Admin: clear `` `join`.token_hash `` (and stamp `time_disconnect`) so mill connect can clock in again; works on a retired desk too (F65). `--dead` only counts seats with no token; it deletes nothing (#96). It also frees every hold the desk owns; `released` says how many (card 842) | `mill_join_reset` |
 
 ### mail
 
@@ -384,7 +384,7 @@ Trust default **high**; Admin may set **limited** (or back to high). Show: `mill
 | **`create roster`** | `mill create roster N [--yes]` creates a roster name (typed once; prompts unless `--yes`). high: any seated desk; limited: Admin | `mill_name_host` |
 | **`reclaim`** | Admin: undelete a retired name (name twice + `--yes`). Acts on the TYPE named (F60). A retired desk comes back with no seat: `invite --seat` it (F65). | `mill_name_reclaim` |
 | **`rename`** | Admin (or desk self-rename by hash). Acts on the TYPE named (F60). | `mill_name_rename` |
-| **`retire`** | Admin: flag `name.deleted`. A desk retired this way also loses its seat, so that seat stops connecting (F65). Acts on the TYPE named: `retire label d1` leaves desk `d1` alone, as a desk-focus label needs; a request with no type for a name two types share is refused with both forms (F60). | `mill_name_retire` |
+| **`retire`** | Admin: flag `name.deleted`. A desk retired this way also loses its seat, so that seat stops connecting (F65), and its holds are freed (`released`, card 842). Acts on the TYPE named: `retire label d1` leaves desk `d1` alone, as a desk-focus label needs; a request with no type for a name two types share is refused with both forms (F60). | `mill_name_retire` |
 | **`member-add`** | self always; other desk trust-gated (high any; limited Admin). `Admin` grant = host loopback only, in any spelling of the name (#675) | `mill_member_put`; Admin: `mill_member_admin_put` |
 | **`member-remove`** | self always; other desk trust-gated. Never Office / never strip last Admin path by accident. `Admin` revoke = host loopback and an Admin caller, in any spelling (#675) | `mill_member_delete`; Admin: `mill_member_admin_delete` |
 | **`trust`** | show office trust (any seated desk). `mill trust high` / `mill trust limited` = Admin set. Pack/wall must ship verb first | - |
