@@ -24,8 +24,8 @@ import sys
 from pathlib import Path
 
 _HERE = Path(__file__).resolve()
-# agent_coord/web/wall_ui/lib/check.py -> parents[3] is the repo (or site-packages) root
-ROOT = _HERE.parents[3]
+# agent_coord/web/wall_ui/lib/check.py -> parents[4] holds agent_coord/ (the repo or site-packages)
+ROOT = _HERE.parents[4]
 WALL_UI = ROOT / "agent_coord" / "web" / "wall_ui"
 LIB = WALL_UI / "lib"
 DEFAULT = WALL_UI / "default"
