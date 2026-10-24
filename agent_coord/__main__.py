@@ -1409,7 +1409,7 @@ def _build_parser() -> MillArgumentParser:
     jn.add_argument("--websocket", action="store_true", help="switch the desk back to websocket only (forget the webhook)")
     # #628: which items wake this desk. addressed: room-only letters wait for its next connect.
     jn.add_argument("--wake-on", default="", choices=("addressed", "all"),
-                    help="with the webhook options: wake for every item (all, the default) or only items addressed to this desk")
+                    help="with the webhook options: wake only for items addressed to this desk (addressed, the default) or for room copies too (all)")
 
     sub.add_parser(
         "local",

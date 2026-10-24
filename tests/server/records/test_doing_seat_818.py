@@ -214,7 +214,9 @@ def test_b_seat_holds_state_and_behaves(cn, migrated):
         assert len(seat) == 1
         for k in ("token_hash", "delivery_mode", "endpoint_url", "endpoint_key", "wake_on",
                   "lan_ip", "time_connect", "time_disconnect", "created", "updated"):
-            assert seat[0][k] == old[k], (desk, k)
+            # Card 836 (F127): seats on the old default move to addressed once.
+            want = "addressed" if k == "wake_on" and old[k] == "all" else old[k]
+            assert seat[0][k] == want, (desk, k)
     # Same behavior as before through the procedures.
     assert rec_join.token_matches(cn, "fx818-a", token_hash("tok-a"))
     assert rec_join.desk_for_token_hash(cn, token_hash("tok-c")) == "fx818-c"
