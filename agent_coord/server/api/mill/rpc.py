@@ -2222,14 +2222,16 @@ def _h_open(c: Book, body: dict[str, Any], project: str, owner: str | None) -> A
     parent_t = str(body.get("parent_type") or body.get("type_a") or "")
     parent_id = int(body.get("parent_id") or body.get("id_a") or 0)
     if hit:
-        rec_todo.update(c._cn, int(hit["id"]), _stored(owner or ""), status=st, body=body_s)
+        # Card 775: create never rewrites a card. It used to reset status and detail.
         tid = int(hit["id"])
-        # An existing card is already committed. Attach stays the old path.
-        if tid and parent_t and parent_id:
-            from agent_coord.server.records import tree as rec_tree
-
-            rec_tree.add(c._cn, parent_t, parent_id, "todo", tid)
-    elif parent_t and parent_id:
+        status = rec_todo.normalize_status(str(hit.get("status") or ""), default="open")
+        forms = f"add a line with mill note {project} {need} --note TEXT"
+        if parent_t and parent_id:
+            forms += f"; put it under the parent with mill attach {project} {parent_t} {parent_id} todo {tid}"
+        raise CoordError(
+            f"create todo: {project}/{need} exists (id {tid}, {status}); nothing changed; {forms}"
+        )
+    if parent_t and parent_id:
         # New card and its tree place commit together. A 1062 retries inside (#146).
         rows = rec_todo.insert_attached(
             c._cn, _stored(project), _stored(owner or ""), st, body_s, parent_t, parent_id
