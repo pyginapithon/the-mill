@@ -1941,6 +1941,32 @@ def _ids_in_tree_order(nodes: list[dict], ids: list[int], extra: int = 0) -> lis
     return [i for i in order if i in have]
 
 
+def _mark_shown(c: Book, ids: list[int], desk: str) -> list[int]:
+    """Stamp opened on this desk's unread rows among ids; return those ids, in order."""
+    from agent_coord.server.records import opened as rec_opened
+    from agent_coord.server.records.name import get as name_get
+
+    want = [int(i) for i in ids if int(i or 0)]
+    did = name_get(c._cn, desk, CONST_DESK) if desk and want else None
+    if not did:
+        return []
+    marks = ",".join(["%s"] * len(want))
+    cur = c._cn.cursor()
+    try:
+        cur.execute(
+            "SELECT id FROM mail_to WHERE type = 'mail' AND desk_id = %s AND opened IS NULL"
+            " AND id IN (" + marks + ")",
+            (int(did), *want),
+        )
+        unread = {int(r[0]) for r in cur.fetchall()}
+    finally:
+        cur.close()
+    done = [i for i in want if i in unread]
+    for mid in done:
+        rec_opened.insert(c._cn, mid, desk)
+    return done
+
+
 @_ends_read
 def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     """Read a room by mail id or TREE/room name. Lean MAIL rows only (no opened).
@@ -2039,7 +2065,11 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
     # latest_id = max this desk can see. Stable under --after and every scope.
     out["latest_id"] = max(visible) if visible else 0
     out["scope"] = scope
-    # A read does not mark handled. mill mark does (#195).
+    # Card 843: a read that prints letters whole marks them handled for this desk,
+    # the same stamp as mill mark (unread = mail_to.opened NULL, receipts too).
+    # Short-row --room previews and a room summary print previews; they do not.
+    whole = scope in ("branch", "full", "subtree") or (scope == "room" and after_id > 0)
+    out["marked"] = _mark_shown(c, pick, self_bare) if whole else []
     total = len(visible)
     out["room_letters"] = total
     seen = set(visible)

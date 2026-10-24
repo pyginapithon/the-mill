@@ -626,7 +626,8 @@ def _build_parser() -> MillArgumentParser:
             "(implies --room). A room name with no flag = short summary "
             "(root, latest few, counts). Envelope latest_id, room_letters, hint. "
             "Not a participant? mill reply <root id> --body-file PATH joins. "
-            "A read does not mark; reply marks the parent, mill mark marks the rest."
+            "A read that prints letters whole marks them (listed in marked); --room previews "
+            "and a summary do not. reply marks the parent, mill mark marks the rest."
         ),
     )
     mt.add_argument(
