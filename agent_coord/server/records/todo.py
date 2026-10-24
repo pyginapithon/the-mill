@@ -410,13 +410,6 @@ def progress_git_sha(progress: str) -> str:
     return (m.group(1).lower() if m else "")
 
 
-def next_status(status: str, progress: str, *, need_id: str = "") -> str:
-    st = (status or "").strip().lower()
-    if st == "claimed" and progress_is_done(progress):
-        return "shipped"
-    return st
-
-
 def is_progress_token(text: str) -> bool:
     """Short progress text (9/12, 75%, done, git <sha>), not a diary line."""
     s = (text or "").strip()

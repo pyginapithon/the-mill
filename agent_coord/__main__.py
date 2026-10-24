@@ -1265,7 +1265,7 @@ def _build_parser() -> MillArgumentParser:
     inv.add_argument("--mint", action="store_true", help="mint a pending invite (prints URL once; host --enable before mill join)")
     inv.add_argument("--enable", default="", metavar="KEY", help="enable a pending invite key_id so mill join can finish")
     inv.add_argument("--list", action="store_true", dest="invite_list", help="list invite keys (pending/active/expired/revoked)")
-    inv.add_argument("--revoke", default="", metavar="KEY", help="revoke key_id; also revokes cohort humans")
+    inv.add_argument("--revoke", default="", metavar="KEY", help="revoke key_id")
     inv.add_argument("--ttl", default="", metavar="TTL", help="with --mint: duration (7d/24h); or KEY then DURATION via --for")
     inv.add_argument("--for", dest="ttl_for", default="", metavar="KEY", help="key_id when setting TTL (invite --ttl 7d --for KEY)")
     inv.add_argument("--seat", default="", metavar="DESK", help="mint one-seat agent invite URL for DESK (ready; trust-gated)")

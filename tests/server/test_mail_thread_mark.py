@@ -36,10 +36,6 @@ def _patch(monkeypatch, inserted: list[int]) -> None:
         "agent_coord.server.records.mail.public_mail_chain",
         lambda cn, mid, ids=None, room=None: {"chain": [{"id": int(mid), "body": "hi"}]},
     )
-    monkeypatch.setattr(
-        "agent_coord.server.records.opened.select",
-        lambda cn, mid, desk: [],
-    )
 
     def _insert(cn, mid, desk):
         inserted.append(int(mid))

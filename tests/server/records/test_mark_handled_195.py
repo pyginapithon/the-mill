@@ -57,8 +57,7 @@ def cn():
 
 
 def _stamped(cn, mid: int, desk: str) -> bool:
-    rows = opened.select(cn, mid, desk)
-    return any(int(r.get("mail_id") or 0) == int(mid) for r in rows)
+    return int(mid) in opened.read_ids(cn, [mid], desk)
 
 
 def test_fetch_does_not_mark_and_reply_marks_the_parent_only(cn) -> None:
