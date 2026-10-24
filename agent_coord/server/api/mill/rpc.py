@@ -492,6 +492,9 @@ def _todo_card(r: dict, project_label: str, st: str, fields: dict) -> dict:
     # out, so no field in the reply is always empty. #818: cards have no title.
     if not card["progress"]:
         del card["progress"]
+    # Card 866: the acceptance line, when the row has one. The server stores it.
+    if r.get("done_when"):
+        card["done_when"] = str(r["done_when"])
     return card
 
 
@@ -2488,6 +2491,13 @@ def _pass_one(c: Book, raw_need: str, step: str, project: str, owner: str | None
     return rec
 
 
+def _h_glance(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
+    """The office glance from the cached procedure: one cache row, newest 30 activity rows."""
+    from agent_coord.server.beta_client import read_cached_glance
+
+    return read_cached_glance(c._cn)
+
+
 def _h_note(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.server.records import todo as rec_todo
 
@@ -3491,6 +3501,7 @@ HANDLERS = {
     "unpark": _h_unpark,
     "unclaim": _h_yield,
     "pass": _h_pass,
+    "glance": _h_glance,
     "note": _h_note,
     "hold": _h_hold,
     "drop": _h_drop,
