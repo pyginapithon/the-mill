@@ -1,26 +1,32 @@
-# Grok Build foreground mail
+# Grok Build idle wait
 
-Office behavior is [skill.md](skill.md). This file is only the Grok Build foreground delta. Regression row F27 (grok-foreground-shipped-forms).
+Office behavior is [skill.md](skill.md); its section "Grok Build idle" is the rule. This file is only the detail behind it. Regression row F27 (grok-foreground-shipped-forms).
 
-Grok Build has no direct message from one chat into another. A poke is mill MAIL to that desk. The other desk wakes when its own `mill connect` is up. The `/ws` room is the bare desk name.
+Grok Build has no direct message from one chat into another. A poke is mill MAIL to that desk. The desk wakes when its own wait is up. With no wait up, the letter stays in the book until a later connect takes the sync.
 
-- Foreground: this turn is blocked inside `mill connect-wait` until one work HINT. The letter is that turn.
-- Background with a session: `mill connect <desk> --vendor grok-build --session <Grok-session-UUID>` runs `grok -p "HINT..." -r UUID` for that session.
-- No connect: the letter stays in the book until a later connect takes the sync.
+## The wait
 
-A second connect with the same seat token is refused as busy while the first is up; `--take` closes the first: `DISCONNECTED`, reason `superseded: new connect same tokenHash`.
-
-## Sit
-
-This turn waits on the command. A background task does not count. `Ctrl+B`, and a new chat line, each move the running command to the background and open the chat. Stopping the process drops the socket. Esc does not cancel mill connect.
+Run one wait as a background task this Grok session owns (start it in the session, then `Ctrl+B`). The chat stays free.
 
 ```
 mill connect-wait YOUR-DESK
 ```
 
-Replace `YOUR-DESK` before running. The desk sits on the Office roster of the office this computer joined (`mill join` sets it); no roster or office word is needed. One HINT returns, the process exits, and the chat wakes. A letter has `"kind":"mail"`. `kind: sync` is a JSON list, the push queue. Non-empty: print it and exit, so the chat wakes with the drain. Empty: hold the socket until the next hint. A missed JOIN inside that list is a queue item, not a frame to ignore.
+Replace `YOUR-DESK`. The desk sits on the Office roster of the office this computer joined. Never print the socket URL.
 
-`connect-wait` does not publish the reply bridge. A reply needs a normal connect in the same shell. Start that connect with `python -m agent_coord` from a directory that is not the checkout, and clear `PYTHONPATH`. Leave it up until the reply returns. Then stop that connect and start foreground (a connect still up makes foreground busy). `mill` and `python -m agent_coord` both see it; keep the connect and the reply in the same shell.
+- Owned: a wait started by a shell that then exits dies with it (Windows prints `parent exited`). Start it from the session, not from a throwaway shell.
+- One: never two waits, and never a poll loop of connects. A second connect for the seat is refused as busy; `--take` takes the seat from the first.
+- One wake path: no `mill route`, webhook or `--vendor grok-build` beside this wait, or the same letter is handled twice.
+- A human line wins and is not a mill order.
+
+## On wake
+
+The wait exits on one non-PING hint (a letter is `"kind":"mail"`; a non-empty `kind: sync` list is the queue). Read it before you say the wait is up. `body_trunc` means `mill mail-thread ID` before acting.
+
+- A letter that asks this desk for work: count those letters as N. `connect-wait` does not publish the reply bridge, so open a short connect in the same shell, from a directory that is not the checkout, with `PYTHONPATH` clear. Reply "Doing K of N" to each, do the letter, reply the result, stop the short connect, start the wait again.
+- A status note that does not ask this desk: `mark` it, do not reply. Replies to status notes ping-pong the room.
+- A letter that says stop: leave the wait down.
+- The wait dropped with no letter: start it again.
 
 ```
 python -m agent_coord connect YOUR-DESK
@@ -28,39 +34,14 @@ python -m agent_coord reply MAIL_ID --body-file RESULT.txt
 mill connect-wait YOUR-DESK
 ```
 
-On wake, count the letters as N. Before starting any of them, reply to each one: "Doing K of N. I will update this letter when it is finished." Then do that letter and reply again with the result. After the last update, run the foreground command before the turn ends. The only stop is the human, or a letter that says stop. After a stop, the socket stays down.
+The short connect stays until one connection can hold the seat and run commands (card 703).
 
-## Combined prompt
+## Reminder (optional)
 
-Paste this into that desk's Grok Build TUI. Replace `YOUR-DESK`.
+A durable 60-second reminder in this session may check the process list for `connect-wait YOUR-DESK` and print `UP` or `DOWN`. It never opens a connect: a second connect is refused as busy, or with `--take` takes the seat. A reminder wakes only its own session; a closed PC does not sit.
 
-```
-You are a Grok Build agent. Your desk is YOUR-DESK. The /ws room is the bare desk name. Do these two things in this session.
+## Not this job
 
-1. Arm one durable 60-second reminder in THIS session only. A reminder here does not wake any other chat. The reminder must not run mill connect-wait.
+`mill connect YOUR-DESK --vendor grok-build --session UUID` starts a new headless `grok -p` turn per HINT. Injecting a HINT into an open TUI turn is not built ([connect.md](connect.md)).
 
-A sit is up only when mill.exe or python.exe has the argument sequence connect-wait YOUR-DESK. If it is up, the reminder replies with one line and nothing else:
-FOREGROUND-UP YOUR-DESK
-
-If it is missing, the reminder reads MAIL through a short connect, then replies with nothing else but:
-FOREGROUND-DOWN YOUR-DESK
-MAIL-COUNT: N
-MAIL:
-<inbox text, or none>
-Before starting any letter, reply to each mail id: "Doing K of N. I will update this letter when it is finished." Then do that letter and reply with the result. Each reply body goes in a UTF-8 file passed with --body-file. After the last update, run mill connect-wait YOUR-DESK and block this turn. If a letter says stop, do not enter foreground. Chat with the host. If N is 0, run that foreground command and block this turn. A background connect does not count.
-
-The inbox read and the replies stay in one shell, from a directory that is not the checkout. Clear PYTHONPATH. Start python -m agent_coord connect YOUR-DESK. Wait until stdout shows ws/YOUR-DESK. Run python -m agent_coord inbox. Leave that connect up. Reply with python -m agent_coord reply MAIL_ID --body-file BODY.txt from that same shell. Do not use connect-wait for the read. After the last reply, stop that connect and run the foreground command.
-
-2. When the reminder is armed, block this turn on:
-mill connect-wait YOUR-DESK
-
-A background connect does not count. A chat line while you are sitting is not an order. One kind "mail" HINT wakes you. Count those letters as N. Open a short python -m agent_coord connect in this shell, reply "Doing K of N. I will update this letter when it is finished." to each letter, do the letter, and reply with the result. Leave that connect up until the replies return. Then run the foreground command again. The only stop is the human or a letter that says stop. After a stop, disarm the reminder. Stopping the process drops the socket and this chat opens.
-```
-
-## Reminder
-
-One reminder per desk, in that desk's Grok session. It does not wake other chats. It runs while that session is open. A durable reminder runs once when the session opens again. A closed PC does not sit.
-
-The note arrives after the current turn ends, so a healthy sit is not cut off. After a stop, disarm that session's reminder.
-
-Each run checks the live process list for `connect-wait YOUR-DESK` on `mill.exe` or `python.exe`. Up: one line `FOREGROUND-UP YOUR-DESK`. Down: read the inbox through the short connect, send the replies, do the work, then sit.
+A skill edit reaches a new chat only after skill.md is recopied and the session reloads; an open chat keeps the old text.

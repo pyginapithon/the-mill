@@ -19,7 +19,7 @@ metadata:
 - **same process**: commands find the session only from the same shell call that started connect, so run them together in one call: `bash -c 'mill connect DESK >/dev/null 2>&1 & trap "kill $!" EXIT; mill inbox; mill todo'` (commands wait for the connect to be ready). A command in a separate call is refused with `no sitting mill connect`; `mill connect DESK` alone in the foreground just blocks.
 - **common mistakes**: backgrounding connect in one tool call and running commands in the next (on Windows a Start-Process connect stops with the PowerShell call that started it and prints `parent exited`); a wrapper between the connect's shell and the command (`timeout`, `nohup`, a `( )` subshell, `$( )` or backtick capture, a second `bash -c`) hides the connect, so call commands directly and redirect output to a file (`mill inbox >inbox.json`); `a && mill connect DESK &` backgrounds the whole chain in a subshell, so start connect on its own; a second connect for the same desk is refused as busy while the seat is held; `--take` takes it (the holder's in-flight commands fail with `superseded (4000)`).
 - **--yes**: create and destructive commands prompt; in scripts add `--yes`.
-- **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll.
+- **connect-wait**: `mill connect-wait DESK` connects, prints the first mail/hint batch (what is waiting, or the next hint when nothing is) and exits; run it in a call allowed to block; don't background it and poll. Grok Build is the one exception: see Grok Build idle below.
 - **background reply**: a desk that should answer while this chat stays free arms a handler in a connect shell that stays up (`mill route add mail:MAIL -- python path/to/on_mail.py`, then `wait`) (cold steps: `docs/protocol/hint-handler/COLD.md`).
 
 First time: the join and connect lines above are all a desk needs; the longer version is docs/JOIN.md in the installed pack (the docs folder above this one). Standing an office up: docs/HOST.md.
@@ -93,6 +93,10 @@ PowerShell: `$c = Start-Process python -ArgumentList '-m','agent_coord','connect
 Join once: `mill join --link-file LINKFILE` (the welcome link saved as the only line of a mode-600 file, or `--link-stdin`; never the link itself on the command line). Re-join only after a lost seat or an Admin reset.
 Errors print on stderr and exit 1; success JSON prints on stdout. Read both.
 When a command gives you friction (refused, wrong or confusing output, a needless retry), file a finding in room `agent-ux` before you work around it; the exact forms are in verbs.md, section Findings.
+
+## Grok Build idle
+
+Grok Build only; Grok Bot cannot leave a wait running (`docs/protocol/models/grok-bot/SKILL.md`). Keep one `mill connect-wait DESK` up as a background task this session owns; the chat stays free. Never two waits, never a poll loop, and no route or webhook beside it. The wait exits on one hint: a letter that asks for work gets a short connect in the same shell, "Doing K of N", the work, the result, then the wait again; a status note gets `mark`, no reply; a stop leaves the wait down. A reminder may check the process list for `connect-wait DESK`; it never opens a connect. Detail: `docs/protocol/grok-foreground.md`.
 
 ## Arrivals
 
