@@ -2072,6 +2072,32 @@ def _h_mail_thread(c: Book, body: dict[str, Any], project: str, owner: str | Non
     return out
 
 
+# Card 778: the moves states.md draws. claim and assign take an open card (or a
+# claimed one, for --take-over and an eta); unclaim releases one. Parked goes
+# through unpark (it needs a plan parent); shipped and done move by pass.
+_MOVES_FROM = {"claim": ("open", "claimed"), "assign": ("open", "claimed"), "unclaim": ("open", "claimed")}
+
+
+def _card_moves(c: Book, hit: dict[str, Any], command: str, project: str, need: str) -> None:
+    """Refuse a claim, assign or unclaim the card's status does not allow; nothing changes."""
+    from agent_coord.server.records import todo as rec_todo
+    from agent_coord.server.records import tree as rec_tree
+
+    st = rec_todo.normalize_status(str(hit.get("status") or ""), default="open")
+    if st in _MOVES_FROM[command]:
+        return
+    card = f"{command}: {project}/{need} is {st}; "
+    form = f"mill pass {project} {need}"
+    if st == "parked":
+        unpark = f"mill unpark {project} {need}"
+        if not rec_tree.has_parent(c._cn, "todo", int(hit["id"])):
+            unpark += " --parent-type T --parent-id N"
+        raise CoordError(card + unpark + " first")
+    if st == "shipped":
+        raise CoordError(card + f"the asker accepts it with {form} --done, or steps it back with {form} --back")
+    raise CoordError(card + f"{form} --back steps it back to shipped; for new work file a new card")
+
+
 def _h_assign(c: Book, body: dict[str, Any], project: str, owner: str | None) -> Any:
     from agent_coord.config import mill_trust
     from agent_coord.server.records import todo as rec_todo
@@ -2082,6 +2108,7 @@ def _h_assign(c: Book, body: dict[str, Any], project: str, owner: str | None) ->
     hit = rec_todo.find(c._cn, project, need)
     if hit is None:
         raise CoordError(f"no such need: {project}/{need}")
+    _card_moves(c, hit, "assign", project, need)
     current = _desk_slug(c._cn, hit, "volunteer", "assigned")
     if current and current != "-":
         raise CoordError("assign: assignee must relinquish first")
@@ -2102,6 +2129,7 @@ def _h_claim(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     hit = rec_todo.find(c._cn, project, need)
     if hit is None:
         raise CoordError(f"no such need: {project}/{need}")
+    _card_moves(c, hit, "claim", project, need)
     # --eta and --msg are stored. A bad eta or an oversize msg refuses
     # before the claim is written (#232).
     eta_raw = str(body.get("eta") or "").strip()
@@ -2319,6 +2347,7 @@ def _h_yield(c: Book, body: dict[str, Any], project: str, owner: str | None) -> 
     hit = rec_todo.find(c._cn, project, need)
     if not hit:
         raise CoordError(f"no such need: {project}/{need}")
+    _card_moves(c, hit, "unclaim", project, need)
     who = _stored(owner or "")
     vol = _desk_slug(c._cn, hit, "volunteer", "assigned")
     if vol and who and vol != who:
