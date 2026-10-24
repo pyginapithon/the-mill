@@ -598,7 +598,10 @@ def public_mail(
     lean: bool = False,
     lean_n: int = MAIL_BODY_LIST_MAX,
 ) -> dict:
-    """Public MAIL: id, created, sender, body, mail_tos (+ crumbs).
+    """Public MAIL: id, created, from, sender, body, mail_tos (+ crumbs).
+
+    `from` is the sender desk name, the one key every letter row carries
+    (short rows and push arrivals too, card 837); `sender` adds its roster.
 
     lean=True (list/poll): truncate body to lean_n and set body_trunc when clipped.
     """
@@ -629,6 +632,7 @@ def public_mail(
     out: dict = {
         "id": mid,
         "created": created,
+        "from": sender["deskId"],
         "sender": sender,
         "body": body,
         "mail_tos": mail_tos,
