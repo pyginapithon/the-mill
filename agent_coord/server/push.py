@@ -741,7 +741,7 @@ def ack_sync(cn, desk: str, ids) -> int:
     from agent_coord.server.records import push as rec_push
 
     try:
-        return rec_push.ack(cn, ids)
+        return rec_push.ack(cn, desk, ids)
     except Exception as e:
         _bc_log(f"push ack err desk={desk} err={e}")
         return 0
@@ -770,7 +770,32 @@ def connect_sync_frame(cn, desk: str, *, hold: bool = False) -> dict:
         gate_clear(desk)
     except Exception:
         pass
-    return {"kind": "sync", "sync": sync, "holds": holds, "wake": wake_line(cn, desk)}
+    return {"kind": "sync", "sync": sync, "holds": holds, "wake": wake_line(cn, desk), "hello": hello_line(cn)}
+
+
+def sp_stamp() -> str:
+    """The SP stamp this pack ships: sp-<sha256[:12]> of its SP file (beta_sp.sql)."""
+    import hashlib
+    from pathlib import Path
+
+    f = Path(__file__).resolve().parent / "sql" / "beta_sp.sql"
+    try:
+        return "sp-" + hashlib.sha256(f.read_bytes()).hexdigest()[:12]
+    except OSError:
+        return ""
+
+
+def hello_line(cn) -> str:
+    """#867: the pack's SP stamp against the office's (mill_hello, warn mode).
+    'ok' on a match, else the SP's warn line. A failed check says so; connect goes on."""
+    from agent_coord.server.records.db import call
+
+    try:
+        rows = call(cn, "mill_hello", [sp_stamp() or None, "warn"])
+    except Exception as e:
+        _bc_log(f"mill_hello err={type(e).__name__}")
+        return "check failed"
+    return str((rows[0].get("status") if rows else "") or "").strip() or "check failed"
 
 
 def wake_line(cn, desk: str) -> str:

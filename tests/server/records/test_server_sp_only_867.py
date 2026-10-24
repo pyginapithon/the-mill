@@ -9,8 +9,6 @@ are SP calls too. pass takes optional evidence; a card carries done_when.
 """
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from agent_coord.helpers.errors import CoordError
@@ -20,7 +18,6 @@ from tests.server.records.conftest import seed_names
 pytestmark = pytest.mark.sql
 
 ASKER, VOL, OTHER = "a867", "v867", "o867"
-_RAW = re.compile(r"\b(FROM|INTO|UPDATE|JOIN|TABLE)\b", re.I)
 
 
 class _Book:
@@ -29,7 +26,10 @@ class _Book:
 
 
 class _SpOnlyCursor:
-    """A cursor that refuses any statement that is not a CALL or a bare function SELECT."""
+    """A cursor that refuses a raw write (anything but CALL and SELECT) and records CALLs.
+
+    Raw SELECTs outside this card's files (name, tree, label reads) still run; the
+    EXECUTE-only test below is the end state that refuses them too."""
 
     def __init__(self, cur, seen):
         self._cur, self._seen = cur, seen
@@ -39,8 +39,8 @@ class _SpOnlyCursor:
         head = text.split(None, 1)[0].upper() if text else ""
         if head == "CALL":
             self._seen.append(text.split("(", 1)[0].split()[-1].strip("`"))
-        elif head != "SELECT" or _RAW.search(text):
-            raise AssertionError("raw SQL from the server: " + text[:120])
+        elif head != "SELECT":
+            raise AssertionError("raw SQL write from the server: " + text[:120])
         return self._cur.execute(sql, *a, **k)
 
     def callproc(self, name, *a, **k):
@@ -72,6 +72,12 @@ def _card(cn, need, *, done_when=None):
         body["done_when"] = done_when
     rec = rpc._h_open(book, body, "unit", ASKER)
     return book, rec
+
+
+def _read(cn, need):
+    """The card as `mill todo unit NEED` shows it."""
+    got = rpc._h_todo(_Book(cn), {"need": need}, "unit", OTHER)
+    return got[0] if isinstance(got, list) else got
 
 
 # F150: the guards run in the SP, under the row lock, same texts.
@@ -151,18 +157,20 @@ def test_pass_evidence_over_2000_chars_is_refused_and_changes_nothing(cn):
     rpc._h_claim(book, {"need": "e867-b"}, "unit", VOL)
     with pytest.raises(CoordError, match="evidence"):
         rpc._h_pass(book, {"need": "e867-b", "evidence": "x" * 2001}, "unit", VOL)
-    assert rpc._h_todo(_Book(cn), {"need": "e867-b"}, "unit", VOL)["status"] == "claimed"
+    from agent_coord.server.records import todo as rec_todo
+
+    assert rec_todo.find(cn, "unit", "e867-b")["status"] == "claimed"
 
 
 def test_card_carries_done_when_and_only_the_asker_changes_it(cn):
     book, rec = _card(cn, "w867-a", done_when="CI green and Validator PASS")
     assert rec["done_when"] == "CI green and Validator PASS"
-    card = rpc._h_todo(_Book(cn), {"need": "w867-a"}, "unit", OTHER)
+    card = _read(cn, "w867-a")
     assert card["done_when"] == "CI green and Validator PASS"
     with pytest.raises(CoordError, match="who-may: done-when is the asker or Admin"):
         rpc._h_note(book, {"need": "w867-a", "done_when": "other"}, "unit", OTHER)
     rpc._h_note(book, {"need": "w867-a", "done_when": "merged on main"}, "unit", ASKER)
-    assert rpc._h_todo(_Book(cn), {"need": "w867-a"}, "unit", OTHER)["done_when"] == "merged on main"
+    assert _read(cn, "w867-a")["done_when"] == "merged on main"
 
 
 # F152: the raw writers are SP calls.
@@ -176,7 +184,7 @@ def test_push_ack_deletes_only_the_calling_desks_rows(cn, sp_only):
     assert "cmd_push_sent" in sp_only
 
 
-def test_mark_read_is_cmd_mark_not_a_tree_read_upsert(cn):
+def test_read_cursor_is_an_sp_not_a_tree_read_upsert(cn):
     import inspect
 
     from agent_coord.server.records import mail as rec_mail
