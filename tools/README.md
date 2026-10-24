@@ -99,7 +99,7 @@ It starts from `pyproject.toml` console scripts (`mill`, `mill-hold`, `agent-coo
 
 `web/wall_ui_save/` is a snapshot and is not scanned.
 
-A module can be an orphan and still be a stub you meant to keep (`install/todo_diary.py` is the todo snapshot across a schema wipe; it is just not wired to a command). The scan does not decide keep or delete.
+A module can be an orphan and still be a stub you meant to keep. The scan does not decide keep or delete.
 
 ## probe_deleted_rows.py
 
