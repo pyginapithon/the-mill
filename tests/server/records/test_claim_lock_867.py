@@ -39,7 +39,7 @@ def _second(cn):
     db = cur.fetchone()[0]
     cur.close()
     kw = conn_kwargs()
-    kw.update(database=db, autocommit=False)
+    kw.update(database=db, autocommit=False, use_pure=True)
     other = mysql.connector.connect(**kw)
     c = other.cursor()
     c.execute("SET SESSION innodb_lock_wait_timeout = 20")
@@ -60,6 +60,37 @@ def _call(cn, sql, args):
         cur.close()
 
 
+def _waits_on_a_lock(cn, t, thread_id, hold=1.0, limit=15.0):
+    """True once B's connection has sat in cmd_claim's guard read for `hold` seconds.
+
+    With FOR UPDATE, B blocks on the guard SELECT until A commits.
+    Without it, B reads past the guards and blocks in the UPDATE instead.
+    The processlist shows which statement B is stuck in, so the test can tell
+    the two apart without depending on timing.
+    """
+    end = time.monotonic() + limit
+    since = None
+    while time.monotonic() < end and t.is_alive():
+        cur = cn.cursor()
+        try:
+            cur.execute(
+                "SELECT INFO FROM information_schema.PROCESSLIST WHERE ID = %s",
+                (thread_id,),
+            )
+            row = cur.fetchone()
+        finally:
+            cur.close()
+        info = (row[0] or "") if row else ""
+        if info.lstrip().startswith("SELECT t.status"):
+            since = since or time.monotonic()
+            if time.monotonic() - since >= hold:
+                return True
+        else:
+            since = None
+        time.sleep(0.05)
+    return False
+
+
 @pytest.fixture()
 def book(cn, monkeypatch):
     seed_names(cn, (R, "roster"), (ASKER, "desk"), (A, "desk"), (B, "desk"), (C, "desk"))
@@ -70,7 +101,8 @@ def book(cn, monkeypatch):
 def test_a_second_claim_waits_on_the_row_lock_and_is_refused(book, cn):
     rpc._h_open(book, {"need": "race"}, R, ASKER)
     tid = int(rec_todo.find(cn, R, "race")["id"])
-    first, second = _second(cn), _second(cn)
+    # Pure-Python connections: the C extension is not used across threads here.
+    first, second, watch = _second(cn), _second(cn), _second(cn)
     claim = "CALL cmd_claim(MILL_DESK_ID(%s), %s, 0, '', NULL)"
     got: dict = {}
     try:
@@ -87,15 +119,14 @@ def test_a_second_claim_waits_on_the_row_lock_and_is_refused(book, cn):
 
         t = threading.Thread(target=other)
         t.start()
-        time.sleep(1.0)
-        assert t.is_alive(), "B did not wait on A's row lock"
+        assert _waits_on_a_lock(watch, t, second.connection_id), "B did not wait on A's row lock"
         first.commit()
         t.join(30)
         assert "card:claimed_by:" + A in got.get("err", ""), got
         assert rec_todo.find(cn, R, "race")["assigned"] == A
     finally:
-        first.close()
-        second.close()
+        for x in (first, second, watch):
+            x.close()
 
 
 def test_take_over_names_the_prior_read_under_the_lock(book, cn, monkeypatch):
