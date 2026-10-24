@@ -11,12 +11,15 @@ def _isolate_mill_home(tmp_path_factory, monkeypatch):
     yield d
 
 
-def pytest_runtest_logreport(report):
-    """Temporary (#867 CI diagnosis): name failing tests in a GitHub annotation."""
+
+def pytest_terminal_summary(terminalreporter):
+    """Temporary (#867 CI diagnosis): name failing tests in GitHub annotations."""
     import os
 
-    if not os.environ.get("GITHUB_ACTIONS") or not report.failed:
+    if not os.environ.get("GITHUB_ACTIONS"):
         return
-    text = str(report.longreprtext or "")[-1500:]
-    text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
-    print("\n::error title=%s %s::%s" % (report.when, report.nodeid, text), flush=True)
+    for key in ("failed", "error"):
+        for rep in terminalreporter.stats.get(key, []):
+            text = str(getattr(rep, "longreprtext", "") or "")[-1500:]
+            text = text.replace("%", "%25").replace("\r", "").replace("\n", "%0A")
+            terminalreporter.write_line("::error title=%s %s::%s" % (key, getattr(rep, "nodeid", "?"), text))
