@@ -40,3 +40,24 @@ def test_short_row_from_a_legacy_string_sender():
 def test_push_arrival_has_from():
     item = compact_mail({"id": 7, "desk": "gardener", "body": "hi"}, [{"desk": "builder"}], "builder")
     assert item["from"] == "gardener" and item["sender"] == "gardener"
+
+
+# Dogfood follow-up (letters 2751, 2754): recipients came in two shapes too,
+# `mail_tos[{deskId, receipt}]` on reads and `mail_tos["desk"]` on the push.
+# `to` is the plain desk list on both, as `from` is for the sender.
+
+def test_full_letter_has_to_list():
+    out = public_mail(_row(), [{"desk": "builder", "receipt": 1}, {"desk": "wall-ui", "receipt": 0}])
+    assert out["to"] == ["builder", "wall-ui"]
+    assert out["mail_tos"] == [{"deskId": "builder", "receipt": 1}, {"deskId": "wall-ui", "receipt": 0}]
+
+
+def test_given_mail_tos_objects_give_the_same_to():
+    row = dict(_row(), mail_tos=[{"deskId": "builder", "roster": None}, {"deskId": "validator"}])
+    assert public_mail(row)["to"] == ["builder", "validator"]
+
+
+def test_push_arrival_has_to():
+    item = compact_mail({"id": 7, "desk": "gardener", "body": "hi"},
+                        [{"desk": "builder"}, {"desk": "wall-ui"}], "builder")
+    assert item["to"] == ["builder", "wall-ui"] == item["mail_tos"]
