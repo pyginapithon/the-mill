@@ -118,3 +118,4 @@ dec
 wave
 typical
 ring
+minimal
