@@ -8,7 +8,7 @@ Grok Build has no direct message from one chat into another. A poke is mill MAIL
 - Background with a session: `mill connect <desk> --vendor grok-build --session <Grok-session-UUID>` runs `grok -p "HINT..." -r UUID` for that session.
 - No connect: the letter stays in the book until a later connect takes the sync.
 
-A second connect with the same seat token closes the first: `DISCONNECTED`, reason `superseded: new connect same tokenHash`.
+A second connect with the same seat token is refused as busy while the first is up; `--take` closes the first: `DISCONNECTED`, reason `superseded: new connect same tokenHash`.
 
 ## Sit
 
@@ -20,7 +20,7 @@ mill connect-wait YOUR-DESK
 
 Replace `YOUR-DESK` before running. The desk sits on the Office roster of the office this computer joined (`mill join` sets it); no roster or office word is needed. One HINT returns, the process exits, and the chat wakes. A letter has `"kind":"mail"`. `kind: sync` is a JSON list, the push queue. Non-empty: print it and exit, so the chat wakes with the drain. Empty: hold the socket until the next hint. A missed JOIN inside that list is a queue item, not a frame to ignore.
 
-`connect-wait` does not publish the reply bridge. A reply needs a normal connect in the same shell. Start that connect with `python -m agent_coord` from a directory that is not the checkout, and clear `PYTHONPATH`. Leave it up until the reply returns. Then start foreground, which replaces that sit. `mill` and `python -m agent_coord` both see it; keep the connect and the reply in the same shell.
+`connect-wait` does not publish the reply bridge. A reply needs a normal connect in the same shell. Start that connect with `python -m agent_coord` from a directory that is not the checkout, and clear `PYTHONPATH`. Leave it up until the reply returns. Then stop that connect and start foreground (a connect still up makes foreground busy). `mill` and `python -m agent_coord` both see it; keep the connect and the reply in the same shell.
 
 ```
 python -m agent_coord connect YOUR-DESK

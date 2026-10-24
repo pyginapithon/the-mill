@@ -296,7 +296,7 @@ def test_a_burst_of_ten_hints_rings_once_and_the_sync_has_all_ten(monkeypatch) -
         body = posts[0]
         assert body["idem"] == "hint:todo:6180:away"
         assert body["wake"]["pending"] == 1 and body["wake"]["window_s"] == int(wake.WAKE_WINDOW_S)
-        assert "mill connect away" in body["wake"]["next"]
+        assert "mill connect -r away" in body["wake"]["next"]
         frame = push.connect_sync_frame(cn, "away")
         assert [r["id"] for r in frame["sync"]] == list(range(6180, 6190))
         assert {r["outcome"] for r in frame["sync"]} == {"missed"}

@@ -414,8 +414,9 @@ def wake_body(
         "next": (
             "nothing to do: this is the join test"
             if test
-            else f"mill connect {desk}: the sync line hands over every waiting hint and letter, "
-            "and this desk's routes walk them"
+            else f"mill connect -r {desk}: the sync line hands over every waiting hint and letter, "
+            "and this desk's routes walk them. A busy answer means another session has the seat "
+            "and gets these letters: stop"
         ),
     }
     return stamp_mill(body)

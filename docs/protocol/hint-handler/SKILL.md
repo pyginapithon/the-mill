@@ -52,7 +52,7 @@ wait'
 
 `mill route` waits for that connect to sit. Everything after the key is the program. The catch-all key is `"*"`, quoted so the shell does not expand it. The list is a chain in add order. Exit 0 with any last stdout line other than `not-mine` means handled (stop). Print `not-mine` last and exit 0 to pass to the next redirector. mill connect re-reads the chain on every frame. No restart. The route file stays after the shell exits.
 
-Every other `mill connect` for this desk takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk commands before `wait`, or stop this shell first.
+Every other `mill connect` for this desk is refused as busy while this one is up; `mill connect --take` takes the seat from this one (`superseded (4000)`), and this one does not come back. Run later desk commands before `wait`, or stop this shell first.
 
 `--session` on connect is the Grok session id for a grok-build poke. Omit it unless that poke needs it.
 

@@ -917,10 +917,12 @@ def _build_parser() -> MillArgumentParser:
     dr.add_argument("--drain-id", default="", help="optional drain id")
     dr.add_argument("--dst", default="*", help="MAIL dst (default *)")
 
-    # #332: -r refuses a held seat; plain connect takes it. Exit 6 = seat in use.
-    _REFUSE_HELP = (
-        "refuse when another connect holds this desk's seat (exit 6); "
-        "without -r the newest connect takes the seat"
+    # Card 834: connect refuses a held seat by default (busy, exit 0); --take takes it.
+    # -r/--refuse (#332) is kept; it is now the default.
+    _REFUSE_HELP = "the default: refuse when another connect holds this desk's seat (busy, exit 0)"
+    _TAKE_HELP = (
+        "take the seat from the connect holding it (it exits 5, superseded); "
+        "for a dead or stale seat"
     )
     cnct = sub.add_parser(
         "connect",
@@ -943,7 +945,8 @@ def _build_parser() -> MillArgumentParser:
         default="",
         help="AGENT_COORD_VENDOR for HINT poke (grok-bot, grok-build, claude, ...)",
     )
-    cnct.add_argument("-r", "--refuse", action="store_true", help=_REFUSE_HELP)
+    cnct.add_argument("-r", "--refuse", dest="refuse", action="store_true", default=True, help=_REFUSE_HELP)
+    cnct.add_argument("--take", dest="refuse", action="store_false", help=_TAKE_HELP)
 
     rt = sub.add_parser(
         "route",
@@ -978,7 +981,8 @@ def _build_parser() -> MillArgumentParser:
     cw.add_argument("desk", nargs="?", default="", help="desk id this connect sits (required)")
     cw.add_argument("--vendor", default="", help="AGENT_COORD_VENDOR for HINT poke")
     cw.add_argument("--session", default="", help="Grok session UUID for grok-build poke")
-    cw.add_argument("-r", "--refuse", action="store_true", help=_REFUSE_HELP)
+    cw.add_argument("-r", "--refuse", dest="refuse", action="store_true", default=True, help=_REFUSE_HELP)
+    cw.add_argument("--take", dest="refuse", action="store_false", help=_TAKE_HELP)
 
     rst = sub.add_parser(
         "reset",

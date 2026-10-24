@@ -161,7 +161,10 @@ def mill_http_call(body: dict[str, Any]) -> Any:
         if not who:
             who = (wait_for_sitting_desk() or "").strip()
         if not who:
-            raise CoordError(SESSION_WS_BRIDGE_REQUIRED)
+            from agent_coord.client.ws import busy_for_parent
+
+            # Card 834: this shell's connect was refused as busy; say so, not "no connect".
+            raise CoordError(busy_for_parent() or SESSION_WS_BRIDGE_REQUIRED)
         key = mill_api_key(who)
         if not key:
             raise CoordError(SESSION_TOKEN_REQUIRED)
@@ -1047,7 +1050,9 @@ def mill_here_over_http(args: Any) -> int:
             )
             return 130
         print(json.dumps(got, default=str), flush=True)
-        return 0 if got.get("ok") else int(got.get("exit") or 1)
+        if got.get("ok"):
+            return 0
+        return int(got["exit"]) if "exit" in got else 1  # busy exits 0 (card 834)
     stop = threading.Event()
     outcome: dict = {}
     from agent_coord.client.ws import clear_connect_starting, write_connect_starting
