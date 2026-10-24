@@ -69,7 +69,7 @@ def test_a_skipped_room_item_takes_no_window(desk):
     assert len(desk.posts) == 1
 
 
-def test_all_is_the_default_and_wakes_for_room_letters(desk):
+def test_wake_on_all_wakes_for_room_letters(desk):
     desk.state["wake_on"] = "all"
     _letter({"away"})
     assert len(desk.posts) == 1 and desk.posts[0]["wake"]["reason"] == "room"

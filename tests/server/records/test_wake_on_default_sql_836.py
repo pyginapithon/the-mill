@@ -51,3 +51,42 @@ def test_wake_on_default_and_the_one_time_move(cn):
     cn.commit()
     assert migrate._ensure_seat_wake_on_default(cn) == []
     assert rec_join.wake_state(cn, "fx836-d2")["wake_on"] == "all"
+
+
+def _seat_wake_on(cn, desk: str) -> str:
+    cur = cn.cursor()
+    cur.execute(
+        "SELECT s.wake_on FROM seat s JOIN name n ON n.id = s.desk_id"
+        " WHERE n.type = 'desk' AND n.name = %s", (desk,))
+    got = cur.fetchone()
+    cur.close()
+    return str(got[0]) if got else ""
+
+
+def test_the_arm_procedure_reads_null_as_addressed(cn):
+    # Python always passes wake_on; the procedure's own default is pinned here.
+    from agent_coord.server.records.db import call
+
+    seed_names(cn, ("fx836n", "roster"), ("fx836-n1", "desk"))
+    rec_join.upsert(cn, "fx836n", "fx836-n1", "", token_hash("seat-fx836-n1"), None)
+    rec_join.wake_arm(cn, "fx836-n1", URL, KEY, wake_on="all")
+    cn.commit()
+    call(cn, "mill_join_wake_arm", ["fx836-n1", URL, KEY, None])
+    cn.commit()
+    assert _seat_wake_on(cn, "fx836-n1") == "addressed"
+
+
+def test_wake_off_and_retire_reset_to_addressed(cn):
+    from agent_coord.server.records import name as rec_name
+
+    seed_names(cn, ("fx836r", "roster"), ("fx836-r1", "desk"), ("fx836-r2", "desk"))
+    for d in ("fx836-r1", "fx836-r2"):
+        rec_join.upsert(cn, "fx836r", d, "", token_hash("seat-" + d), None)
+        rec_join.wake_arm(cn, d, URL, KEY, wake_on="all")
+    cn.commit()
+    rec_join.wake_off(cn, "fx836-r1")
+    cn.commit()
+    assert _seat_wake_on(cn, "fx836-r1") == "addressed"
+    rec_name.retire(cn, "fx836-r2", "desk")
+    cn.commit()
+    assert _seat_wake_on(cn, "fx836-r2") == "addressed"
