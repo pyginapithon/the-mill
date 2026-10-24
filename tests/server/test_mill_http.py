@@ -205,15 +205,16 @@ def test_dispatch_unpark_and_unclaim(monkeypatch):
         def _guard_owner(self, *a, **k):
             return {}
 
-    monkeypatch.setattr(
-        "agent_coord.server.records.todo.find", lambda *a, **k: {"id": 9, "status": "parked"}
-    )
+    card = {"id": 9, "status": "parked"}
+    monkeypatch.setattr("agent_coord.server.records.todo.find", lambda *a, **k: dict(card))
     monkeypatch.setattr(
         "agent_coord.server.records.tree.has_parent", lambda *a, **k: True
     )
 
     def update(cn, tid, desk, status="", volunteer="", body=None):
         calls.append((status, volunteer))
+        if status:
+            card["status"] = status  # unclaim after unpark sees an open card (card 778)
         return [{"id": tid}]
 
     monkeypatch.setattr("agent_coord.server.records.todo.update", update)
