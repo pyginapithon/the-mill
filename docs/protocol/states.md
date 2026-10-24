@@ -48,7 +48,7 @@ stateDiagram-v2
   Close --> Wait
 ```
 
-Todo lifecycle (who-may): volunteer `claim` / `unclaim` / first `pass` (claimed->shipped). Asker `pass --done` (shipped->done). Asker or volunteer `pass --back` (done->shipped->claimed). `assign` sets volunteer.
+Todo lifecycle (who-may): volunteer `claim` / `unclaim` / first `pass` (claimed->shipped). `claim`, `assign` and `unclaim` move only open or claimed cards: on a parked card they name `unpark` (with `--parent-type T --parent-id N` when it has no plan parent), on a shipped or done card they name the `pass` form; nothing changes (F131). Asker `pass --done` (shipped->done). Asker or volunteer `pass --back` (done->shipped->claimed). `assign` sets volunteer.
 
 ```mermaid
 stateDiagram-v2
